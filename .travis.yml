@@ -4,18 +4,15 @@ python:
 - 3.7
 - 3.6
 - 3.5
-# install: pip install -U tox-travis
-# script: tox
-# Tests don't run without local server and we haven't configured travis ci
 install: true
-script: 
-  - echo "Skipping tests because we haven't setup a server to use"
+script:
+- echo "Skipping tests because we haven't setup a server to use"
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel
   user: __token__
   password:
-    secure: HInpw2Kh0WMLqdH5ZP5n4uyppAv+6RDL1v6iXDKtYCNSY1KTpB6BOdHiK6YDnZv7rHO9BddKu1SbcOaqbfLiU8BZ2/yMxuKZSR1atIHowzOvoG1MA6AOyyplA1hdO/oLScQabiZqYLoAquNf4YZQrWA2WVlmyW0wiWEBDwdLHbOfRp8IIxn9fvP181mALd7BYi5ECa/tOwL8CF7tGD77nCz4uRgahDckkSlD7h8jn4jhK294ohPwO02kMasc4DqHLEHcjlFmKvAlwQRNwIqWpR45dQFL178ZfXZi378GnbNhOIYmgpeHm0F/vNY8+0R1vNYeOo0cB5VKGzfW4qO1uKtOuWmxm122AF4HrjZvzFkirHAlt0uxZICgkEARcXW25vFIKqPi67UVmxT4UwtO0x6KzHg1JCcp6PwvptGD6RPBoOVLzNe2D5enx3QBCAVuwu9NueiMDsf35PetwkbcIGg36mwkzHEJrxDQ2bszkIBds03xCAkJiKTKp4pA0ziBNJvrEW2jIgMcbuTes0dbncLygOa9y47tNAqSDdwXEmVbajWMOfmw0dcSrvXh18tVKAyNI+1C3QmKKbbKIeLjC8N8i04gtffb6AWZ4iEuZpPsf7pvYn6ZKex9BWQ0CHEIdy8zrFIqmygYktO4Jl1s+XL4zo2sR6O5oYnsqJ1HJHs=
+    secure: D4hBpGXtUFC5UD6qWD3W0GCLVE7LyJlscT/wrHQ2wmlvWR01oK1nGoALW1wo/SFvAFApjucBQtHiTzJos3qVMqc4DHgI2DJOIjkmxIONjJTRvqI7DNt0ZUyiTHxCW4vbKdna47fSSV1wWnl8dgR/XdXHx3DqpRTJyfUKQNGD9UfT2RkpxUwrGqrg/at29wyaAaM7vM1iO0pHDxn0U87CDlqPfD2I32BpSbK0/aORJl7PXVamd1UCHXy3jRm3T2vLhKdUE3CXohm4xDsr4xHY/94UzEq/i9CjDZx97UJ3PUTC/chEYOdVCO1E/268T3+MS5Hy9PFkoAOFYLaLh0GxCASpmJBWcNokCWJb9HH/hCAnLB0RNU8LqEKFwtso7xfuBDe4Vk59mFbpiGHFEtKZZRdaQwE+/Eaupo4reQKs6CTQtE1Hen9Iabyk1IxS9ym7/cOtLysTzX6ZTUJAXM2c+wGCoU09EH/144qWtR0NPOrpFsVnjvb+3xeLx04kLsAHhjXckPt7eHR2GXIz21izq0u7IidIlU115dWhE0fChmlc4KvUKfQ8oeMC/xJGCL6HapEMubDxjZ+Vap3PMAyL57Opi/69A+qbCAgZxvQ2mjHAJqGwx32NuHtD12KefKP+knoNfv3q3HEHBIowM0DbK7fsUrg9SBhgvyLq/c/jI38=
   on:
     tags: true
     repo: mcneilco/acasclient

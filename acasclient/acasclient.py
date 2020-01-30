@@ -130,9 +130,9 @@ class client():
         resp = self.session.get("{}{}".format(self.url, file_path))
         resp.raise_for_status()
         return {
-                'content-type': resp.headers['content-type'],
-                'content-length': resp.headers['content-length'],
-                'last-modified': resp.headers['Last-modified'],
+                'content-type': resp.headers.get('content-type',None),
+                'content-length': resp.headers.get('content-length',None),
+                'last-modified': resp.headers.get('Last-modified',None),
                 'name': PurePath(Path(file_path)).name,
                 'content': resp.content}
 

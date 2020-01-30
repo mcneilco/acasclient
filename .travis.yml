@@ -1,0 +1,18 @@
+language: python
+python:
+- 3.8
+- 3.7
+- 3.6
+- 3.5
+install: pip install -U tox-travis
+script: tox
+deploy:
+  provider: pypi
+  distributions: sdist bdist_wheel
+  user: __token__
+  password:
+    secure: HInpw2Kh0WMLqdH5ZP5n4uyppAv+6RDL1v6iXDKtYCNSY1KTpB6BOdHiK6YDnZv7rHO9BddKu1SbcOaqbfLiU8BZ2/yMxuKZSR1atIHowzOvoG1MA6AOyyplA1hdO/oLScQabiZqYLoAquNf4YZQrWA2WVlmyW0wiWEBDwdLHbOfRp8IIxn9fvP181mALd7BYi5ECa/tOwL8CF7tGD77nCz4uRgahDckkSlD7h8jn4jhK294ohPwO02kMasc4DqHLEHcjlFmKvAlwQRNwIqWpR45dQFL178ZfXZi378GnbNhOIYmgpeHm0F/vNY8+0R1vNYeOo0cB5VKGzfW4qO1uKtOuWmxm122AF4HrjZvzFkirHAlt0uxZICgkEARcXW25vFIKqPi67UVmxT4UwtO0x6KzHg1JCcp6PwvptGD6RPBoOVLzNe2D5enx3QBCAVuwu9NueiMDsf35PetwkbcIGg36mwkzHEJrxDQ2bszkIBds03xCAkJiKTKp4pA0ziBNJvrEW2jIgMcbuTes0dbncLygOa9y47tNAqSDdwXEmVbajWMOfmw0dcSrvXh18tVKAyNI+1C3QmKKbbKIeLjC8N8i04gtffb6AWZ4iEuZpPsf7pvYn6ZKex9BWQ0CHEIdy8zrFIqmygYktO4Jl1s+XL4zo2sR6O5oYnsqJ1HJHs=
+  on:
+    tags: true
+    repo: mcneilco/acasclient
+    python: 3.8

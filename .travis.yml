@@ -8,7 +8,8 @@ python:
 # script: tox
 # Tests don't run without local server and we haven't configured travis ci
 install: true
-script: echo 'Skipping tests because we haven't setup a server to use'
+script: 
+  - echo "Skipping tests because we haven't setup a server to use"
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel

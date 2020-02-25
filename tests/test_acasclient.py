@@ -408,7 +408,130 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('summary', response)
         self.assertIn('Registration completed', response['summary'])
 
-    def test_007_export_cmpd_search_results(self):
+    def test_007_cmpd_search_request(self):
+        """Test cmpd search request."""
+
+        searchRequest = {
+            "corpNameList": "",
+            "corpNameFrom": "",
+            "corpNameTo": "",
+            "aliasContSelect": "contains",
+            "alias": "",
+            "dateFrom": "",
+            "dateTo": "",
+            "searchType": "substructure",
+            "percentSimilarity": 90,
+            "chemist": "anyone",
+            "maxResults": 100,
+            "molStructure": (
+                "NSC 1390\n"
+                "\n"
+                "\n"
+                " 10 11  0  0  0  0  0  0  0  0999 V2000\n"
+                "   -4.4591   -4.9405    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -2.6905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -7.1905    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -0.4344   -2.9770    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "    0.4473   -4.1905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -1.8610   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -1.8610   -4.9405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -5.6905    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -0.4344   -5.4040    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -4.4591   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "  1  8  1  0  0  0  0\n"
+                "  1 10  1  0  0  0  0\n"
+                "  2 10  2  0  0  0  0\n"
+                "  2  6  1  0  0  0  0\n"
+                "  3  8  2  0  0  0  0\n"
+                "  4  5  1  0  0  0  0\n"
+                "  4  6  1  0  0  0  0\n"
+                "  5  9  2  0  0  0  0\n"
+                "  6  7  2  0  0  0  0\n"
+                "  7  8  1  0  0  0  0\n"
+                "  7  9  1  0  0  0  0\n"
+                "M  END")
+        }
+        search_results = self.client.\
+            cmpd_search_request(searchRequest)
+        self.assertGreater(len(search_results["foundCompounds"]), 0)
+        self.assertEqual(
+            search_results["foundCompounds"][0]["corpName"],
+            "CMPD-0000001")
+
+        searchRequest = {
+            "molStructure": (
+                "NSC 1390\n"
+                "\n"
+                "\n"
+                " 10 11  0  0  0  0  0  0  0  0999 V2000\n"
+                "   -4.4591   -4.9405    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -2.6905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -7.1905    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -0.4344   -2.9770    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "    0.4473   -4.1905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -1.8610   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -1.8610   -4.9405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -5.6905    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -0.4344   -5.4040    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -4.4591   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "  1  8  1  0  0  0  0\n"
+                "  1 10  1  0  0  0  0\n"
+                "  2 10  2  0  0  0  0\n"
+                "  2  6  1  0  0  0  0\n"
+                "  3  8  2  0  0  0  0\n"
+                "  4  5  1  0  0  0  0\n"
+                "  4  6  1  0  0  0  0\n"
+                "  5  9  2  0  0  0  0\n"
+                "  6  7  2  0  0  0  0\n"
+                "  7  8  1  0  0  0  0\n"
+                "  7  9  1  0  0  0  0\n"
+                "M  END"),
+        }
+        search_results = self.client.\
+            cmpd_search_request(searchRequest)
+        self.assertGreater(len(search_results["foundCompounds"]), 0)
+        self.assertEqual(
+            search_results["foundCompounds"][0]["corpName"],
+            "CMPD-0000001")
+
+    def test_008_cmpd_search(self):
+        """Test cmpd search request."""
+
+        molStructure = (
+                "NSC 1390\n"
+                "\n"
+                "\n"
+                " 10 11  0  0  0  0  0  0  0  0999 V2000\n"
+                "   -4.4591   -4.9405    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -2.6905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -7.1905    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -0.4344   -2.9770    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "    0.4473   -4.1905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -1.8610   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -1.8610   -4.9405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -3.1600   -5.6905    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -0.4344   -5.4040    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "   -4.4591   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+                "  1  8  1  0  0  0  0\n"
+                "  1 10  1  0  0  0  0\n"
+                "  2 10  2  0  0  0  0\n"
+                "  2  6  1  0  0  0  0\n"
+                "  3  8  2  0  0  0  0\n"
+                "  4  5  1  0  0  0  0\n"
+                "  4  6  1  0  0  0  0\n"
+                "  5  9  2  0  0  0  0\n"
+                "  6  7  2  0  0  0  0\n"
+                "  7  8  1  0  0  0  0\n"
+                "  7  9  1  0  0  0  0\n"
+                "M  END")
+        search_results = self.client.\
+            cmpd_search(molStructure=molStructure)
+        self.assertGreater(len(search_results["foundCompounds"]), 0)
+        self.assertEqual(
+            search_results["foundCompounds"][0]["corpName"],
+            "CMPD-0000001")
+
+    def test_009_export_cmpd_search_results(self):
         """Test export cmpd search results."""
         search_results = {
             "foundCompounds": [
@@ -449,7 +572,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('reportFilePath', search_results_export)
         self.assertIn('summary', search_results_export)
 
-    def test_008_export_cmpd_search_results_get_file(self):
+    def test_010_export_cmpd_search_results_get_file(self):
         """Test export cmpd search results get file."""
         search_results = {
             "foundCompounds": [
@@ -470,7 +593,7 @@ class TestAcasclient(unittest.TestCase):
             get_file(search_results_export['reportFilePath'])
         print(search_results_export)
 
-    def test_009_get_sdf_file_for_lots(self):
+    def test_011_get_sdf_file_for_lots(self):
         """Test get sdf file for lots."""
         search_results_export = self.client.\
             get_sdf_file_for_lots(["CMPD-0000001-001"])
@@ -485,7 +608,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('content-length', search_results_export)
         self.assertIn('last-modified', search_results_export)
 
-    def test_010_write_sdf_file_for_lots(self):
+    def test_012_write_sdf_file_for_lots(self):
         """Test get sdf file for lots."""
         out_file_path = self.client.\
             write_sdf_file_for_lots(["CMPD-0000001-001"], Path(self.tempdir))
@@ -496,7 +619,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertTrue(out_file_path.exists())
         self.assertEqual('output.sdf', out_file_path.name)
 
-    def test_011_experiment_loader_request(self):
+    def test_013_experiment_loader_request(self):
         """Test experiment loader request."""
         data_file_to_upload = Path(__file__).\
             resolve().parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
@@ -522,7 +645,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('transactionId', response)
         self.assertIsNotNone(response['transactionId'])
 
-    def test_012_experiment_loader(self):
+    def test_014_experiment_loader(self):
         """Test experiment loader."""
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
@@ -539,7 +662,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('transactionId', response)
         self.assertIsNotNone(response['transactionId'])
 
-    def test_013_get_protocols_by_label(self):
+    def test_015_get_protocols_by_label(self):
         """Test get protocols by label"""
         protocols = self.client.get_protocols_by_label("Test Protocol")
         self.assertGreater(len(protocols), 0)
@@ -547,8 +670,10 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('lsLabels', protocols[0])
         self.assertEqual(protocols[0]["lsLabels"][0]["labelText"],
                          "Test Protocol")
+        fakeProtocols = self.client.get_protocols_by_label("Fake Protocol")
+        self.assertEqual(len(fakeProtocols), 0)
 
-    def test_014_get_experiments_by_protocol_code(self):
+    def test_016_get_experiments_by_protocol_code(self):
         """Test get experiments by protocol code."""
         protocols = self.client.get_protocols_by_label("Test Protocol")
         experiments = self.client.\
@@ -559,13 +684,13 @@ class TestAcasclient(unittest.TestCase):
         self.assertEqual(experiments[0]["lsLabels"][0]["labelText"],
                          "Test Experiment")
 
-    def test_015_get_experiment_by_code(self):
+    def test_017_get_experiment_by_code(self):
         """Test get experiment by code."""
         experiment = self.client.get_experiment_by_code("EXPT-00000001")
         self.assertIn('codeName', experiment)
         self.assertIn('lsLabels', experiment)
 
-    def test_016_get_source_file_for_experient_code(self):
+    def test_018_get_source_file_for_experient_code(self):
         """Test get source file for experiment code."""
         source_file = self.client.\
             get_source_file_for_experient_code("EXPT-00000001")
@@ -575,7 +700,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('content-length', source_file)
         self.assertIn('last-modified', source_file)
 
-    def test_017_write_source_file_for_experient_code(self):
+    def test_019_write_source_file_for_experient_code(self):
         """Test get source file for experiment code."""
         source_file_path = self.client.\
             write_source_file_for_experient_code("EXPT-00000001", self.tempdir)

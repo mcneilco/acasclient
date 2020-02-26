@@ -484,7 +484,10 @@ class client():
         """
         resp = self.session.get("{}/api/experiments/protocolCodename/{}".
                                 format(self.url, protocol_code))
-        resp.raise_for_status()
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
         return resp.json()
 
     def get_experiment_by_code(self, experiment_code):
@@ -499,7 +502,10 @@ class client():
         """
         resp = self.session.get("{}/api/experiments/codename/{}".
                                 format(self.url, experiment_code))
-        resp.raise_for_status()
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
         return resp.json()
 
     def get_source_file_for_experient_code(self, experiment_code):

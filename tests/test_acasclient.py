@@ -683,12 +683,17 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('lsLabels', experiments[0])
         self.assertEqual(experiments[0]["lsLabels"][0]["labelText"],
                          "Test Experiment")
+        experiments = self.client.\
+            get_experiments_by_protocol_code("FAKECODE")
+        self.assertIsNone(experiments)
 
     def test_017_get_experiment_by_code(self):
         """Test get experiment by code."""
         experiment = self.client.get_experiment_by_code("EXPT-00000001")
         self.assertIn('codeName', experiment)
         self.assertIn('lsLabels', experiment)
+        experiment = self.client.get_experiment_by_code("FAKECODE")
+        self.assertIsNone(experiment)
 
     def test_018_get_source_file_for_experient_code(self):
         """Test get source file for experiment code."""

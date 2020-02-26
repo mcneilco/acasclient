@@ -704,6 +704,9 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('name', source_file)
         self.assertIn('content-length', source_file)
         self.assertIn('last-modified', source_file)
+        source_file = self.client.\
+            get_source_file_for_experient_code("FAKECODE")
+        self.assertIsNone(source_file)
 
     def test_019_write_source_file_for_experient_code(self):
         """Test get source file for experiment code."""

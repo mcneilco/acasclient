@@ -529,6 +529,8 @@ class client():
 
         """
         experiment = self.get_experiment_by_code(experiment_code)
+        if not experiment:
+            return None
         source_file = get_entity_value_by_state_type_kind_value_type_kind(
                         experiment,
                         "metadata",

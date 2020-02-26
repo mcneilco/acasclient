@@ -39,4 +39,4 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 
 Installation
 ------------
-python3 -m venv venv
+pip install acasclient

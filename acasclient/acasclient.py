@@ -226,13 +226,31 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
+    def get_meta_lot(self, lot_corp_name):
+        """Get metalot by lot corp name
+
+        Get a meta lot object from the lot corp name
+
+        Args:
+            lot_corp_name (str): A lot corp name
+
+        Returns: Returns a dict meta lot object
+        """
+        resp = self.session.get("{}/cmpdreg/metalots/corpName/{}/"
+                                .format(self.url, lot_corp_name))
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
+        return resp.json()
+
     def cmpd_search(self, corpNameList="", corpNameFrom="", corpNameTo="",
                     aliasContSelect="contains", alias="", dateFrom="",
                     dateTo="", searchType="substructure", percentSimilarity=90,
                     chemist="anyone", maxResults=100, molStructure=""
                     ):
         search_request = dict(locals())
-        del search_request['self'] 
+        del search_request['self']
         VALID_SEARCH_TYPES = {"substructure", "duplicate",
                               "duplicate_tautomer", "duplicate_no_tautomer",
                               "stereo_ignore", "full_tautomer", "substructure",

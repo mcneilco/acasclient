@@ -12,7 +12,6 @@ import shutil
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
-# CMPD-0000001-001 registered
 
 
 class TestAcasclient(unittest.TestCase):
@@ -713,3 +712,10 @@ class TestAcasclient(unittest.TestCase):
         source_file_path = self.client.\
             write_source_file_for_experient_code("EXPT-00000001", self.tempdir)
         self.assertTrue(source_file_path.exists())
+
+    def test_020_get_meta_lot(self):
+        """Test get meta lot."""
+        meta_lot = self.client.\
+            get_meta_lot('CMPD-0000001-001')
+        self.assertIsNotNone(meta_lot)
+        self.assertEqual(meta_lot['lot']['corpName'], 'CMPD-0000001-001')

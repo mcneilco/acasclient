@@ -626,3 +626,80 @@ class client():
                    "dryRunMode": dry_run}
         resp = self.experiment_loader_request(request)
         return resp
+
+    def experiment_search(self, query):
+        resp = self.session.get("{}/api/experiments/genericSearch/{}/"
+                                .format(self.url, query))
+        return resp.json()
+
+    def get_cmpdreg_bulk_load_files(self):
+        """Get cmpdreg bulk load files
+
+        Gets a list of all cmpdreg bulk files on the system
+
+        Returns: An array of dict objects
+            fileDate (int): The epoch date the file was registered
+            fileName (str): The name of the file
+            fileSize (int): Size in bytes of the file
+            id (int): The file id
+            numberOfMols (int): Number of mols registered by this file
+            recordedBy (str): Username of the user who registered the file
+            version (int): The file version number
+
+        """
+        resp = self.session.get("{}/api/cmpdRegBulkLoader/getFilesToPurge"
+                                .format(self.url))
+        return resp.json()
+
+    def check_cmpdreg_bulk_load_file_dependency(self, id):
+        """Check cmpdreg bulk load file dependencies
+
+        Check for dependencies of cmpdreg bulk load file
+
+        Args:
+            id (int): A bulk load file id
+
+        Returns: Dict object with file content
+            canPurge (bool): Can this file be purged
+            summary (str): An html formatted summary of the dependencies
+
+        """
+        request = {
+            "fileInfo": {
+                "id": id
+            }
+        }
+        resp = self.session.post("{}/api/cmpdRegBulkLoader/checkFileDependencies".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(request))
+        if resp.text == '"Error"':
+            return None
+        return resp.json()
+
+    def purge_cmpdreg_bulk_load_file(self, id):
+        """Purge a cmpdreg bulk load file
+
+        Purges a cmpdreg bulk load file
+
+        Args:
+            id (int): A bulk load file id
+
+        Returns: Dict object with file content
+            fileName (str): The name of the file that was purged
+            success (bool): Did the file purge successfully
+            summary (str): An html formatted summary of the purge results
+
+        """
+        request = {
+                    "fileInfo": {
+                        "id": id
+                    }
+                }
+        resp = self.session.post("{}/api/cmpdRegBulkLoader/purgeFile".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(request))
+        if resp.text == '"Error"':
+            return None
+        return resp.json()

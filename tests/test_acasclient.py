@@ -719,3 +719,70 @@ class TestAcasclient(unittest.TestCase):
             get_meta_lot('CMPD-0000001-001')
         self.assertIsNotNone(meta_lot)
         self.assertEqual(meta_lot['lot']['corpName'], 'CMPD-0000001-001')
+
+    def test_021_experiment_search(self):
+        """Test experiment generic search."""
+        results = self.client.\
+            experiment_search('EXPT')
+        self.assertIsNotNone(results)
+        self.assertGreater(len(results), 0)
+        self.assertIn('codeName', results[0])
+
+    def test_022_get_cmpdreg_bulk_load_files(self):
+        """Test get cmpdreg bulk load files."""
+        results = self.client.\
+            get_cmpdreg_bulk_load_files()
+        self.assertIsNotNone(results)
+        self.assertGreater(len(results), 0)
+        self.assertIn('fileDate', results[0])
+
+    def test_023_check_cmpdreg_bulk_load_file_dependency(self):
+        """Test cmpdreg bulk load file dependency."""
+        files = self.client.\
+            get_cmpdreg_bulk_load_files()
+        results = self.client.\
+            check_cmpdreg_bulk_load_file_dependency(-1)
+        self.assertIsNone(results)
+
+        results = self.client.\
+            check_cmpdreg_bulk_load_file_dependency(files[0]["id"])
+        self.assertIsNotNone(results)
+        self.assertIn('canPurge', results)
+        self.assertIn('summary', results)
+
+    def test_024_purge_cmpdreg_bulk_load_file(self):
+        """Test cmpdreg bulk load file dependency."""
+
+        results = self.client.\
+            purge_cmpdreg_bulk_load_file(-1)
+        self.assertIsNone(results)
+
+        test_012_upload_file_file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+        mappings = [{
+                        "dbProperty": "Parent Stereo Category",
+                        "defaultVal": "unknown",
+                        "required": True,
+                        "sdfProperty": None
+                    }]
+        registration_result = self.client.register_sdf(test_012_upload_file_file, "bob",
+                                                       mappings)
+        self.assertIn('2 new lots', registration_result['summary'])
+        # not currently easy to look up a bulk load files so we will just purge the latest one
+        # get all bulk load files and then find the latest one
+        files = self.client.\
+            get_cmpdreg_bulk_load_files()
+        for index, file in enumerate(files):
+            if index == 0:
+                file_to_purge = file
+            else:
+                if file['fileDate'] > file_to_purge['fileDate']:
+                    file_to_purge = file
+
+        # purge the bulk load file
+        results = self.client.\
+            purge_cmpdreg_bulk_load_file(file_to_purge["id"])
+        self.assertIn('summary', results)
+        self.assertIn('Successfully purged file', results['summary'])
+        self.assertIn('success', results)
+        self.assertTrue(results['success'])

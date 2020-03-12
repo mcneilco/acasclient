@@ -627,6 +627,32 @@ class client():
         resp = self.experiment_loader_request(request)
         return resp
 
+    def delete_experiment(self, idOrCode):
+        """Delete an experiment
+
+        Deletes an experiment.  If a code name is given, the experiment is
+        first retrieved by code name and then deleted by id.
+
+        Args:
+            idOrCode (int or str): An experiment id or an experiment code name
+
+        Returns: Dict object with the experiment status value of the deleted
+                 experiment
+
+        """
+        if isinstance(idOrCode, str):
+            experiment = self.get_experiment_by_code(idOrCode)
+            if experiment is None:
+                return None
+            else:
+                idOrCode = experiment['id']
+
+        resp = self.session.delete("{}/api/experiments/{}".
+                                   format(self.url, idOrCode)
+                                   )
+        resp.raise_for_status()
+        return resp.json()
+
     def experiment_search(self, query):
         resp = self.session.get("{}/api/experiments/genericSearch/{}/"
                                 .format(self.url, query))

@@ -786,3 +786,30 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('Successfully purged file', results['summary'])
         self.assertIn('success', results)
         self.assertTrue(results['success'])
+
+    def test_025_delete_experiment(self):
+        """Test delete experiment."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
+        response = self.client.\
+            experiment_loader(data_file_to_upload, "bob", False)
+        self.assertIn('transactionId', response)
+        self.assertIsNotNone(response['transactionId'])
+        experiment_code = response['results']['experimentCode']
+        response = self.client.\
+            delete_experiment(experiment_code)
+        self.assertIsNotNone(response)
+        self.assertIn('codeValue', response)
+        self.assertEqual('deleted', response['codeValue'])
+        experiment = self.client.get_experiment_by_code(experiment_code)
+        self.assertIsNotNone(experiment)
+        self.assertTrue(experiment['ignored'])
+        experiment_status = acasclient.\
+            get_entity_value_by_state_type_kind_value_type_kind(
+                experiment,
+                "metadata",
+                "experiment metadata",
+                "codeValue",
+                "experiment status")
+        self.assertIn('codeValue', experiment_status)
+        self.assertEqual('deleted', experiment_status['codeValue'])

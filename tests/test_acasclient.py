@@ -8,11 +8,87 @@ from acasclient import acasclient
 from pathlib import Path
 import tempfile
 import shutil
-
+import uuid
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
 
+
+def create_project_thing(code):
+    ls_thing = {
+            "lsType": "project",
+            "lsKind": "project",
+            "recordedBy": "bob",
+            "recordedDate": 1586877284571,
+            "lsLabels": [
+                {
+                    "lsType": "name",
+                    "lsKind": "project name",
+                    "labelText": code,
+                    "ignored": False,
+                    "preferred": True,
+                    "recordedDate": 1586877284571,
+                    "recordedBy": "bob",
+                    "physicallyLabled": False,
+                    "thingType": "project",
+                    "thingKind": "project"
+                },
+                {
+                    "lsType": "name",
+                    "lsKind": "project alias",
+                    "labelText": code,
+                    "ignored": False,
+                    "preferred": False,
+                    "recordedDate": 1586877284571,
+                    "recordedBy": "bob",
+                    "physicallyLabled": False,
+                    "thingType": "project",
+                    "thingKind": "project"
+                }
+            ],
+            "lsStates": [
+                {
+                    "lsType": "metadata",
+                    "lsKind": "project metadata",
+                    "lsValues": [
+                        {
+                            "lsType": "dateValue",
+                            "lsKind": "start date",
+                            "ignored": False,
+                            "recordedDate": 1586877284571,
+                            "recordedBy": "bob",
+                            "dateValue": 1586877284571
+                        }, {
+                            "lsType": "codeValue",
+                            "lsKind": "project status",
+                            "ignored": False,
+                            "recordedDate": 1586877284571,
+                            "recordedBy": "bob",
+                            "codeKind": "status",
+                            "codeType": "project",
+                            "codeOrigin": "ACAS DDICT",
+                            "codeValue": "active"
+                        }, {
+                            "lsType": "codeValue",
+                            "lsKind": "is restricted",
+                            "ignored": False,
+                            "recordedDate": 1586877284571,
+                            "recordedBy": "bob",
+                            "codeKind": "restricted",
+                            "codeType": "project",
+                            "codeOrigin": "ACAS DDICT",
+                            "codeValue": "false"
+                        }
+                    ],
+                    "ignored": False,
+                    "recordedDate": 1586877284571,
+                    "recordedBy": "bob"
+                }
+            ],
+            "lsTags": [],
+            "codeName": code
+        }
+    return ls_thing
 
 class TestAcasclient(unittest.TestCase):
     """Tests for `acasclient` package."""
@@ -37,7 +113,8 @@ class TestAcasclient(unittest.TestCase):
             'acas')
         self.assertIn("username", creds)
         self.assertIn("password", creds)
-        self.assertIn("url", creds)
+        self.assertIn("url"
+        , creds)
         self.assertEqual(creds['username'], 'bob')
         self.assertEqual(creds['password'], 'secret')
         creds = acasclient.creds_from_file(file_credentials,
@@ -453,9 +530,6 @@ class TestAcasclient(unittest.TestCase):
         search_results = self.client.\
             cmpd_search_request(searchRequest)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
-        self.assertEqual(
-            search_results["foundCompounds"][0]["corpName"],
-            "CMPD-0000001")
 
         searchRequest = {
             "molStructure": (
@@ -489,9 +563,6 @@ class TestAcasclient(unittest.TestCase):
         search_results = self.client.\
             cmpd_search_request(searchRequest)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
-        self.assertEqual(
-            search_results["foundCompounds"][0]["corpName"],
-            "CMPD-0000001")
 
     def test_008_cmpd_search(self):
         """Test cmpd search request."""
@@ -526,9 +597,6 @@ class TestAcasclient(unittest.TestCase):
         search_results = self.client.\
             cmpd_search(molStructure=molStructure)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
-        self.assertEqual(
-            search_results["foundCompounds"][0]["corpName"],
-            "CMPD-0000001")
 
     def test_009_export_cmpd_search_results(self):
         """Test export cmpd search results."""
@@ -813,3 +881,122 @@ class TestAcasclient(unittest.TestCase):
                 "experiment status")
         self.assertIn('codeValue', experiment_status)
         self.assertEqual('deleted', experiment_status['codeValue'])
+
+    def test_027_get_ls_thing(self):
+        ls_thing = self.client.get_ls_thing("project",
+                                            "project",
+                                            "PROJ-00000001")
+        self.assertIn('codeName', ls_thing)
+        self.assertEqual("PROJ-00000001", ls_thing["codeName"])
+        ls_thing = self.client.get_ls_thing("project",
+                                            "project",
+                                            "FAKE")
+        self.assertIsNone(ls_thing)
+
+    def test_026_save_ls_thing(self):
+        code = str(uuid.uuid4())
+        ls_thing = create_project_thing(code)
+        saved_ls_thing = self.client.save_ls_thing(ls_thing)
+        self.assertIn('codeName', saved_ls_thing)
+        self.assertEqual(code, saved_ls_thing["codeName"])
+
+    def test_027_get_ls_things_by_codes(self):
+        codes = []
+        for n in range(3):
+            code = str(uuid.uuid4())
+            ls_thing = create_project_thing(code)
+            self.client.save_ls_thing(ls_thing)
+            codes.append(ls_thing["codeName"])
+
+        ls_things = self.client.get_ls_things_by_codes("project",
+                                                       "project",
+                                                       codes)
+        self.assertEqual(len(ls_things), len(codes))
+        self.assertIn('codeName', ls_things[0])
+        self.assertIn(ls_things[0]['codeName'], codes)
+
+    def test_028_save_ls_thing_list(self):
+        ls_things = []
+        for n in range(3):
+            code = str(uuid.uuid4())
+            ls_things.append(create_project_thing(code))
+
+        saved_ls_things = self.client.save_ls_thing_list(ls_things)
+        self.assertEqual(len(saved_ls_things), len(ls_things))
+        self.assertIn('codeName', saved_ls_things[0])
+
+    def test_029_update_ls_thing_list(self):
+        ls_things = []
+        new_codes = []
+        for n in range(3):
+            code = str(uuid.uuid4())
+            ls_thing = create_project_thing(code)
+            saved_thing = self.client.save_ls_thing(ls_thing)
+            new_code = str(uuid.uuid4())
+            new_codes.append(new_code)
+            saved_thing["codeName"] = new_code
+            ls_things.append(saved_thing)
+
+        updated_ls_things = self.client.update_ls_thing_list(ls_things)
+        self.assertEqual(len(updated_ls_things), len(ls_things))
+        self.assertIn('codeName', updated_ls_things[0])
+
+    def test_030_get_thing_codes_by_labels(self):
+        labels = []
+        for n in range(3):
+            label = str(uuid.uuid4())
+            ls_thing = create_project_thing(label)
+            self.client.save_ls_thing(ls_thing)
+            labels.append(label)
+
+        results = self.client.get_thing_codes_by_labels('project',
+                                                        'project',
+                                                        labels)
+        self.assertEqual(len(results), len(labels))
+        self.assertIn('preferredName', results[0])
+
+    def test_031_get_saved_entity_codes(self):
+        labels = []
+        for n in range(3):
+            label = str(uuid.uuid4())
+            ls_thing = create_project_thing(label)
+            self.client.save_ls_thing(ls_thing)
+            labels.append(label)
+        labels.append("FAKE")
+        results = self.client.get_saved_entity_codes('project',
+                                                        'project',
+                                                        labels)
+        self.assertEqual(len(results[0]), len(labels)-1)
+        self.assertEqual(len(results[1]), 1)
+
+    def test_032_advanced_search_ls_things(self):
+        codes = []
+        for n in range(3):
+            code = str(uuid.uuid4())
+            ls_thing = create_project_thing(code)
+            self.client.save_ls_thing(ls_thing)
+            codes.append(code)
+
+        value_listings = [{
+                    "stateType": "metadata",
+                    "stateKind": "project metadata",
+                    "valueType": "codeValue",
+                    "valueKind": "status",
+                    "operator": "="
+                }]
+        ls_things = self.client\
+            .advanced_search_ls_things('project', 'project', 'active',
+                                       value_listings=value_listings,
+                                       codes_only=False,
+                                       max_results=1000)
+        self.assertGreaterEqual(len(ls_things), 3)
+        self.assertIn('codeName', ls_things[0])
+
+        return_codes = self.client\
+            .advanced_search_ls_things('project', 'project', 'active',
+                                       value_listings=value_listings,
+                                       codes_only=True,
+                                       max_results=1000)
+        self.assertIn(codes[0], return_codes)
+
+ 

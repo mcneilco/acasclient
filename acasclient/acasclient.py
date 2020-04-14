@@ -729,3 +729,238 @@ class client():
         if resp.text == '"Error"':
             return None
         return resp.json()
+
+    def purge_cmpdreg_bulk_load_file(self, id):
+        """Purge a cmpdreg bulk load file
+
+        Purges a cmpdreg bulk load file
+
+        Args:
+            id (int): A bulk load file id
+
+        Returns: Dict object with file content
+            fileName (str): The name of the file that was purged
+            success (bool): Did the file purge successfully
+            summary (str): An html formatted summary of the purge results
+
+        """
+        request = {
+                    "fileInfo": {
+                        "id": id
+                    }
+                }
+        resp = self.session.post("{}/api/cmpdRegBulkLoader/purgeFile".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(request))
+        if resp.text == '"Error"':
+            return None
+        return resp.json()
+
+    def get_ls_thing(self, ls_type, ls_kind, code_name, nestedfull=False):
+        """
+        Get a models.LsThing object by ls_type, ls_kind, and code_name
+
+        Args:
+            ls_type (str): Type of ls thing
+            ls_kind (str): Kind of ls thing
+            code_name (str): Code name of ls thing
+
+        """
+        resp = self.session.get("{}/api/things/{}/{}/{}".
+                                format(self.url,
+                                       ls_type,
+                                       ls_kind,
+                                       code_name),
+                                params={'nestedfull': nestedfull})
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
+        return resp.json()
+
+    def save_ls_thing(self, ls_thing):
+        """
+        Persist a models.LsThing object to ACAS
+
+        Args:
+            ls_thing (dict): A dict object representing an ls thing
+
+        Returns: Dict object representing a saved ls_thing
+        """
+
+        resp = self.session.post("{}/api/things/{}/{}".
+                                 format(self.url,
+                                        ls_thing["lsType"],
+                                        ls_thing["lsKind"]),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(ls_thing))
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_ls_things_by_codes(self, ls_type, ls_kind, code_name_list,
+                               nestedfull=False):
+        """
+        Get a list of ls thing dict objects from a list of their code_names
+
+        Args:
+            ls_type (str): ls_type for all things to retrieve
+            ls_kind (str): ls_kind for all things to retrieve
+            code_name_list (str list): list of str code_names
+        """
+        resp = self.session.post("{}/api/things/{}/{}/codeNames/jsonArray".
+                                 format(self.url,
+                                        ls_type,
+                                        ls_kind),
+                                 params={'nestedfull': nestedfull},
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(code_name_list))
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
+        return resp.json()
+
+    def save_ls_thing_list(self, ls_thing_list):
+        """
+        Save a list of ls thing dict objects
+
+        Args:
+            ls_thing_list (str): list of ls_thing dict objects
+        """
+        resp = self.session.post("{}/api/bulkPostThings".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(ls_thing_list))
+        resp.raise_for_status()
+        return resp.json()
+
+    def update_ls_thing_list(self, ls_thing_list):
+        """
+        Update a list of ls thing dict objects
+
+        Args:
+            ls_thing_list (str): list of ls_thing dict objects
+        """
+        #TODO: generate a transaction
+        resp = self.session.put("{}/api/bulkPutThings".
+                                format(self.url),
+                                headers={'Content-Type': "application/json"},
+                                data=json.dumps(ls_thing_list))
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_thing_codes_by_labels(self, ls_type, ls_kind, label_list):
+        """
+        Get a list of thing codes by providing a list of labels
+
+        Args:
+            ls_type (str): ls_type for all things to retrieve
+            ls_kind (str): ls_kind for all things to retrieve
+            label_list (str list): list of str labels
+        Returns:
+            ref_name_lookup_results: list of objects with
+                requestName (str): input label string
+                preferredName (str): LsThing preferred label string
+                referenceName (str): LsThing code name string
+        """
+        request = {
+            'thingType': ls_type,
+            'thingKind': ls_kind,
+            'requests': [
+                {"requestName": label} for label in label_list
+                ]
+        }
+
+        resp = self.session.post("{}/api/getThingCodeByLabel/{}/{}".
+                                 format(self.url,
+                                        ls_type,
+                                        ls_kind),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(request))
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
+        resp_object = resp.json()
+        results = resp_object['results']
+        return results
+
+    def get_saved_entity_codes(self, ls_type, ls_kind, id_list):
+        """
+        Query ACAS to determine which identifiers (labels) are already saved
+
+        Args:
+            ls_type (str): LsThing lsType to query for
+            ls_kind (str): LsThing lsKind to query for
+            id_list (str): list of identifier strings
+        Returns:
+            saved_codes (dict): dict of identifier : LsThing codeName for previously saved entities
+            missing_ids (list): list of identifiers that were not found to be previously saved 
+        """
+        # Query ACAS for list of identifiers
+        ref_name_lookup_results = self.get_thing_codes_by_labels(ls_type, ls_kind, id_list)
+        # Parse results into found and not found
+        saved_codes = {}
+        missing_ids = []
+        for res in ref_name_lookup_results:
+            ident = res['requestName']
+            if res['referenceName'] and len(res['referenceName']) > 0:
+                saved_codes[ident] = res['referenceName']
+            else:
+                missing_ids.append(ident)
+        return saved_codes, missing_ids
+
+    def advanced_search_ls_things(self, ls_type, ls_kind, search_string,
+                                  value_listings=[], codes_only=False,
+                                  max_results=1000):
+        """
+        Query ACAS for deeply specified conditions
+
+        Args:
+            ls_type (str): LsThing lsType to match
+            ls_kind (str): LsThing lsKind to match
+            search_string (str): str to match on or compare to
+            value_listings (list): list of dicts of a structure like:
+                {
+                    "stateType": "metadata",
+                    "stateKind": "pdb",
+                    "valueType": "stringValue",
+                    "valueKind": "librarian search status",
+                    "operator": "="
+                }
+        Returns:
+            if codes_only:
+                list of code_name strings
+            otherwise:
+                list of LsThing objects
+        """
+        request = {
+            'queryString': search_string,
+            'queryDTO': {
+                'maxResults': max_results,
+                'lsType': ls_type,
+                'lsKind': ls_kind,
+                'values': value_listings
+            }
+        }
+        params = {}
+        if codes_only:
+            params = {'format': 'codetable'}
+        resp = self.session.post('{}/api/advancedSearch/things/{}/{}'.
+                                 format(self.url,
+                                        ls_type,
+                                        ls_kind),
+                                 data=json.dumps(request),
+                                 headers={'Content-Type': "application/json"},
+                                 params=params)
+        result = resp.json()
+        if type(result) is not dict:
+            msg = 'Caught error response from {}: {}'.format('/api/advancedSearch/things', result)
+            logger.error(msg)
+            raise ValueError(msg)
+        results = result['results']
+        if codes_only:
+            return [res['code'] for res in results]
+        else:
+            return results

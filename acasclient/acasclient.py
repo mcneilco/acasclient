@@ -7,9 +7,15 @@ import configparser
 import json
 from pathlib import Path
 from pathlib import PurePath
+import re
+import base64
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+def isBase64(s):
+    return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
 
 
 def creds_from_file(fpath, profile="default"):
@@ -200,8 +206,9 @@ class client():
         Pass an array of files to ACAS and upload them to the server
 
         Args:
-            files: An array of either string paths or Path objects (see
-            :py:class:`pathlib.Path`)
+            files: An array of either string paths, Path objects (see
+            :py:class:`pathlib.Path`), base64 encoded strings, or dicts
+            with "name" and "data" (base64 encoded data) attributes.
 
         Returns:
             An object of responses from ACAS in the form:
@@ -220,7 +227,14 @@ class client():
         """
         filesToUpload = {}
         for file in files:
-            filesToUpload[str(file)] = file.open('rb')
+            if isinstance(file, Path):
+                filesToUpload[str(file)] = file.open('rb')
+            elif isBase64(file):
+                filesToUpload[str("file")] = base64.decodebytes(file.encode())
+            elif isinstance(file, dict):
+                filesToUpload[file["name"]] = base64.decodebytes(file["data"].encode())
+            else:
+                filesToUpload[str(file)] = file.open('rb')
         resp = self.session.post("{}/uploads".format(self.url),
                                  files=filesToUpload)
         resp.raise_for_status()
@@ -828,7 +842,7 @@ class client():
         Args:
             ls_thing_list (str): list of ls_thing dict objects
         """
-        resp = self.session.post("{}/api/bulkPostThings".
+        resp = self.session.post("{}/api/bulkPostThingsSaveFile".
                                  format(self.url),
                                  headers={'Content-Type': "application/json"},
                                  data=json.dumps(ls_thing_list))

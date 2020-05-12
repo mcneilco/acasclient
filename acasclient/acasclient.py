@@ -274,6 +274,24 @@ class client():
                              % VALID_SEARCH_TYPES)
         return self.cmpd_search_request(search_request)
 
+    def get_all_lots(self):
+        """Get all lots
+
+        Get all lots the currently logged in user is allowed to access
+
+        Returns: Returns an array of dict objects
+            id (id): the lot corp name
+            lotCorpName (str): the lot corp name
+            lotNumber (int): the lot number
+            parentCorpName (str): the lots parent corp name
+            registrationDate (int): the registration date
+            project (str): the lots project
+        """
+        resp = self.session.get("{}/cmpdReg/parentLot/getAllAuthorizedLots"
+                                .format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+
     def cmpd_search_request(self, search_request):
         search_request["loggedInUser"] = self.username
         if("corpNameList" not in search_request):

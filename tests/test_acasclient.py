@@ -999,4 +999,14 @@ class TestAcasclient(unittest.TestCase):
                                        max_results=1000)
         self.assertIn(codes[0], return_codes)
 
- 
+    def test_033_get_all_lots(self):
+        """Test get all lots request."""
+
+        all_lots = self.client.get_all_lots()
+        self.assertGreater(len(all_lots), 0)
+        self.assertIn('id', all_lots[0])
+        self.assertIn('lotCorpName', all_lots[0])
+        self.assertIn('lotNumber', all_lots[0])
+        self.assertIn('parentCorpName', all_lots[0])
+        self.assertIn('registrationDate', all_lots[0])
+        self.assertIn('project', all_lots[0])

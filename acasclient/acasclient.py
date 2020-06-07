@@ -232,7 +232,10 @@ class client():
             elif isBase64(file):
                 filesToUpload[str("file")] = base64.decodebytes(file.encode())
             elif isinstance(file, dict):
-                filesToUpload[file["name"]] = base64.decodebytes(file["data"].encode())
+                if isBase64(file['data']):
+                    filesToUpload[file["name"]] = base64.decodebytes(file["data"].encode())
+                else:
+                    filesToUpload[file["name"]] = file["data"]
             else:
                 filesToUpload[str(file)] = file.open('rb')
         resp = self.session.post("{}/uploads".format(self.url),

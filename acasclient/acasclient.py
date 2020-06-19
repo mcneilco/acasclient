@@ -878,7 +878,7 @@ class client():
             ls_thing_list (str): list of ls_thing dict objects
         """
         #TODO: generate a transaction
-        resp = self.session.put("{}/api/bulkPutThings".
+        resp = self.session.put("{}/api/bulkPutThingsSaveFile".
                                 format(self.url),
                                 headers={'Content-Type': "application/json"},
                                 data=json.dumps(ls_thing_list))

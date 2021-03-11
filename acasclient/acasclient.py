@@ -632,7 +632,11 @@ class client():
             "mappings": mappings,
         }
         if prefix:
-            request["labelPrefix"] = {"name": prefix}
+            request["labelPrefix"] = {
+                "name": prefix,
+                "labelTypeAndKind":"id_corpName",
+                "thingTypeAndKind":"parent_compound"
+            }
         response = self.register_sdf_request(request)
         report_files = []
         for file in response[0]['reportFiles']:

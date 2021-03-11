@@ -624,13 +624,15 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def register_sdf(self, file, userName, mappings):
+    def register_sdf(self, file, userName, mappings, prefix):
         files = self.upload_files([file])
         request = {
             "fileName": files['files'][0]["name"],
             "userName": userName,
-            "mappings": mappings
+            "mappings": mappings,
         }
+        if prefix:
+            request["labelPrefix"] = {"name": prefix}
         response = self.register_sdf_request(request)
         report_files = []
         for file in response[0]['reportFiles']:
@@ -999,3 +1001,29 @@ class client():
             return [res['code'] for res in results]
         else:
             return results
+
+    def create_label_sequence(self, labelPrefix, startingNumber, digits,
+                                  labelSeparator, labelTypeAndKind, thingTypeAndKind,
+                                  labelSequenceRoles):
+        """
+        Create a label sequence
+
+        Args:
+            labelPrefix (str): Prefix of the label
+            startingNumber (str): Set to 0 for the first number to be 1
+            digits (str): The number of leading zeros to add to the label sequence when formatting (e.g. CMPD-0000007 would be digts: 7 )
+            labelTypeAndKind (str): the label type and kind associated with this sequence (used for finding all labels of a specific label type and kind in some interfaces)
+            thingTypeAndKind (str): the thing type and kind associated with this sequence (used for finding all labels of a specific thing type and kind in some interfaces)
+            labelSequenceRoles (list): the registered role to associate with this label (used for limiting access to specific label sequences in some interfaces)
+
+        Returns:
+            a dict object representing the new label sequence
+        """
+       
+        resp = self.session.post("{}/api/labelsequences/".format(self.url),
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(search_request))
+        resp.raise_for_status()
+        return resp.json()
+

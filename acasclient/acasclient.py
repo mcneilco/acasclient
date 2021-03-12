@@ -624,7 +624,7 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def register_sdf(self, file, userName, mappings, prefix):
+    def register_sdf(self, file, userName, mappings, prefix = None):
         files = self.upload_files([file])
         request = {
             "fileName": files['files'][0]["name"],
@@ -634,6 +634,7 @@ class client():
         if prefix:
             request["labelPrefix"] = {
                 "name": prefix,
+                "labelPrefix": prefix,
                 "labelTypeAndKind":"id_corpName",
                 "thingTypeAndKind":"parent_compound"
             }

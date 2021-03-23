@@ -850,6 +850,7 @@ class client():
             ls_kind (str): ls_kind for all things to retrieve
             code_name_list (str list): list of str code_names
         """
+        params = {}
         if nestedfull:
             params = {**params, 'with': 'nestedfull'}
         resp = self.session.post("{}/api/things/{}/{}/codeNames/jsonArray".

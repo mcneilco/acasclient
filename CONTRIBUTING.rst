@@ -126,3 +126,6 @@ $ git push
 $ git push --tags
 
 Travis will then deploy to PyPI if tests pass.
+
+# Creating a new version
+bump2version --new-version 0.1.13 

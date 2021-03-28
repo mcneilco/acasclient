@@ -799,7 +799,7 @@ class client():
             return None
         return resp.json()
 
-    def get_ls_thing(self, ls_type, ls_kind, code_name, nestedfull=False):
+    def get_ls_thing(self, ls_type, ls_kind, code_name, nestedfull=True):
         """
         Get a models.LsThing object by ls_type, ls_kind, and code_name
 
@@ -841,7 +841,7 @@ class client():
         return resp.json()
 
     def get_ls_things_by_codes(self, ls_type, ls_kind, code_name_list,
-                               nestedfull=False):
+                               nestedfull=True):
         """
         Get a list of ls thing dict objects from a list of their code_names
 

@@ -1010,3 +1010,34 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('parentCorpName', all_lots[0])
         self.assertIn('registrationDate', all_lots[0])
         self.assertIn('project', all_lots[0])
+
+    def test_034_get_ls_things_by_type_and_kind(self):
+        codes = []
+        for n in range(3):
+            code = str(uuid.uuid4())
+            ls_thing = create_project_thing(code)
+            self.client.save_ls_thing(ls_thing)
+            codes.append(ls_thing["codeName"])
+
+        ls_things = self.client.get_ls_things_by_type_and_kind("project",
+                                                               "project",
+                                                               "stub")
+        self.assertIn('codeName', ls_things[0])
+        returnedCodes = []
+        for thing in ls_things:
+            if thing['codeName'] in codes:
+                returnedCodes.append(thing['codeName'])
+        self.assertEqual(len(returnedCodes), len(codes))
+        self.assertIn('codeName', ls_things[0])
+
+        #Verify that codectable format works
+        ls_things = self.client.get_ls_things_by_type_and_kind("project",
+                                                               "project",
+                                                               format="codetable")
+        self.assertIn('code', ls_things[0])
+
+        #Verify that giving bad format gives ValueError
+        with self.assertRaises(ValueError):
+            self.client.get_ls_things_by_type_and_kind("project",
+                                                       "project",
+                                                       format="badformat")

@@ -866,6 +866,31 @@ class client():
             resp.raise_for_status()
         return resp.json()
 
+    def get_ls_things_by_type_and_kind(self, ls_type, ls_kind,
+                               format='stub'):
+        """
+        Get a list of ls thing dict objects from ls_type and ls_kind
+
+        Args:
+            ls_type (str): ls_type for all things to retrieve
+            ls_kind (str): ls_kind for all things to retrieve
+        """
+        allowedFormats = {'codetable', 'stub'}
+        if format not in allowedFormats:
+            raise ValueError("format must be one of %s." % allowedFormats)
+        params = {format: '1'}
+        resp = self.session.get("{}/api/things/{}/{}".
+                                 format(self.url,
+                                        ls_type,
+                                        ls_kind),
+                                 params=params,
+                                 headers={'Content-Type': "application/json"})
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
+        return resp.json()
+
     def save_ls_thing_list(self, ls_thing_list):
         """
         Save a list of ls thing dict objects

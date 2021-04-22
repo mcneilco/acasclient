@@ -1036,8 +1036,8 @@ class client():
             return results
 
     def create_label_sequence(self, labelPrefix, startingNumber, digits,
-                                  labelSeparator, labelTypeAndKind, thingTypeAndKind,
-                                  labelSequenceRoles):
+                                  labelSeparator, labelTypeAndKind = None, thingTypeAndKind = None,
+                                  labelSequenceRoles =  []):
         """
         Create a label sequence
 
@@ -1052,11 +1052,103 @@ class client():
         Returns:
             a dict object representing the new label sequence
         """
-       
-        resp = self.session.post("{}/api/labelsequences/".format(self.url),
+        request = {
+            'labelPrefix': labelPrefix,
+            'startingNumber': startingNumber,
+            'digits': digits,
+            'labelSeparator': labelSeparator,
+            'labelTypeAndKind': labelTypeAndKind,
+            'thingTypeAndKind': thingTypeAndKind,
+            'labelSequenceRoles': labelSequenceRoles
+        }
+        resp = self.session.post("{}/api/labelsequences/".
                                  format(self.url),
                                  headers={'Content-Type': "application/json"},
-                                 data=json.dumps(search_request))
+                                 data=json.dumps(request))
         resp.raise_for_status()
         return resp.json()
 
+    def get_all_label_sequences(self):
+        """
+        Get all label sequences (limited to those authorized by logged in user roles)
+
+        Returns:
+            a list of dict objects representing the labelSequence
+        """
+       
+        json = self.get_label_sequence_by_types_and_kinds()
+        return json
+
+    def get_label_sequence_by_types_and_kinds(self, labelTypeAndKind = None, thingTypeAndKind = None):
+        """
+        Get label sequence by types and kinds (limited to those authorized by logged in user roles)
+
+        Args:
+            labelPrefix (str): Prefix of the label
+            startingNumber (str): Set to 0 for the first number to be 1
+            digits (str): The number of leading zeros to add to the label sequence when formatting (e.g. CMPD-0000007 would be digts: 7 )
+            labelTypeAndKind (str): the label type and kind associated with this sequence (used for finding all labels of a specific label type and kind in some interfaces)
+            thingTypeAndKind (str): the thing type and kind associated with this sequence (used for finding all labels of a specific thing type and kind in some interfaces)
+            labelSequenceRoles (list): the registered role to associate with this label (used for limiting access to specific label sequences in some interfaces)
+
+        Returns:
+            a list of dict objects representing the labelSequence
+        """
+        params = {}
+        if labelTypeAndKind:
+            params = {**params, 'labelTypeAndKind': labelTypeAndKind}
+        if thingTypeAndKind:
+            params = {**params, 'thingTypeAndKind': thingTypeAndKind}
+        resp = self.session.get("{}/api/labelSequences/getAuthorizedLabelSequences".
+                                 format(self.url),
+                                 params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_labels(self, labelTypeAndKind, thingTypeAndKind, numberOfLabels):
+        """
+        Get next n labels from label sequence prefix
+
+        Args:
+            labelTypeAndKind (str): Prefix of the registered label (see create_label_sequence)
+            numberOfLabels (int): Number of labels to fetch
+
+        Returns:
+            a list of dict objects representing the labelSequence
+        """
+        request = {
+            'labelTypeAndKind': labelTypeAndKind,
+            'thingTypeAndKind': thingTypeAndKind,
+            'numberOfLabels': numberOfLabels
+        }
+        resp = self.session.post("{}/api/getNextLabelSequence".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(request))
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_all_ddict_values(self):
+        """
+        Get all ddict values
+
+        Returns:
+            a list of dict objects representing the ddict value (aka code value)
+        """
+        all_values = self.get_ddict_values_by_type_and_kind()
+        return all_values
+
+    def get_ddict_values_by_type_and_kind(self, codeType=None, codeKind=None):
+        """
+        Get ddict values
+
+        Returns:
+            a list of dict objects representing the ddict value (aka code value)
+        """
+        path = "/api/codetables"
+        if codeType and codeKind:
+            path = "{}/{}/{}".format(path, codeType, codeKind)
+        resp = self.session.get("{}{}".
+                                format(self.url, path))
+        resp.raise_for_status()
+        return resp.json()

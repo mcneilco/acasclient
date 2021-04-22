@@ -1040,4 +1040,56 @@ class TestAcasclient(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.client.get_ls_things_by_type_and_kind("project",
                                                        "project",
-                                                       format="badformat")
+                                                       format="badformat")                                 
+
+    def test_035_test_create_label_sequence(self):
+        labelPrefix = "TESTSEQ"+str(uuid.uuid4())
+        sequence = self.client.create_label_sequence(labelPrefix, 0, 0, "-", "id_corpName", "parent_compound")
+        self.assertIn('dbSequence', sequence)
+        self.assertIn(labelPrefix, sequence["labelPrefix"])
+        self.assertIn('id_corpName', sequence["labelTypeAndKind"])
+        self.assertIn('parent_compound', sequence["thingTypeAndKind"])
+
+
+    def test_036_get_all_label_sequences(self):
+        sequences = self.client.get_all_label_sequences()
+        self.assertGreater(len(sequences), 0)
+        self.assertIn('dbSequence', sequences[0])
+        self.assertIn('labelPrefix', sequences[0])
+        self.assertIn('thingTypeAndKind', sequences[0])
+
+    def test_037_get_label_sequence_by_types_and_kinds(self):
+        labelTypeAndKind = "id_corpName"
+        thingTypeAndKind = "parent_compound"
+        sequences = self.client.get_label_sequence_by_types_and_kinds(labelTypeAndKind, thingTypeAndKind)
+        self.assertGreater(len(sequences), 0)
+        for sequence in sequences:
+            self.assertEqual(labelTypeAndKind, sequence["labelTypeAndKind"])
+            self.assertEqual(thingTypeAndKind, sequence["thingTypeAndKind"])
+
+    def test_038_get_labels(self):
+        numberOfLabels = 5
+        labels = self.client.get_labels("id_codeName", "document_experiment", numberOfLabels)
+        self.assertEqual(len(labels), numberOfLabels)
+        for label in labels:
+            self.assertIn('autoLabel', label)
+
+    def test_039_get_all_ddict_values(self):
+        all_ddict_values = self.client.get_all_ddict_values()
+        self.assertGreater(len(all_ddict_values), 0)
+        for ddict_value in all_ddict_values:
+            self.assertIn('codeType', ddict_value)
+            self.assertIn('codeKind', ddict_value)
+            self.assertIn('code', ddict_value)
+
+    def test_040_get_ddict_values_by_type_and_kind(self):
+        codeType = "experiment metadata"
+        codeKind = "file type"
+        all_ddict_values = self.client.get_ddict_values_by_type_and_kind(codeType, codeKind)
+        self.assertGreater(len(all_ddict_values), 0)
+        for ddict_value in all_ddict_values:
+            self.assertIn('codeType', ddict_value)
+            self.assertIn('codeKind', ddict_value)
+            self.assertEqual(codeType, ddict_value["codeType"])
+            self.assertEqual(codeKind, ddict_value["codeKind"])
+

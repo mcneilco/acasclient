@@ -90,6 +90,40 @@ def create_project_thing(code):
         }
     return ls_thing
 
+
+def create_thing_with_blob_value(code):
+    # Function for creating a thing with a blob value
+    # Returns a  thing, file name and bytes_array for unit testing purposes
+
+    # Get a file to load
+    file_name = 'blob_test.png'
+    blob_test_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name)
+    f = open(blob_test_path, "rb")
+    bytes_array = f.read()
+
+    # Need to save blob value as an int array not bytes
+    int_array_to_save = [x for x in bytes_array]
+    f.close()
+
+    # Create an Ls thing and add the blob value
+    # comments should be the file name
+    code = str(uuid.uuid4())
+    ls_thing = create_project_thing(code)
+    blob_value = {
+        "lsType": "blobValue",
+        "blobValue": int_array_to_save,
+        "lsKind": "my file",
+        "ignored": False,
+        "recordedDate": 1586877284571,
+        "recordedBy": "bob",
+        "comments": file_name
+    }
+    ls_thing["lsStates"][0]["lsValues"].append(blob_value)
+
+    # Return thing file and bytes array for testing
+    return ls_thing, file_name, bytes_array
+
 class TestAcasclient(unittest.TestCase):
     """Tests for `acasclient` package."""
 
@@ -1093,3 +1127,27 @@ class TestAcasclient(unittest.TestCase):
             self.assertEqual(codeType, ddict_value["codeType"])
             self.assertEqual(codeKind, ddict_value["codeKind"])
 
+    def test_041_get_blob_data_by_value_id(self):
+        # Save an ls thing with a blob value
+        code = str(uuid.uuid4())
+        ls_thing, file_name, bytes_array = create_thing_with_blob_value(code)
+        saved_ls_thing = self.client.save_ls_thing(ls_thing)
+
+        # Get the blob value from the saved ls thing (does not contain blobValue data)
+        saved_blob_value = None
+        for state in saved_ls_thing["lsStates"]:
+            for value in state["lsValues"]:
+                if value["lsType"] == "blobValue":
+                    saved_blob_value = value
+                    break
+
+        # Blob value should return and the comments should be set to the file name
+        self.assertIsNotNone(saved_blob_value)
+        self.assertEqual(saved_blob_value["comments"], file_name)
+
+        # Get the actual blob value data by value id
+        blob_data = self.client.get_blob_data_by_value_id(saved_blob_value["id"])
+
+        # Assert that the returned blob data is of type bytes and is equal to the blob data sent in
+        self.assertEqual(type(blob_data), bytes)
+        self.assertEqual(blob_data, bytes_array)

@@ -1152,3 +1152,19 @@ class client():
                                 format(self.url, path))
         resp.raise_for_status()
         return resp.json()
+
+
+    def get_blob_data_by_value_id(self, valueId):
+        """
+        Get blob data by value id
+        Args:
+            valueId (int): A known value id to fetch from the database that is stored as a blobValue lsType
+
+        Returns:
+            (bytes): representing the blob value
+        """
+
+        resp = self.session.get("{}/api/thingvalues/downloadThingBlobValueByID/{}"
+                                .format(self.url, valueId))
+        resp.raise_for_status()
+        return resp.content

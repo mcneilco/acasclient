@@ -920,14 +920,16 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def get_thing_codes_by_labels(self, ls_type, ls_kind, label_list):
+    def get_thing_codes_by_labels(self, thing_type, thing_kind, labels_or_codes, label_type=None, label_kind=None):
         """
         Get a list of thing codes by providing a list of labels
 
         Args:
-            ls_type (str): ls_type for all things to retrieve
-            ls_kind (str): ls_kind for all things to retrieve
-            label_list (str list): list of str labels
+            labels_or_codes (str list): list of str labels or codes
+            thing_type (str): ls_type for all things to retrieve
+            thing_kind (str): ls_kind for all things to retrieve
+            label_type (str): label_type to limit label searches
+            label_kind (str): label_kind to limit label searches
         Returns:
             ref_name_lookup_results: list of objects with
                 requestName (str): input label string
@@ -935,17 +937,17 @@ class client():
                 referenceName (str): LsThing code name string
         """
         request = {
-            'thingType': ls_type,
-            'thingKind': ls_kind,
+            'thingType': thing_type,
+            'thingKind': thing_kind,
+            'labelType': label_type,
+            'labelKind': label_kind,
             'requests': [
-                {"requestName": label} for label in label_list
-                ]
+                    {"requestName": request} for request in labels_or_codes
+            ]
         }
 
-        resp = self.session.post("{}/api/getThingCodeByLabel/{}/{}".
-                                 format(self.url,
-                                        ls_type,
-                                        ls_kind),
+        resp = self.session.post("{}/api/getThingCodeByLabel".
+                                 format(self.url),
                                  headers={'Content-Type': "application/json"},
                                  data=json.dumps(request))
         if resp.status_code == 500:
@@ -953,6 +955,8 @@ class client():
         else:
             resp.raise_for_status()
         resp_object = resp.json()
+        if resp_object == 'error trying to lookup lsThing name':
+            raise RuntimeError("Failed to get things, please see acas logs.")
         results = resp_object['results']
         return results
 

@@ -14,7 +14,11 @@ import uuid
 # "PROJ-00000001" registered
 
 
-def create_project_thing(code):
+def create_project_thing(code, name=None, alias=None):
+    if name is None:
+        name = code
+    if alias is None:
+        alias = name
     ls_thing = {
             "lsType": "project",
             "lsKind": "project",
@@ -24,7 +28,7 @@ def create_project_thing(code):
                 {
                     "lsType": "name",
                     "lsKind": "project name",
-                    "labelText": code,
+                    "labelText": name,
                     "ignored": False,
                     "preferred": True,
                     "recordedDate": 1586877284571,
@@ -36,7 +40,7 @@ def create_project_thing(code):
                 {
                     "lsType": "name",
                     "lsKind": "project alias",
-                    "labelText": code,
+                    "labelText": alias,
                     "ignored": False,
                     "preferred": False,
                     "recordedDate": 1586877284571,
@@ -976,18 +980,81 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('codeName', updated_ls_things[0])
 
     def test_030_get_thing_codes_by_labels(self):
-        labels = []
+        codes = []
+        names = []
+        aliases = []
         for n in range(3):
-            label = str(uuid.uuid4())
-            ls_thing = create_project_thing(label)
+            code = str(uuid.uuid4())
+            name = str(uuid.uuid4())
+            alias = str(uuid.uuid4())
+            ls_thing = create_project_thing(code, name, alias)
             self.client.save_ls_thing(ls_thing)
-            labels.append(label)
+            codes.append(code)
+            names.append(name)
+            aliases.append(alias)
 
+        # Verify search by code type and kind works without label filter
         results = self.client.get_thing_codes_by_labels('project',
                                                         'project',
-                                                        labels)
-        self.assertEqual(len(results), len(labels))
+                                                        codes)
+
+        self.assertEqual(len(results), len(codes))
         self.assertIn('preferredName', results[0])
+        # Preferred name should be the name sent to the service as preferred, not the code
+        self.assertIn(results[0]["preferredName"], names)
+
+        # Adding label type and label kind should not stop searching by code name
+        # but the preferred ids should still be the names
+        results = self.client.get_thing_codes_by_labels('project',
+                                                        'project',
+                                                        codes,
+                                                        'garbageshouldnotexist',
+                                                        'garbageshouldnotexist')
+        self.assertEqual(len(results), len(codes))
+        self.assertIn(results[0]["preferredName"], names)
+
+        # Searching by labels without limiting by label type/kind  should give results
+        results = self.client.get_thing_codes_by_labels('project',
+                                                        'project',
+                                                        names)
+        self.assertEqual(len(results), len(names))
+        self.assertIn(results[0]["preferredName"], names)
+
+        # Searching by names and filtering label types and kinds should give no results when no matching
+        results = self.client.get_thing_codes_by_labels('project',
+                                                        'project',
+                                                        names,
+                                                        'garbageshouldnotexist',
+                                                        'garbageshouldnotexist')
+        self.assertEqual(len(results), len(names))
+        self.assertEqual(results[0]["preferredName"], '')
+
+        # Searching when code and label is the same should still produce a single response
+        codeAndName = str(uuid.uuid4())
+        alias = str(uuid.uuid4())
+        ls_thing = create_project_thing(codeAndName, codeAndName, alias)
+        self.client.save_ls_thing(ls_thing)
+        results = self.client.get_thing_codes_by_labels('project',
+                                              'project',
+                                              [codeAndName])
+        self.assertEqual(results[0]["preferredName"], codeAndName)
+
+        # Searching by alias should work but still return preferredNames
+        results = self.client.get_thing_codes_by_labels('project',
+                                                        'project',
+                                                        aliases)
+        self.assertEqual(len(results), len(names))
+        self.assertIn(results[0]["preferredName"], names)
+
+        # Searching by alias should work but still return preferredNames even when specifying labeltype and kind
+        results = self.client.get_thing_codes_by_labels('project',
+                                                        'project',
+                                                        aliases,
+                                                        'name',
+                                                        'project alias')
+        self.assertEqual(len(results), len(names))
+        self.assertIn(results[0]["preferredName"], names)
+
 
     def test_031_get_saved_entity_codes(self):
         labels = []

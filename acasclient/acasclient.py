@@ -960,7 +960,7 @@ class client():
         results = resp_object['results']
         return results
 
-    def get_saved_entity_codes(self, ls_type, ls_kind, id_list):
+    def get_saved_entity_codes(self, ls_type, ls_kind, id_list, label_type=None, label_kind=None):
         """
         Query ACAS to determine which identifiers (labels) are already saved
 
@@ -968,12 +968,14 @@ class client():
             ls_type (str): LsThing lsType to query for
             ls_kind (str): LsThing lsKind to query for
             id_list (str): list of identifier strings
+            label_type (str): label_type to limit label searches
+            label_kind (str): label_kind to limit label searches
         Returns:
             saved_codes (dict): dict of identifier : LsThing codeName for previously saved entities
             missing_ids (list): list of identifiers that were not found to be previously saved 
         """
         # Query ACAS for list of identifiers
-        ref_name_lookup_results = self.get_thing_codes_by_labels(ls_type, ls_kind, id_list)
+        ref_name_lookup_results = self.get_thing_codes_by_labels(ls_type, ls_kind, id_list, label_type, label_kind)
         # Parse results into found and not found
         saved_codes = {}
         missing_ids = []

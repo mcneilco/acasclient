@@ -1055,20 +1055,38 @@ class TestAcasclient(unittest.TestCase):
         self.assertEqual(len(results), len(names))
         self.assertIn(results[0]["preferredName"], names)
 
-
     def test_031_get_saved_entity_codes(self):
         labels = []
         for n in range(3):
+            code = str(uuid.uuid4())
             label = str(uuid.uuid4())
-            ls_thing = create_project_thing(label)
+            ls_thing = create_project_thing(code, label)
             self.client.save_ls_thing(ls_thing)
             labels.append(label)
         labels.append("FAKE")
         results = self.client.get_saved_entity_codes('project',
-                                                        'project',
-                                                        labels)
+                                                     'project',
+                                                     labels)
         self.assertEqual(len(results[0]), len(labels)-1)
         self.assertEqual(len(results[1]), 1)
+
+        # Verify that limiting by label type/kind gives correct result
+        results = self.client.get_saved_entity_codes('project',
+                                                     'project',
+                                                     labels,
+                                                     'name',
+                                                     'project name')
+        self.assertEqual(len(results[0]), len(labels)-1)
+        self.assertEqual(len(results[1]), 1)
+
+        # Verify that limiting by nonexistant label type/kind give 0 results
+        results = self.client.get_saved_entity_codes('project',
+                                                     'project',
+                                                     labels,
+                                                     'badtype',
+                                                     'badkind')
+        self.assertEqual(len(results[0]), 0)
+        self.assertEqual(len(results[1]), len(labels))
 
     def test_032_advanced_search_ls_things(self):
         codes = []

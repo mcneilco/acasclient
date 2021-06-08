@@ -93,6 +93,8 @@ def parse_values_into_dict(ls_values):
                 val = value.url_value
             elif value.ls_type == 'fileValue':
                 val = FileValue(value.file_value)
+            elif value.ls_type == 'blobValue':
+                val = BlobValue(value=value.blob_value, comments=value.comments)
             # In cases where there are multiple values with same ls_kind, 
             # make the dictionary value into a list and append this value
             if key in values_dict:
@@ -131,15 +133,17 @@ def is_equal_ls_value_simple_value(ls_value, val):
     if (isinstance(val, list) and not isinstance(ls_value, list)) \
         or (isinstance(ls_value, list) and not isinstance(val, list)):
         return False
-    elif type(val) == FileValue:
+    elif isinstance(val, FileValue):
         return ls_value.file_value == val
+    elif isinstance(val, BlobValue):
+        return ls_value.blob_value == BlobValue(val.value, val.comments)
+    elif isinstance(val, clob):
+        return ls_value.clob_value == str(val)
     elif type(val) == str:
         if val.startswith('https://') or val.startswith('http://'):
             return ls_value.url_value == val
         else:
             return ls_value.string_value == val
-    elif type(val) ==  clob:
-        return ls_value.clob_value == str(val)
     elif type(val) == bool:
         return ls_value.code_value == str(val)
     elif isinstance(val, DDictValue):
@@ -163,9 +167,11 @@ def is_equal_ls_value_simple_value(ls_value, val):
     elif pd.isnull(val):
         return (pd.isnull(ls_value.code_value) and
                 pd.isnull(ls_value.string_value) and
+                pd.isnull(ls_value.clob_value) and
                 pd.isnull(ls_value.url_value) and
                 pd.isnull(ls_value.date_value) and
                 pd.isnull(ls_value.file_value) and
+                pd.isnull(ls_value.blob_value) and
                 pd.isnull(ls_value.numeric_value)
                 )
     else:
@@ -188,6 +194,15 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     if isinstance(val, FileValue):
         value = value_cls(ls_type="fileValue", ls_kind=value_kind, recorded_by=recorded_by,
                                                 file_value=val, unit_kind = unit_kind)
+    if isinstance(val, BlobValue):
+        value = value_cls(
+            ls_type="blobValue",
+            ls_kind=value_kind,
+            recorded_by=recorded_by,
+            blob_value=val.value,
+            unit_kind=unit_kind,
+            comments=val.comments,
+        )
     elif isinstance(val, str) and val not in ['true', 'false']:
         if len(val) > 255 or isinstance(val, clob):
             value = value_cls(ls_type='clobValue', ls_kind=value_kind, recorded_by=recorded_by,
@@ -351,6 +366,17 @@ class clob(str):
 
 class FileValue(str):
     pass
+
+
+class BlobValue(object):
+    
+    def __init__(self, value=None, comments=None):
+        self.value = value
+        self.comments = comments
+    
+    def __eq__(self, other: object) -> bool:
+        return self.value == other.value and self.comments == other.comments
+
 
 ## Model classes
 

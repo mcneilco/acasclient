@@ -10,6 +10,7 @@ from collections import defaultdict
 from datetime import datetime
 
 import pandas as pd
+from six import text_type as str
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -21,14 +22,38 @@ ROW_NUM_KEY = 'row number'
 ### JSON encoding / decoding
 
 def camel_to_underscore(name):
+    """Convert string from camelCase to snake_case
+
+    :param name: camelCase string to convert
+    :type name: str
+    :return: equivalent string in snake_case
+    :rtype: str
+    """
     camel_pat = re.compile(r'([A-Z])')
     return camel_pat.sub(lambda x: '_' + x.group(1).lower(), name)
 
 def underscore_to_camel(name):
+    """Convert string from snake_case to camelCase
+
+    :param name: snake_case string to convert
+    :type name: str
+    :return: equivalent string in camelCase
+    :rtype: str
+    """
     under_pat = re.compile(r'_([a-z])')
     return under_pat.sub(lambda x: x.group(1).upper(), name)
 
 def convert_json(data, convert):
+    """Convert the keys within a nested dictionary data structure using the function passed to convert
+
+    :param data: Data structure to be converted. Either a dict or a list.
+    :type data: Union[dict, list]
+    :param convert: Function to run on dict keys
+    :type convert: func(str) -> str
+    :raises ValueError: if datatype cannot be converted
+    :return: Same data structure with keys converted by function passed as `convert` argument
+    :rtype: Union[dict, list]
+    """
     if type(data) is list:
         new_data = []
         for val in data:
@@ -42,30 +67,39 @@ def convert_json(data, convert):
     return new_data
 
 def datetime_to_ts(date):
+    """Convert a datetime object to Unix timestamp *in milliseconds*
+    Intended to generate Javascript-compatible millisecond timestamps.
+
+    :param date: Date as a `datetime` instance
+    :type date: datetime
+    :return: Timestamp in milliseconds
+    :rtype: int
+    """
     if date is None:
         return None
     return int(date.timestamp() * 1000)
 
 def ts_to_datetime(ts):
+    """Convert a timestamp in milliseconds into a python `datetime` object
+
+    :param ts: Timestamp in milliseconds
+    :type ts: int
+    :return: Datetime as a python `datetime`
+    :rtype: datetime
+    """
     if ts is None:
         return None
     return datetime.fromtimestamp(ts / 1000)
 
-from six import text_type as str
-
-
-def ensure_string_list(list_to_convert):
-    return [str(potential_integer) for potential_integer in list_to_convert]
-
 
 ## ACAS-specific conversion helpers
 def parse_states_into_dict(ls_states_dict):
-    """
-    Parse a dict of LsStates with nested LsValues into a simpler dict of state_kind: { value_kind: value}
-    Input:
-        ls_states: dict of state_kind: LsState
-    Output:
-        state_dict: dictionary of state_kind: { value_kind : value}
+    """Parse a dict of LsStates with nested LsValues into a simpler dict of { state_kind: { value_kind: value} }
+
+    :param ls_states_dict: Dict of state_kind: LsState
+    :type ls_states_dict: dict
+    :return: Dictionary of state_kind: { value_kind: value }
+    :rtype: dict
     """
     state_dict = {}
     for state_kind, state in ls_states_dict.items():
@@ -73,6 +107,15 @@ def parse_states_into_dict(ls_states_dict):
     return state_dict
 
 def parse_values_into_dict(ls_values):
+    """Parse a list of LsValues into a dict of { value_kind: value }
+    If there are multiple non-ignored LsValues with the same type, the value in the returned dict
+    will be a list of values.
+
+    :param ls_values: List of LsValue objects
+    :type ls_values: list
+    :return: Dictionary of { value_kind: value } where value may be of many possible data types
+    :rtype: dict
+    """
     values_dict = {}
     for value in ls_values:
         if not value.ignored and not value.deleted:
@@ -110,6 +153,15 @@ def parse_values_into_dict(ls_values):
 
 
 def get_lsKind_to_lsvalue(ls_values_raw):
+    """Convert a list of LsValues into a dict of { value_kind: LsValue }
+    If there are multiple non-ignored LsValues with the same ls_kind, the dict will have
+    {value_kind: [LsValue, LsValue, ...]}
+
+    :param ls_values_raw: List of LsValues
+    :type ls_values_raw: list
+    :return: dict of { value_kind: LsValue }
+    :rtype: dict
+    """
     # Filter out ignored values
     ls_values = [v for v in ls_values_raw if not v.ignored and not v.deleted]
     lsKind_to_lsvalue = dict()
@@ -130,6 +182,18 @@ def get_lsKind_to_lsvalue(ls_values_raw):
 
 
 def is_equal_ls_value_simple_value(ls_value, val):
+    """Compare an LsValue to a simple value (i.e. str, int, clob, float, etc.)
+    The purpose of this function is to detect whether a given value has changed
+    relative to the previously saved value and therefore needs to be updated within ACAS.
+
+    :param ls_value: LsValue for comparison
+    :type ls_value: LsValue
+    :param val: simple value to compare to ls_value
+    :type val: Union[list, FileValue, BlobValue, clob, str, bool, DDictValue, float, int, datetime]
+    :raises ValueError: If unrecognized datatype is passed in
+    :return: True if ls_value and val are equivalent, False if not
+    :rtype: bool
+    """
     if (isinstance(val, list) and not isinstance(ls_value, list)) \
         or (isinstance(ls_value, list) and not isinstance(val, list)):
         return False
@@ -178,6 +242,13 @@ def is_equal_ls_value_simple_value(ls_value, val):
         raise ValueError("Comparing values of type {} are not yet implemented!".format(type(val)))
 
 def get_units_from_string(string):
+    """Extract units from a string of format "field (units)"
+
+    :param string: raw string to extract from
+    :type string: str
+    :return: Units extracted, as a str, or None
+    :rtype: Union[str, None]
+    """
     # Gets the units from strings,
     found_string = re.sub(r".*\((.*)\).*|(.*)", r"\1", string)
     units = None
@@ -186,9 +257,30 @@ def get_units_from_string(string):
     return units
 
 def get_value_kind_without_extras(string):
+    """Strip undesired characters and patterns from a string to prepare it to be used as an ls_kind for an LsValue
+
+    :param string: raw string
+    :type string: str
+    :return: cleaned string
+    :rtype: str
+    """
     return re.sub(r"\[[^)]*\]","",re.sub(r"(.*)\((.*)\)(.*)", r"\1\3",re.sub(r"\{[^}]*\}","",string))).strip()
 
 def make_ls_value(value_cls, value_kind, val, recorded_by):
+    """Construct an LsValue of class `value_cls` that can be recognized and persisted by ACAS
+
+    :param value_cls: class of desired output. Should inherit from AbstractValue
+    :type value_cls: class inherited from AbstractValue
+    :param value_kind: ls_kind of LsValue
+    :type value_kind: str
+    :param val: Raw value to be represented by the LsValue
+    :type val: Union[list, FileValue, BlobValue, clob, str, bool, DDictValue, float, int, datetime]
+    :param recorded_by: Username to associate with the value for auditing purposes
+    :type recorded_by: str
+    :raises ValueError: If val of unrecognized datatype is passed in
+    :return: LsValue of class `value_cls`
+    :rtype: determined by `value_cls` argument
+    """
     unit_kind = get_units_from_string(value_kind)
     value_kind = get_value_kind_without_extras(value_kind)
     if isinstance(val, FileValue):
@@ -232,6 +324,27 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     return value
 
 def update_ls_states_from_dict(state_class, state_type, value_class, state_value_simple_dict, ls_states_dict, ls_values_dict, edit_user):
+    """Translates updates between the "simple dict" data model and the more complex LsState / LsValue data model.
+    If a new state is needed, this method will create a new LsState. Otherwise it will update existing LsStates in place.
+    This method includes a nested update of all underlying LsValues as well.
+
+    :param state_class: class of LsState being handled. Used when creating new LsStates
+    :type state_class: subclass of AbstractState
+    :param state_type: lsType of LsStates
+    :type state_type: str
+    :param value_class: class of LsValue being handled. Used by nested function when creating new LsValues
+    :type value_class: subclass of AbstractValue
+    :param state_value_simple_dict: Simple dict of format { state_kind: { value_kind: value } }
+    :type state_value_simple_dict: dict
+    :param ls_states_dict: dict of LsState objects with format {state_kind: LsState}
+    :type ls_states_dict: dict
+    :param ls_values_dict: dict of LsValue objects with format {state_kind: {value_kind: LsValue}}
+    :type ls_values_dict: dict
+    :param edit_user: Username to be associated with changes, for auditing purposes
+    :type edit_user: str
+    :return: list of LsStates with updates applied
+    :rtype: list
+    """
     ls_states = []
     for state_kind, values_dict in state_value_simple_dict.items():
         try:
@@ -249,6 +362,28 @@ def update_ls_states_from_dict(state_class, state_type, value_class, state_value
     return ls_states
 
 def update_state_table_states_from_dict(state_class, value_class, state_table_simple_dict, state_table_states, state_table_values, edit_user):
+    """Translates updates between the "state table simple dict" data model and the more complex LsState model.
+    If a new state is needed, this method will create a new LsState. Otherwise it will update existing LsStates in place.
+    This method includes a nested update of all underlying LsValues as well.
+    
+    State Tables in ACAS are used when there are multiple LsStates with identical lsType and lsKind on the same Thing. These different
+    states are differentiated by a `row number` value that allows them to be rendered in a tabular format.
+
+    :param state_class: class of LsState being handled. Used when creating new LsStates
+    :type state_class: subclass of AbstractState
+    :param value_class: class of LsValue being handled. Used by nested function when creating new LsValues
+    :type value_class: subclass of AbstractValue
+    :param state_table_simple_dict: Simpler dict of format { (state_type, state_kind): row_number: {value_kind: value}}
+    :type state_table_simple_dict: dict
+    :param state_table_states: Dict of format { (state_type, state_kind): row_number: LsState }
+    :type state_table_states: dict
+    :param state_table_values: Dict of format { (state_type, state_kind): row_number: {value_kind: LsValue}}
+    :type state_table_values: dict
+    :param edit_user: Username to be associated with changes, for auditing purposes
+    :type edit_user: str
+    :return: list of LsStates with updates applied
+    :rtype: list
+    """
     ls_states = []
     for type_kind_key, state_table in state_table_simple_dict.items():
         for row_num, values_dict in state_table.items():
@@ -271,6 +406,19 @@ def update_state_table_states_from_dict(state_class, value_class, state_table_si
     return ls_states
 
 def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, edit_user):
+    """Translates updates from the "simple dict" data model into the more complex LsValue data model
+
+    :param value_class: class of LsValue being handled. Used when creating new LsValues
+    :type value_class: subclass of AbstractValue
+    :param simple_value_dict: dict of format {value_kind: value}
+    :type simple_value_dict: dict
+    :param ls_values_dict: dict of format {value_kind: LsValue}
+    :type ls_values_dict: dict
+    :param edit_user: Username to be associated with changes, for auditing purposes
+    :type edit_user: str
+    :return: list of LsValues with updates applied
+    :rtype: list
+    """
     ls_values = []
     for val_kind, val_value in simple_value_dict.items():
         new_val_is_list = isinstance(val_value, list)
@@ -320,6 +468,24 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
     return ls_values
 
 def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_labels_dict, edit_user, preferred_label_kind=None):
+    """Translates the "simple dict" data model into the more complex ACAS LsLabel format.
+
+    :param label_class: class of LsLabel being handled. Used when creating a new LsLabel.
+    :type label_class: subclass of AbstractLabel
+    :param label_type: lsType of LsLabels to create
+    :type label_type: str
+    :param simple_label_dict: dict of format {label_kind: value}
+    :type simple_label_dict: dict
+    :param ls_labels_dict: dict of format {label_kind: LsLabel}
+    :type ls_labels_dict: dict
+    :param edit_user: Username to associate with changes, for auditing purposes
+    :type edit_user: str
+    :param preferred_label_kind: lsKind of LsLabel that is "preferred" for this LsThing, defaults to None. 
+                                 New labels created that have this ls_kind will be marked with `preferred=True`
+    :type preferred_label_kind: str, optional
+    :return: list of LsLabels with updates applied
+    :rtype: list
+    """
     ls_labels = []
     for label_kind, label_text in simple_label_dict.items():
         if isinstance(label_text, list):
@@ -362,15 +528,38 @@ def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_la
     return ls_labels
 
 class clob(str):
+    """Class used to represent long string values (> 255 chars) in ACAS, saved to a database field of type `text`.
+    Used as a wrapper around str, and can be used to force ACAS to save shorter values as clobValue type for consistency
+    if the desired datatype is clobValue.
+
+    :param str: long string
+    :type str: str
+    """
     pass
 
 class FileValue(str):
+    """Class used to save files to ACAS. ACAS has a folder of uploaded files on the filesystem, and stores references
+    to the file paths as LsValues with ls_type='fileValue', file_value=filepath
+
+    :param str: filepath to file
+    :type str: str
+    """
     pass
 
 
 class BlobValue(object):
+    """Class used to save files as byte arrays to ACAS.
+    These files must be small (< 1 GB) and will be stored in a `bytea` database column.
+    """
     
     def __init__(self, value=None, comments=None):
+        """Create a BlobValue
+
+        :param value: Bytes of file content, defaults to None
+        :type value: bytes, optional
+        :param comments: Filename as a string, defaults to None
+        :type comments: str, optional
+        """
         self.value = value
         self.comments = comments
     

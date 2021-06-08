@@ -125,7 +125,7 @@ def parse_values_into_dict(ls_values):
             if value.ls_type == 'stringValue':
                 val = value.string_value
             elif value.ls_type == 'codeValue':
-                val = DDictValue(value.code_value, code_type=value.code_type, code_kind=value.code_kind, code_origin=value.code_origin)
+                val = CodeValue(value.code_value, code_type=value.code_type, code_kind=value.code_kind, code_origin=value.code_origin)
             elif value.ls_type == 'numericValue':
                 val = value.numeric_value
             elif value.ls_type == 'dateValue':
@@ -189,7 +189,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
     :param ls_value: LsValue for comparison
     :type ls_value: LsValue
     :param val: simple value to compare to ls_value
-    :type val: Union[list, FileValue, BlobValue, clob, str, bool, DDictValue, float, int, datetime]
+    :type val: Union[list, FileValue, BlobValue, clob, str, bool, CodeValue, float, int, datetime]
     :raises ValueError: If unrecognized datatype is passed in
     :return: True if ls_value and val are equivalent, False if not
     :rtype: bool
@@ -210,8 +210,8 @@ def is_equal_ls_value_simple_value(ls_value, val):
             return ls_value.string_value == val
     elif type(val) == bool:
         return ls_value.code_value == str(val)
-    elif isinstance(val, DDictValue):
-        return DDictValue(ls_value.code_value, ls_value.code_type, ls_value.code_kind, ls_value.code_origin) == val
+    elif isinstance(val, CodeValue):
+        return CodeValue(ls_value.code_value, ls_value.code_type, ls_value.code_kind, ls_value.code_origin) == val
     elif isinstance(val, float) or isinstance(val, int):
         return ls_value.numeric_value == val
     elif isinstance(val, datetime):
@@ -223,7 +223,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
 
         ddicts = set()
         for value in ls_value:
-            ddict = DDictValue(value.code_value, value.code_type,
+            ddict = CodeValue(value.code_value, value.code_type,
                                value.code_kind, value.code_origin)
             ddicts.add(ddict)
 
@@ -274,7 +274,7 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     :param value_kind: ls_kind of LsValue
     :type value_kind: str
     :param val: Raw value to be represented by the LsValue
-    :type val: Union[list, FileValue, BlobValue, clob, str, bool, DDictValue, float, int, datetime]
+    :type val: Union[list, FileValue, BlobValue, clob, str, bool, CodeValue, float, int, datetime]
     :param recorded_by: Username to associate with the value for auditing purposes
     :type recorded_by: str
     :raises ValueError: If val of unrecognized datatype is passed in
@@ -308,7 +308,7 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     elif type(val) == bool or (isinstance(val, str) and val in ['true', 'false']):
         value = value_cls(ls_type='codeValue', ls_kind=value_kind, recorded_by=recorded_by,
                                                 code_value=str(val).lower(), unit_kind = unit_kind)
-    elif isinstance(val, DDictValue):
+    elif isinstance(val, CodeValue):
         value = value_cls(ls_type='codeValue', ls_kind=value_kind, recorded_by=recorded_by,
                             code_value=val.code, code_type=val.code_type, code_kind=val.code_kind, code_origin=val.code_origin, unit_kind = unit_kind)
     elif isinstance(val, float) or isinstance(val, int):
@@ -570,6 +570,8 @@ class BlobValue(object):
 ## Model classes
 
 class BaseModel(object):
+    """Base class for attributes shared by all levels of ACAS objects (thing, label, state, value)
+    """
     _fields = ['id', 'ls_type', 'ls_kind', 'deleted', 'ignored', 'version']
 
     def __init__(self, id=None, ls_type=None, ls_kind=None, deleted=False, ignored=False, version=None):
@@ -581,8 +583,10 @@ class BaseModel(object):
         self.version = version
 
     def as_dict(self):
-        """
-        :return: The instance as a dict
+        """Serialize instance as a dict
+
+        :return: dictionary of instance attributes specified in `self._fields`
+        :rtype: dict
         """
         data = {}
         for field in self._fields:
@@ -597,33 +601,67 @@ class BaseModel(object):
         return data
 
     def as_camel_dict(self):
+        """Serialize instance as a dict with camelCase keys
+
+        :return: dict of instance attributes specified in `self._fields` but with camelCase keys
+        :rtype: dict
+        """
         snake_case_dict = self.as_dict()
         camel_dict = convert_json(snake_case_dict, underscore_to_camel)
         return camel_dict
     
     def as_json(self, **kwargs):
+        """Serialize instance into a JSON string with camelCase keys
+
+        :return: JSON string containing attributes specified in `self._fields` but with camelCase keys
+        :rtype: str
         """
-        :return: The instance as a Json string
-        """
-        snake_case_dict = self.as_dict()
-        camel_dict = convert_json(snake_case_dict, underscore_to_camel)
+        camel_dict = self.as_camel_dict()
         return json.dumps(camel_dict, **kwargs)
 
     @classmethod
     def as_list(cls, models):
+        """Convert a list of objects into a list of dicts
+
+        :param models: list of AbstractModel objects
+        :type models: list
+        :return: list of dicts
+        :rtype: list
+        """
         return [model.as_dict() for model in models or []]
         
     @classmethod
     def as_json_list(cls, models):
+        """Convert a list of objects into a JSON string list of dicts
+
+        :param models: list of AbstractModel objets
+        :type models: list
+        :return: JSON string representing list of dicts
+        :rtype: str
+        """
         return json.dumps([json.loads(model.as_json()) for model in models or []])
 
     @classmethod
     def from_camel_dict(cls, data):
+        """Construct an AbstractModel object from a camelCase dict
+
+        :param data: dict of attributes
+        :type data: dict
+        :return: instance of class AbstractModel
+        :rtype: AbstractModel
+        """
         snake_case_dict = convert_json(data, camel_to_underscore)
         return cls.from_dict(snake_case_dict)
     
     @classmethod
     def from_dict(cls, data):
+        """Construct an AbstractModel object from a dict
+
+        :param data: dict with attributes matching cls._fields
+        :type data: dict
+        :return: AbstractModel object
+        :rtype: AbstractModel
+        """
         local_data = {}
         for field in cls._fields:
             if field in data:
@@ -637,42 +675,36 @@ class BaseModel(object):
 
     @classmethod
     def from_json(cls, data):
+        """Construct an AbstractModel object from a JSON string with camelCase attribute keys
+
+        :param data: JSON string from ACAS with camelCase attribute keys
+        :type data: str
+        :return: AbstractModel object
+        :rtype: AbstractModel
+        """
         camel_dict = json.loads(data)
         snake_case_dict = convert_json(camel_dict, camel_to_underscore)
-        return cls.from_dict(json.loads(data))
+        return cls.from_dict(json.loads(snake_case_dict))
 
     @classmethod
     def from_list(cls, arr):
+        """Convert a list of dicts into a list of AbstractModel objects
+
+        :param arr: list of dicts
+        :type arr: list
+        :return: list of AbstractModel objects
+        :rtype: list
+        """
         return [cls.from_dict(elem) for elem in arr]
 
-class DDictClass(object):
-    # Data Dictionary Classes are controlled dictionaries of values
-    # They're referenced by ls_thing_values of lsType "codeValue"
-    _fields = ['code_type', 'code_kind', 'values']
+class CodeValue(object):
+    """ ACAS uses the "codeValue" type to save data that referencess a controlled dictionary of possible values.
 
-    def __init__(self, type_kind, values):
-        self.code_type, self.code_kind = type_kind
-        self.values = values
-        self.parser_map = {}
-        for code, val_obj in self.values.items():
-            accepted_vals = [code]
-            if 'accepted_values' in val_obj:
-                accepted_vals.extend(val_obj['accepted_values'])
-            for val in accepted_vals:
-                if val in self.parser_map and self.parser_map[val] != code:
-                    raise ValueError('Invalid DDict definition for type/kind {}, {}. Accepted value "{}" is already being used by code "{}"'.format(self.code_type, self.code_kind, val, self.parser_map[val]))
-                else:
-                    self.parser_map[val.lower()] = code
+    In ACAS, these controlled vocabularies are called DDictValues, short for Data Dictionary Values.
+    DDictValues are grouped together by "code_type" and "code_kind", then the individual possible values are specified by the "code" attribute.
     
-    def parse(self, raw_str):
-        safe_str = raw_str.lower()
-        if safe_str in self.parser_map:
-            return DDictValue(self.parser_map[safe_str], code_type=self.code_type, code_kind=self.code_kind, code_origin=self.code_origin)
-        else:
-            logger.error('Value "{}" not recognized for DDictClass "{}, {}, {}" - skipping!'.format(safe_str, self.code_type, self.code_kind, self.code_origin))
-            return None
-
-class DDictValue(object):
+    The CodeValue class is used to save references to DDictValues as LsValues of ls_type='codeValue'.
+    """
     _fields = ['code_type', 'code_kind','code_origin', 'code']
 
     def __init__(self, code, code_type=None, code_kind=None,
@@ -692,9 +724,20 @@ class DDictValue(object):
                     f'{self.code_origin}')
 
     def _validate_params(self, code, code_type, code_kind, code_origin, client):
-        """
-        :return: Error message if the params provided are invalid else None
-        :rtype: Union[str, None]
+        """Validate that this CodeValue conforms to the saved list of possible DDictValues
+
+        :param code: value of this CodeValue, i.e. which DDictValue is being referenced
+        :type code: str
+        :param code_type: LsType of DDictValue being referenced
+        :type code_type: str
+        :param code_kind: LsKind of DDictValue being referenced
+        :type code_kind: str
+        :param code_origin: Origin of DDictValue referenced, typically 'ACAS DDict'
+        :type code_origin: str
+        :param client: Authenticated acasclient.client instance to look up current DDictValues
+        :type client: acasclient.client
+        :return: Error message, or None if valid
+        :rtype: str | None
         """
         if client is None:
             return
@@ -1361,22 +1404,22 @@ class SimpleLsThing(BaseModel):
             link_dicts.append(link.as_dict())
         my_dict['links'] = link_dicts
 
-        # Check metadata for DDictValues and convert them to dicts
+        # Check metadata for CodeValues and convert them to dicts
         metadata = {}
         for key, val in self.metadata.items():
             metadata[key] = {}
             for k, v in val.items():
-                if isinstance(v, DDictValue):
+                if isinstance(v, CodeValue):
                     v = v.as_dict()
                 metadata[key][k] = v
         my_dict['metadata'] = metadata
 
-        # Check results for DDictValues and convert them to dicts
+        # Check results for CodeValues and convert them to dicts
         results = {}
         for key, val in self.results.items():
             results[key] = {}
             for k, v in val.items():
-                if isinstance(v, DDictValue):
+                if isinstance(v, CodeValue):
                     v = v.as_dict()
                 results[key][k] = v
         my_dict['results'] = results
@@ -1396,20 +1439,20 @@ class SimpleLsThing(BaseModel):
                 if preferredLabel.label_text:
                     my_dict['Links'][link.verb] = preferredLabel.label_text
     
-        # Check metadata for DDictValues and convert them to dicts
+        # Check metadata for CodeValues and convert them to dicts
         for key, val in self.metadata.items():
             my_dict[key] = {}
             for k, v in val.items():
-                if isinstance(v, DDictValue):
+                if isinstance(v, CodeValue):
                     v = v.code
                 my_dict[key][k] = v
 
-        # Check results for DDictValues and convert them to dicts
+        # Check results for CodeValues and convert them to dicts
         results = {}
         for key, val in self.results.items():
             my_dict[key] = {}
             for k, v in val.items():
-                if isinstance(v, DDictValue):
+                if isinstance(v, CodeValue):
                     v = v.code
                 my_dict[key][k] = v
 

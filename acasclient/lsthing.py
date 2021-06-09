@@ -766,6 +766,8 @@ class CodeValue(object):
 ### Base ACAS entities, states, values, and interactions
 
 class AbstractThing(BaseModel):
+    """Base class for LsThing and ItxLsThingLsThing ACAS objects
+    """
 
     _fields = BaseModel._fields + ['code_name', 'ls_transaction','modified_by', 'modified_date', 'recorded_by', 'recorded_date']
 
@@ -791,6 +793,8 @@ class AbstractThing(BaseModel):
         self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
 
 class AbstractLabel(BaseModel):
+    """Base class for ACAS LsLabel objects such as LsThingLabel and ItxLsThingLsThingLabel
+    """
 
     _fields = BaseModel._fields + ['image_file', 'label_text', 'ls_transaction','modified_date', 'physically_labled', 
                                 'preferred', 'recorded_by', 'recorded_date', 'version']
@@ -823,6 +827,8 @@ class AbstractLabel(BaseModel):
         self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
 
 class AbstractState(BaseModel):
+    """Base class for ACAS LsState objects
+    """
 
     _fields = BaseModel._fields + ['comments', 'ls_transaction', 'modified_by', 'modified_date', 'recorded_by', 'recorded_date']
 
@@ -848,6 +854,8 @@ class AbstractState(BaseModel):
         self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
 
 class AbstractValue(BaseModel):
+    """Base class for ACAS LsValue objects
+    """
 
     _fields = BaseModel._fields + ['blob_value', 'clob_value', 'code_kind', 'code_origin', 'code_type', 'code_value', 'comments',
                                  'conc_unit', 'concentration', 'date_value', 'file_value', 'ls_transaction', 'modified_by',
@@ -921,6 +929,9 @@ class AbstractValue(BaseModel):
         self.url_value = url_value
 
 class LsThing(AbstractThing):
+    """Class for creating and interacting with ACAS LsThing objects.
+    This is a 1:1 mapping of the ACAS LsThing class, just with pythonic snake_case attribute names
+    """
 
     _fields = AbstractThing._fields + ['ls_states', 'ls_labels', 'first_ls_things', 'second_ls_things']
 
@@ -950,11 +961,22 @@ class LsThing(AbstractThing):
         self.second_ls_things = second_ls_things
 
     def get_preferred_label(self):
+        """Get the first non-ignored LsThingLabel with `preferred=True`
+
+        :return: The preferred LsThingLabel
+        :rtype: LsThingLabel
+        """
         for label in self.ls_labels:
             if not label.ignored and not label.deleted and label.preferred:
                 return label
 
     def as_dict(self):
+        """Serialize LsThing to python dictionary.
+        This includes serializing nested objects: LsLabels, LsStates, LsValues, and ItxLsThingLsThings (interactions)
+
+        :return: nested object as dictionary
+        :rtype: dict
+        """
         my_dict = super(LsThing, self).as_dict()
         state_dicts = []
         for state in self.ls_states:
@@ -976,6 +998,14 @@ class LsThing(AbstractThing):
     
     @classmethod
     def from_dict(cls, data):
+        """Deserialize LsThing object from python dict format.
+        This includes deserializing nested objects such as LsLabels, LsStates, LsValues and interactions
+
+        :param data: dict-formatted LsThing
+        :type data: dict
+        :return: LsThing object
+        :rtype: LsThing
+        """
         my_obj = super(LsThing, cls).from_dict(data)
         ls_states = [] 
         for state_dict in my_obj.ls_states:
@@ -1000,6 +1030,13 @@ class LsThing(AbstractThing):
         return my_obj
     
     def save(self, client):
+        """Persist this LsThing to an ACAS server's database
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :return: Updated persisted LsThing object returned from the server
+        :rtype: LsThing
+        """
         if self.id and self.code_name:
             resp_dict = client.update_ls_thing_list([self.as_camel_dict()])
         else:
@@ -1007,6 +1044,8 @@ class LsThing(AbstractThing):
         return LsThing.from_camel_dict(resp_dict[0])
 
 class LsThingLabel(AbstractLabel):
+    """Class to create and interact with ACAS LsThingLabels
+    """
 
     _fields = AbstractLabel._fields + ['ls_thing']
 
@@ -1032,6 +1071,8 @@ class LsThingLabel(AbstractLabel):
         self.ls_thing = ls_thing
 
 class LsThingState(AbstractState):
+    """Class to create and interact with ACAS LsThingStates
+    """
 
     _fields = AbstractState._fields + ['ls_values', 'ls_thing']
 
@@ -1078,6 +1119,8 @@ class LsThingState(AbstractState):
         return my_obj
 
 class LsThingValue(AbstractValue):
+    """Class to interact with and save ACAS LsThingValues
+    """
 
     _fields = AbstractValue._fields + ['ls_state']
 
@@ -1129,6 +1172,8 @@ class LsThingValue(AbstractValue):
         self.ls_state = ls_state
 
 class ItxLsThingLsThing(AbstractThing):
+    """Class to manage ACAS ItxLsThingLsThings, which are rich "interactions" or links between LsThings.
+    """
 
     _fields = AbstractThing._fields + ['ls_states', 'first_ls_thing', 'second_ls_thing']
 
@@ -1277,6 +1322,93 @@ class ItxLsThingLsThingValue(AbstractValue):
 
 
 class SimpleLsThing(BaseModel):
+    """The SimpleLsThing class is meant to vastly simplify how a programmer interacts with ACAS LsThing objects.
+    This class buries the complexities of LsThings, LsStates, LsValues, LsLabels, and interactions into a simplified interface,
+    and handles the conversions and updates to underlying ACAS LsThing classes to allow a python programmer to stick to editing
+    much simpler dictionary objects.
+
+    ACAS LsThings are "generic entities", meaning that they can be used to represent many different types of data. Across ACAS,
+    the ls_type and ls_kind attributes are used to specify the meaning of an individual entity, label, value, or state.
+
+    Top-level attributes (mapped directly onto the LsThing):
+     - ls_type: The broadest classifier for what class of entities this LsThing represents.
+     - ls_kind: A more specific classifier for what class of entities this LsThing represents.
+     - code_name: Unique internal identifier, auto-generated by ACAS. Every LsThing with the same ls_type and ls_kind shares a
+                  sequence of code_names with incrementing numbers.
+     - recorded_by: The username of the person that recorded or saved this LsThing to ACAS. This is used for auditing and tracking
+                    down the provenance of data.
+    
+    Identifiers (mapped onto LsThingLabels):
+     - ids: IDs, often unique identifiers that can be used to reference this LsThing or to align this LsThing with entries in 
+            external data sources.
+     - names: Human-readable names for this LsThing.
+     - aliases: Additional non-primary identifiers. Notably different from `ids` and `names`, `aliases` allow for multiple
+                labels of the same category (i.e. same ls_kind).
+    
+    Metadata and Results (mapped onto LsThingStates and LsThingValues):
+     - metadata: Section for saving metadata about this entity. Highly flexible.
+     - results: Section for saving data or results about this entity. Also highly flexible.
+    
+    State Tables (mapped onto LsThingStates and LsThingValues):
+     - Stores tabular data with multiple "rows" of data with defined "columns".
+    
+    Links (Mapped onto ItxLsThingLsThing): Express relationships to other entities.
+
+    Example storing "Toto" from the Wizard of Oz: 
+    ```
+    {
+        'ls_type': 'animal',
+        'ls_kind': 'dog',
+        'code_name': 'DOG00001',
+        'recorded_by': 'bob',
+        'ids': {
+            'Dog License Number': 'DL0023114'
+        },
+        'names': {
+            'Full Name': 'Terry'
+        },
+        'aliases': {
+            'Character Name': ['Toto', 'Rex']
+        },
+        'metadata': {
+            'Birth Date': -1139961600000
+            'Death Date': -767923200000,
+            'Birth City': 'Chicago'
+            'Death City': 'Hollywood'
+        },
+        'state_tables': {
+            ('credits', 'Film'): {
+                '0':{
+                    'Movie Title': 'The Wizard of Oz',
+                    'Release Year': 1939
+                },
+                '1':{
+                    'Movie Title': 'The Women',
+                    'Release Year': 1939
+                }
+            }
+        }
+        'results': {
+            'Total Film Appearances': 16,
+            'Wikipedia Page': 'https://en.wikipedia.org/wiki/Terry_(dog)'
+        },
+        'links': [
+            {
+                'verb': 'is owned by',
+                'linked_thing': {
+                    'ls_type': 'animal',
+                    'ls_kind': 'human',
+                    'code_name': 'HUM00001',
+                    'names': {
+                        'Full Name': 'Carl Spitz'
+                    }
+                }
+            }
+        ]
+
+    }
+    ```
+    """
     _fields = ['ls_type', 'ls_kind', 'code_name', 'names', 'ids', 'aliases', 'metadata', 'results', 'links', 'recorded_by',
                 'state_tables']
     
@@ -1316,6 +1448,11 @@ class SimpleLsThing(BaseModel):
             self._state_table_values = defaultdict(lambda: defaultdict(dict))
     
     def populate_from_ls_thing(self, ls_thing):
+        """Translates an LsThing object into the "simple" dictionary
+
+        :param ls_thing: instance of class LsThing
+        :type ls_thing: LsThing
+        """
         self.ls_type = ls_thing.ls_type
         self.ls_kind = ls_thing.ls_kind
         self.code_name = ls_thing.code_name
@@ -1459,6 +1596,15 @@ class SimpleLsThing(BaseModel):
         return my_dict
 
     def _prepare_for_save(self, client, user=None):
+        """Translates all changes made to the "simple dict" attributes of this object
+        into the underlying LsThing / LsState / LsValue / LsLabel data models, to prepare
+        for saving updates to the ACAS server.
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param user: Username to record as having made these changes, defaults to self.recorded_by
+        :type user: str, optional
+        """
         #TODO redo recorded_by logic to allow passing in of an updater
         if not user:
             user = self.recorded_by
@@ -1489,6 +1635,11 @@ class SimpleLsThing(BaseModel):
         self.populate_from_ls_thing(self._ls_thing)
     
     def save(self, client):
+        """Persist changes to the ACAS server.
+
+        :param client: Authenticated instances of acasclient.client
+        :type client: acasclient.client
+        """
         self._prepare_for_save(client)
         # Persist
         self._ls_thing = self._ls_thing.save(client)
@@ -1496,6 +1647,19 @@ class SimpleLsThing(BaseModel):
     
     @classmethod
     def get_by_code(cls, code_name, client=None, ls_type=None, ls_kind=None):
+        """Fetch a SimpleLsThing object from the ACAS server by ls_type + ls_kind + code_name
+
+        :param code_name: code_name of LsThing to fetch
+        :type code_name: str
+        :param client: Authenticated instance of acasclient.client, defaults to None
+        :type client: acasclient.client, optional
+        :param ls_type: ls_type of LsThing to fetch, defaults to None
+        :type ls_type: str, optional
+        :param ls_kind: ls_kind of LsThing to fetch, defaults to None
+        :type ls_kind: str, optional
+        :return: SimpleLsThing object with latest data fetched frm the ACAS server
+        :rtype: SimpleLsThing
+        """
         if not ls_type:
             ls_type = cls.ls_type
         if not ls_kind:
@@ -1505,6 +1669,15 @@ class SimpleLsThing(BaseModel):
     
     @classmethod
     def save_list(cls, client, models):
+        """Persist a list of new SimpleLsThing objects to the ACAS server
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param models: List of SimpleLsThing objects to save
+        :type models: list
+        :return: Updated list of SimpleLsThing objects after save
+        :rtype: list
+        """
         if len(models) == 0:
             return []
 
@@ -1520,6 +1693,15 @@ class SimpleLsThing(BaseModel):
     
     @classmethod
     def update_list(cls, client, models, clear_links=False):
+        """Persist updates for a list of existing SimpleLsThing objects to the ACAS server
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param models: List of SimpleLsThing objects to update
+        :type models: list
+        :return: Updated list of SimpleLsThing objects after update
+        :rtype: list
+        """
         if len(models) == 0:
             return []
 
@@ -1545,18 +1727,30 @@ class SimpleLsThing(BaseModel):
         return(hasher.hexdigest())
 
     def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata={}, results={}):
-        """
-        Create a new link between this SimpleLsThing and another SimpleLsThing `linked_thing`
+        """Create a new link between this SimpleLsThing and another SimpleLsThing `linked_thing`
+
+        :param verb: The nature of the link. This should be defined in `interactions.py`, defaults to None
+        :type verb: str, optional
+        :param linked_thing: The "other" SimpleLsThing to create a link to, defaults to None
+        :type linked_thing: SimpleLsThing, optional
+        :param recorded_by: Username to record as having created the link, defaults to None
+        :type recorded_by: str, optional
+        :param metadata: Dictionary of metadata to associate with the link itself, defaults to {}
+        :type metadata: dict, optional
+        :param results: Dictioanry of results to associate with the link itself, defaults to {}
+        :type results: dict, optional
         """
         self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type, 
                                     recorded_by=recorded_by, metadata=metadata, results=results))
     
     def upload_file_values(self, client):
-        """
-        Loop through the values for file values and check if the value is a base64 string or
+        """Loop through the values for file values and check if the value is a base64 string or
         a dict object.  If its either, then upload the file and replace the value
         with the relative path on the server (just the file name), required for the 
-        service route to properly handle the file on save of the ls thing.
+        service route to properly handle the file on save of the LsThing.
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
         """
         def isBase64(s):
             return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
@@ -1574,6 +1768,41 @@ class SimpleLsThing(BaseModel):
 
 
 class SimpleLink(BaseModel):
+    """The SimpleLink class is used to save directional relationships between SimpleLsThings. ACAS's LsThing data model is conceptually made
+    up of nodes and edges in a "graph", where SimpleLsThings are the nodes and SimpleLinks are the edges. In this data model, the
+    edges can be "rich" with data similar to the nodes.
+
+    The relationships or links between SimpleLsThings are organized using verbs, such that the "first" SimpleLsThing, the SimpleLink "verb"
+    and the "second" SimpleLsThing form an English "subject verb object" phrase.
+
+    Following the example provided in SimpleLsThing of the dog actor Terry and her owner Carl Spitz, the relationship can be expressed as
+    "Carl Spritz owns Terry", where subject="Carl Spritz", verb="owns", object="Terry".
+
+    Looking directly at this relationship as a SimpleLink, it would appear as:
+
+    ```
+    {
+        'verb': 'owns',
+        'subject': {
+            'ls_type': 'animal',
+            'ls_kind': 'human',
+            'code_name': 'HUM00001',
+            'names': {
+                'Full Name': 'Carl Spitz'
+            }
+        },
+        'object': {
+            'ls_type': 'animal',
+            'ls_kind': 'dog',
+            'code_name': 'DOG00001',
+            'names': {
+                'Full Name': 'Terry'
+            },
+        }
+    }
+    ```
+    
+    """
     _fields = ['verb', 'subject', 'object', 'metadata', 'results']
 
     def __init__(self, verb=None, subject=None, object=None, metadata={}, results={}, recorded_by=None, itx_ls_thing_ls_thing=None,
@@ -1677,6 +1906,15 @@ class SimpleLink(BaseModel):
             self._itx_ls_thing_ls_thing.ls_states = list(self._metadata_states.values()) + list(self._results_states.values())
         
     def _convert_values_to_objects(self, values_dict, state):
+        """Converts simple dictionary values into ItxLsThingLsThingLsValues
+
+        :param values_dict: simple dict of { value_kind: value }
+        :type values_dict: dict
+        :param state: ItxLsThingLsThingState to attached values to
+        :type state: ItxLsThingLsThingState
+        :return: Tuple of (updated state, ls_values_dict) where ls_values dict is of format { value_kind: LsValue }
+        :rtype: tuple
+        """
         values_obj_dict = {}
         ls_values = []
         for val_kind, val_value in values_dict.items():

@@ -27,6 +27,7 @@ INTERACTION_VERBS_DICT = {
     'comprises': 'is comprised of',
     'analyzes': 'is analyzed by',
     'is input structure for': 'has input structure',
+    'owns': 'is owned by'
 }
 
 def opposite(verb):

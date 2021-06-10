@@ -357,7 +357,7 @@ class TestAcasclient(unittest.TestCase):
         response = self.client.register_sdf_request(request)
         self.assertIn('reportFiles', response[0])
         self.assertIn('summary', response[0])
-        self.assertIn('Registration completed', response[0]['summary'])
+        self.assertIn('Number of entries processed', response[0]['summary'])
 
     def test_006_register_sdf(self):
         """Test register sdf."""
@@ -520,7 +520,7 @@ class TestAcasclient(unittest.TestCase):
                                             mappings)
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
-        self.assertIn('Registration completed', response['summary'])
+        self.assertIn('Number of entries processed', response['summary'])
 
     def test_007_cmpd_search_request(self):
         """Test cmpd search request."""
@@ -873,7 +873,7 @@ class TestAcasclient(unittest.TestCase):
         }]
         registration_result = self.client.register_sdf(test_012_upload_file_file, "bob",
                                                        mappings)
-        self.assertIn('2 new lots', registration_result['summary'])
+        self.assertIn('New lots of existing compounds: 2', registration_result['summary'])
         # not currently easy to look up a bulk load files so we will just purge the latest one
         # get all bulk load files and then find the latest one
         files = self.client.\
@@ -1100,7 +1100,7 @@ class TestAcasclient(unittest.TestCase):
             "stateType": "metadata",
             "stateKind": "project metadata",
             "valueType": "codeValue",
-            "valueKind": "status",
+            "valueKind": "project status",
             "operator": "="
         }]
         ls_things = self.client\

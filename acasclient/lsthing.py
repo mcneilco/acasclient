@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from .interactions import INTERACTION_VERBS_DICT, opposite
 
 import copy
 import hashlib
@@ -8,18 +9,17 @@ import pathlib
 import re
 from collections import defaultdict
 from datetime import datetime
-
 import pandas as pd
 from six import text_type as str
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-from .interactions import INTERACTION_VERBS_DICT, opposite
 
 ROW_NUM_KEY = 'row number'
 
-### JSON encoding / decoding
+# JSON encoding / decoding
+
 
 def camel_to_underscore(name):
     """Convert string from camelCase to snake_case
@@ -32,6 +32,7 @@ def camel_to_underscore(name):
     camel_pat = re.compile(r'([A-Z])')
     return camel_pat.sub(lambda x: '_' + x.group(1).lower(), name)
 
+
 def underscore_to_camel(name):
     """Convert string from snake_case to camelCase
 
@@ -42,6 +43,7 @@ def underscore_to_camel(name):
     """
     under_pat = re.compile(r'_([a-z])')
     return under_pat.sub(lambda x: x.group(1).upper(), name)
+
 
 def convert_json(data, convert):
     """Convert the keys within a nested dictionary data structure using the function passed to convert
@@ -57,14 +59,18 @@ def convert_json(data, convert):
     if type(data) is list:
         new_data = []
         for val in data:
-            new_data.append(convert_json(val, convert) if (isinstance(val, dict) or isinstance(val, list)) else val)
+            new_data.append(convert_json(val, convert) if (
+                isinstance(val, dict) or isinstance(val, list)) else val)
     elif type(data) is dict:
         new_data = {}
         for key, val in data.items():
-            new_data[convert(key)] = convert_json(val, convert) if (isinstance(val, dict) or isinstance(val, list)) else val
+            new_data[convert(key)] = convert_json(val, convert) if (
+                isinstance(val, dict) or isinstance(val, list)) else val
     else:
-        raise ValueError("Cannot convert {} to JSON: {}".format(type(data), data))
+        raise ValueError(
+            "Cannot convert {} to JSON: {}".format(type(data), data))
     return new_data
+
 
 def datetime_to_ts(date):
     """Convert a datetime object to Unix timestamp *in milliseconds*
@@ -79,6 +85,7 @@ def datetime_to_ts(date):
         return None
     return int(date.timestamp() * 1000)
 
+
 def ts_to_datetime(ts):
     """Convert a timestamp in milliseconds into a python `datetime` object
 
@@ -92,7 +99,7 @@ def ts_to_datetime(ts):
     return datetime.fromtimestamp(ts / 1000)
 
 
-## ACAS-specific conversion helpers
+# ACAS-specific conversion helpers
 def parse_states_into_dict(ls_states_dict):
     """Parse a dict of LsStates with nested LsValues into a simpler dict of { state_kind: { value_kind: value} }
 
@@ -105,6 +112,7 @@ def parse_states_into_dict(ls_states_dict):
     for state_kind, state in ls_states_dict.items():
         state_dict[state_kind] = parse_values_into_dict(state.ls_values)
     return state_dict
+
 
 def parse_values_into_dict(ls_values):
     """Parse a list of LsValues into a dict of { value_kind: value }
@@ -125,7 +133,8 @@ def parse_values_into_dict(ls_values):
             if value.ls_type == 'stringValue':
                 val = value.string_value
             elif value.ls_type == 'codeValue':
-                val = CodeValue(value.code_value, code_type=value.code_type, code_kind=value.code_kind, code_origin=value.code_origin)
+                val = CodeValue(value.code_value, code_type=value.code_type,
+                                code_kind=value.code_kind, code_origin=value.code_origin)
             elif value.ls_type == 'numericValue':
                 val = value.numeric_value
             elif value.ls_type == 'dateValue':
@@ -137,8 +146,9 @@ def parse_values_into_dict(ls_values):
             elif value.ls_type == 'fileValue':
                 val = FileValue(value.file_value)
             elif value.ls_type == 'blobValue':
-                val = BlobValue(value=value.blob_value, comments=value.comments)
-            # In cases where there are multiple values with same ls_kind, 
+                val = BlobValue(value=value.blob_value,
+                                comments=value.comments)
+            # In cases where there are multiple values with same ls_kind,
             # make the dictionary value into a list and append this value
             if key in values_dict:
                 if isinstance(values_dict[key], list):
@@ -195,7 +205,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
     :rtype: bool
     """
     if (isinstance(val, list) and not isinstance(ls_value, list)) \
-        or (isinstance(ls_value, list) and not isinstance(val, list)):
+            or (isinstance(ls_value, list) and not isinstance(val, list)):
         return False
     elif isinstance(val, FileValue):
         return ls_value.file_value == val
@@ -224,7 +234,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
         ddicts = set()
         for value in ls_value:
             ddict = CodeValue(value.code_value, value.code_type,
-                               value.code_kind, value.code_origin)
+                              value.code_kind, value.code_origin)
             ddicts.add(ddict)
 
         return all([value in ddicts for value in val])
@@ -239,7 +249,9 @@ def is_equal_ls_value_simple_value(ls_value, val):
                 pd.isnull(ls_value.numeric_value)
                 )
     else:
-        raise ValueError("Comparing values of type {} are not yet implemented!".format(type(val)))
+        raise ValueError(
+            "Comparing values of type {} are not yet implemented!".format(type(val)))
+
 
 def get_units_from_string(string):
     """Extract units from a string of format "field (units)"
@@ -256,6 +268,7 @@ def get_units_from_string(string):
         units = found_string
     return units
 
+
 def get_value_kind_without_extras(string):
     """Strip undesired characters and patterns from a string to prepare it to be used as an ls_kind for an LsValue
 
@@ -264,7 +277,8 @@ def get_value_kind_without_extras(string):
     :return: cleaned string
     :rtype: str
     """
-    return re.sub(r"\[[^)]*\]","",re.sub(r"(.*)\((.*)\)(.*)", r"\1\3",re.sub(r"\{[^}]*\}","",string))).strip()
+    return re.sub(r"\[[^)]*\]", "", re.sub(r"(.*)\((.*)\)(.*)", r"\1\3", re.sub(r"\{[^}]*\}", "", string))).strip()
+
 
 def make_ls_value(value_cls, value_kind, val, recorded_by):
     """Construct an LsValue of class `value_cls` that can be recognized and persisted by ACAS
@@ -285,7 +299,7 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     value_kind = get_value_kind_without_extras(value_kind)
     if isinstance(val, FileValue):
         value = value_cls(ls_type="fileValue", ls_kind=value_kind, recorded_by=recorded_by,
-                                                file_value=val, unit_kind = unit_kind)
+                          file_value=val, unit_kind=unit_kind)
     if isinstance(val, BlobValue):
         value = value_cls(
             ls_type="blobValue",
@@ -298,30 +312,32 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     elif isinstance(val, str) and val not in ['true', 'false']:
         if len(val) > 255 or isinstance(val, clob):
             value = value_cls(ls_type='clobValue', ls_kind=value_kind, recorded_by=recorded_by,
-                                                    clob_value=val, unit_kind = unit_kind)
+                              clob_value=val, unit_kind=unit_kind)
         elif val.startswith('https://') or val.startswith('http://'):
             value = value_cls(ls_type='urlValue', ls_kind=value_kind, recorded_by=recorded_by,
-                                                    url_value=val, unit_kind = unit_kind)
+                              url_value=val, unit_kind=unit_kind)
         else:
             value = value_cls(ls_type='stringValue', ls_kind=value_kind, recorded_by=recorded_by,
-                                                    string_value=val, unit_kind = unit_kind)
+                              string_value=val, unit_kind=unit_kind)
     elif type(val) == bool or (isinstance(val, str) and val in ['true', 'false']):
         value = value_cls(ls_type='codeValue', ls_kind=value_kind, recorded_by=recorded_by,
-                                                code_value=str(val).lower(), unit_kind = unit_kind)
+                          code_value=str(val).lower(), unit_kind=unit_kind)
     elif isinstance(val, CodeValue):
         value = value_cls(ls_type='codeValue', ls_kind=value_kind, recorded_by=recorded_by,
-                            code_value=val.code, code_type=val.code_type, code_kind=val.code_kind, code_origin=val.code_origin, unit_kind = unit_kind)
+                          code_value=val.code, code_type=val.code_type, code_kind=val.code_kind, code_origin=val.code_origin, unit_kind=unit_kind)
     elif isinstance(val, float) or isinstance(val, int):
         if pd.isnull(val):
             val = None
         value = value_cls(ls_type='numericValue', ls_kind=value_kind, recorded_by=recorded_by,
-                                                numeric_value=val, unit_kind = unit_kind)
+                          numeric_value=val, unit_kind=unit_kind)
     elif isinstance(val, datetime):
         value = value_cls(ls_type='dateValue', ls_kind=value_kind, recorded_by=recorded_by,
-                                                date_value=datetime_to_ts(val), unit_kind = unit_kind)
+                          date_value=datetime_to_ts(val), unit_kind=unit_kind)
     else:
-        raise ValueError("Saving values of type {} are not yet implemented!".format(type(val)))
+        raise ValueError(
+            "Saving values of type {} are not yet implemented!".format(type(val)))
     return value
+
 
 def update_ls_states_from_dict(state_class, state_type, value_class, state_value_simple_dict, ls_states_dict, ls_values_dict, edit_user):
     """Translates updates between the "simple dict" data model and the more complex LsState / LsValue data model.
@@ -351,21 +367,24 @@ def update_ls_states_from_dict(state_class, state_type, value_class, state_value
             state = ls_states_dict[state_kind]
         except KeyError:
             # state not found, so create one
-            state = state_class(ls_type=state_type, ls_kind=state_kind, recorded_by=edit_user)
+            state = state_class(ls_type=state_type,
+                                ls_kind=state_kind, recorded_by=edit_user)
         try:
             current_values = ls_values_dict[state_kind]
         except KeyError:
             current_values = {}
-        ls_values = update_ls_values_from_dict(value_class, values_dict, current_values, edit_user)
+        ls_values = update_ls_values_from_dict(
+            value_class, values_dict, current_values, edit_user)
         state.ls_values = ls_values
         ls_states.append(state)
     return ls_states
+
 
 def update_state_table_states_from_dict(state_class, value_class, state_table_simple_dict, state_table_states, state_table_values, edit_user):
     """Translates updates between the "state table simple dict" data model and the more complex LsState model.
     If a new state is needed, this method will create a new LsState. Otherwise it will update existing LsStates in place.
     This method includes a nested update of all underlying LsValues as well.
-    
+
     State Tables in ACAS are used when there are multiple LsStates with identical lsType and lsKind on the same Thing. These different
     states are differentiated by a `row number` value that allows them to be rendered in a tabular format.
 
@@ -392,7 +411,8 @@ def update_state_table_states_from_dict(state_class, value_class, state_table_si
             except KeyError:
                 # state not found, so create one
                 state_type, state_kind = type_kind_key
-                state = state_class(ls_type=state_type, ls_kind=state_kind, recorded_by=edit_user)
+                state = state_class(ls_type=state_type,
+                                    ls_kind=state_kind, recorded_by=edit_user)
             # Ensure there is a row number value, and if not auto-create it
             if ROW_NUM_KEY not in values_dict:
                 values_dict[ROW_NUM_KEY] = row_num
@@ -400,10 +420,12 @@ def update_state_table_states_from_dict(state_class, value_class, state_table_si
                 current_values = state_table_values[type_kind_key][row_num]
             except KeyError:
                 current_values = {}
-            ls_values = update_ls_values_from_dict(value_class, values_dict, current_values, edit_user)
+            ls_values = update_ls_values_from_dict(
+                value_class, values_dict, current_values, edit_user)
             state.ls_values = ls_values
             ls_states.append(state)
     return ls_states
+
 
 def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, edit_user):
     """Translates updates from the "simple dict" data model into the more complex LsValue data model
@@ -436,10 +458,12 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
                 if not new_val_null:
                     # Handle lists within the value dict
                     if new_val_is_list:
-                        new_ls_vals = [make_ls_value(value_class, val_kind, val, edit_user) for val in val_value]
+                        new_ls_vals = [make_ls_value(
+                            value_class, val_kind, val, edit_user) for val in val_value]
                         ls_values.extend(new_ls_vals)
                     else:
-                        new_ls_val = make_ls_value(value_class, val_kind, val_value, edit_user)
+                        new_ls_val = make_ls_value(
+                            value_class, val_kind, val_value, edit_user)
                         ls_values.append(new_ls_val)
                 # To handle lists we cast old_ls_val into a list at this point if it's not
                 if old_val_is_list:
@@ -459,13 +483,16 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
             if val_value is not None:
                 # New value of an ls_kind not seen before
                 # Handle lists within the value dict
-                    if new_val_is_list:
-                        new_ls_vals = [make_ls_value(value_class, val_kind, val, edit_user) for val in val_value]
-                        ls_values.extend(new_ls_vals)
-                    else:
-                        new_ls_val = make_ls_value(value_class, val_kind, val_value, edit_user)
-                        ls_values.append(new_ls_val)
+                if new_val_is_list:
+                    new_ls_vals = [make_ls_value(
+                        value_class, val_kind, val, edit_user) for val in val_value]
+                    ls_values.extend(new_ls_vals)
+                else:
+                    new_ls_val = make_ls_value(
+                        value_class, val_kind, val_value, edit_user)
+                    ls_values.append(new_ls_val)
     return ls_values
+
 
 def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_labels_dict, edit_user, preferred_label_kind=None):
     """Translates the "simple dict" data model into the more complex ACAS LsLabel format.
@@ -480,7 +507,7 @@ def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_la
     :type ls_labels_dict: dict
     :param edit_user: Username to associate with changes, for auditing purposes
     :type edit_user: str
-    :param preferred_label_kind: lsKind of LsLabel that is "preferred" for this LsThing, defaults to None. 
+    :param preferred_label_kind: lsKind of LsLabel that is "preferred" for this LsThing, defaults to None.
                                  New labels created that have this ls_kind will be marked with `preferred=True`
     :type preferred_label_kind: str, optional
     :return: list of LsLabels with updates applied
@@ -503,8 +530,9 @@ def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_la
             # Replace with the new set
             if replace_all:
                 for new_label_text in label_list:
-                    preferred = False # preferred is not allowed for aliases
-                    new_ls_label = label_class(ls_type=label_type, ls_kind=label_kind, label_text=new_label_text, preferred=preferred, recorded_by=edit_user)
+                    preferred = False  # preferred is not allowed for aliases
+                    new_ls_label = label_class(ls_type=label_type, ls_kind=label_kind,
+                                               label_text=new_label_text, preferred=preferred, recorded_by=edit_user)
                     ls_labels.append(new_ls_label)
         else:
             if label_kind in ls_labels_dict:
@@ -513,7 +541,8 @@ def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_la
                     # Label has changed. Mark old LsLabel as ignored and create  a new LsLabel
                     if label_text is not None:
                         preferred = (label_kind == preferred_label_kind)
-                        new_ls_label = label_class(ls_type=label_type, ls_kind=label_kind, label_text=label_text, preferred=preferred, recorded_by=edit_user)
+                        new_ls_label = label_class(
+                            ls_type=label_type, ls_kind=label_kind, label_text=label_text, preferred=preferred, recorded_by=edit_user)
                         ls_labels.append(new_ls_label)
                     old_ls_label.ignored = True
                     old_ls_label.modified_by = edit_user
@@ -523,9 +552,11 @@ def update_ls_labels_from_dict(label_class, label_type, simple_label_dict, ls_la
                 if label_text is not None:
                     # New label of an ls_kind not seen before
                     preferred = (label_kind == preferred_label_kind)
-                    new_ls_label = label_class(ls_type=label_type, ls_kind=label_kind, label_text=label_text, preferred=preferred, recorded_by=edit_user)
+                    new_ls_label = label_class(ls_type=label_type, ls_kind=label_kind,
+                                               label_text=label_text, preferred=preferred, recorded_by=edit_user)
                     ls_labels.append(new_ls_label)
     return ls_labels
+
 
 class clob(str):
     """Class used to represent long string values (> 255 chars) in ACAS, saved to a database field of type `text`.
@@ -536,6 +567,7 @@ class clob(str):
     :type str: str
     """
     pass
+
 
 class FileValue(str):
     """Class used to save files to ACAS. ACAS has a folder of uploaded files on the filesystem, and stores references
@@ -551,7 +583,7 @@ class BlobValue(object):
     """Class used to save files as byte arrays to ACAS.
     These files must be small (< 1 GB) and will be stored in a `bytea` database column.
     """
-    
+
     def __init__(self, value=None, comments=None):
         """Create a BlobValue
 
@@ -562,12 +594,12 @@ class BlobValue(object):
         """
         self.value = value
         self.comments = comments
-    
+
     def __eq__(self, other: object) -> bool:
         return self.value == other.value and self.comments == other.comments
 
 
-## Model classes
+# Model classes
 
 class BaseModel(object):
     """Base class for attributes shared by all levels of ACAS objects (thing, label, state, value)
@@ -609,7 +641,7 @@ class BaseModel(object):
         snake_case_dict = self.as_dict()
         camel_dict = convert_json(snake_case_dict, underscore_to_camel)
         return camel_dict
-    
+
     def as_json(self, **kwargs):
         """Serialize instance into a JSON string with camelCase keys
 
@@ -629,7 +661,7 @@ class BaseModel(object):
         :rtype: list
         """
         return [model.as_dict() for model in models or []]
-        
+
     @classmethod
     def as_json_list(cls, models):
         """Convert a list of objects into a JSON string list of dicts
@@ -652,7 +684,7 @@ class BaseModel(object):
         """
         snake_case_dict = convert_json(data, camel_to_underscore)
         return cls.from_dict(snake_case_dict)
-    
+
     @classmethod
     def from_dict(cls, data):
         """Construct an AbstractModel object from a dict
@@ -697,15 +729,16 @@ class BaseModel(object):
         """
         return [cls.from_dict(elem) for elem in arr]
 
+
 class CodeValue(object):
     """ ACAS uses the "codeValue" type to save data that referencess a controlled dictionary of possible values.
 
     In ACAS, these controlled vocabularies are called DDictValues, short for Data Dictionary Values.
     DDictValues are grouped together by "code_type" and "code_kind", then the individual possible values are specified by the "code" attribute.
-    
+
     The CodeValue class is used to save references to DDictValues as LsValues of ls_type='codeValue'.
     """
-    _fields = ['code_type', 'code_kind','code_origin', 'code']
+    _fields = ['code_type', 'code_kind', 'code_origin', 'code']
 
     def __init__(self, code, code_type=None, code_kind=None,
                  code_origin=None, client=None):
@@ -763,142 +796,156 @@ class CodeValue(object):
             self.code_origin == value.code_origin
         ])
 
-### Base ACAS entities, states, values, and interactions
+# Base ACAS entities, states, values, and interactions
+
 
 class AbstractThing(BaseModel):
     """Base class for LsThing and ItxLsThingLsThing ACAS objects
     """
 
-    _fields = BaseModel._fields + ['code_name', 'ls_transaction','modified_by', 'modified_date', 'recorded_by', 'recorded_date']
+    _fields = BaseModel._fields + ['code_name', 'ls_transaction',
+                                   'modified_by', 'modified_date', 'recorded_by', 'recorded_date']
 
     def __init__(self,
-                id=None,
-                code_name=None,
-                deleted=False,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                modified_by=None,
-                modified_date=None,
-                recorded_by=None, # Should this and recorded_date be auto-filled-in here?
-                recorded_date=None,
-                version=None):
-        super(AbstractThing, self).__init__(id=id, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 id=None,
+                 code_name=None,
+                 deleted=False,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 modified_by=None,
+                 modified_date=None,
+                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
+                 recorded_date=None,
+                 version=None):
+        super(AbstractThing, self).__init__(id=id, deleted=deleted,
+                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
         self.code_name = code_name
         self.ls_transaction = ls_transaction
         self.modified_by = modified_by
         self.modified_date = modified_date
         self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
+        self.recorded_date = datetime_to_ts(
+            datetime.now()) if recorded_date is None else recorded_date
+
 
 class AbstractLabel(BaseModel):
     """Base class for ACAS LsLabel objects such as LsThingLabel and ItxLsThingLsThingLabel
     """
 
-    _fields = BaseModel._fields + ['image_file', 'label_text', 'ls_transaction','modified_date', 'physically_labled', 
-                                'preferred', 'recorded_by', 'recorded_date', 'version']
+    _fields = BaseModel._fields + ['image_file', 'label_text', 'ls_transaction', 'modified_date', 'physically_labled',
+                                   'preferred', 'recorded_by', 'recorded_date', 'version']
 
     def __init__(self,
-                id=None,
-                deleted=False,
-                ignored=False,
-                image_file=None,
-                label_text=None,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                modified_date=None,
-                physically_labled=False,
-                preferred=False,
-                recorded_by=None, # Should this and recorded_date be auto-filled-in here?
-                recorded_date=None,
-                version=None):
-        super(AbstractLabel, self).__init__(id=id, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 id=None,
+                 deleted=False,
+                 ignored=False,
+                 image_file=None,
+                 label_text=None,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 modified_date=None,
+                 physically_labled=False,
+                 preferred=False,
+                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
+                 recorded_date=None,
+                 version=None):
+        super(AbstractLabel, self).__init__(id=id, deleted=deleted,
+                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
         self.image_file = image_file
         if len(label_text) > 255:
-            raise ValueError('Label text "{}" exceeds max length of 255 characters. It is {} characters'.format(label_text, len(label_text)))
+            raise ValueError('Label text "{}" exceeds max length of 255 characters. It is {} characters'.format(
+                label_text, len(label_text)))
         self.label_text = label_text
         self.ls_transaction = ls_transaction
         self.modified_date = modified_date
         self.physically_labled = physically_labled
         self.preferred = preferred
         self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
+        self.recorded_date = datetime_to_ts(
+            datetime.now()) if recorded_date is None else recorded_date
+
 
 class AbstractState(BaseModel):
     """Base class for ACAS LsState objects
     """
 
-    _fields = BaseModel._fields + ['comments', 'ls_transaction', 'modified_by', 'modified_date', 'recorded_by', 'recorded_date']
+    _fields = BaseModel._fields + ['comments', 'ls_transaction',
+                                   'modified_by', 'modified_date', 'recorded_by', 'recorded_date']
 
     def __init__(self,
-                id=None,
-                comments=None,
-                deleted=False,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                modified_by=None,
-                modified_date=None,
-                recorded_by=None, # Should this and recorded_date be auto-filled-in here?
-                recorded_date=None,
-                version=None):
-        super(AbstractState, self).__init__(id=id, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 id=None,
+                 comments=None,
+                 deleted=False,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 modified_by=None,
+                 modified_date=None,
+                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
+                 recorded_date=None,
+                 version=None):
+        super(AbstractState, self).__init__(id=id, deleted=deleted,
+                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
         self.comments = comments
         self.ls_transaction = ls_transaction
         self.modified_by = modified_by
         self.modified_date = modified_date
         self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
+        self.recorded_date = datetime_to_ts(
+            datetime.now()) if recorded_date is None else recorded_date
+
 
 class AbstractValue(BaseModel):
     """Base class for ACAS LsValue objects
     """
 
     _fields = BaseModel._fields + ['blob_value', 'clob_value', 'code_kind', 'code_origin', 'code_type', 'code_value', 'comments',
-                                 'conc_unit', 'concentration', 'date_value', 'file_value', 'ls_transaction', 'modified_by',
-                                 'modified_date', 'number_of_replicates', 'numeric_value', 'operator_kind', 'operator_type',
-                                 'public_data', 'recorded_by', 'recorded_date', 'sig_figs', 'string_value', 'uncertainty',
-                                 'uncertainty_type', 'unit_kind', 'unit_type', 'url_value']
+                                   'conc_unit', 'concentration', 'date_value', 'file_value', 'ls_transaction', 'modified_by',
+                                   'modified_date', 'number_of_replicates', 'numeric_value', 'operator_kind', 'operator_type',
+                                   'public_data', 'recorded_by', 'recorded_date', 'sig_figs', 'string_value', 'uncertainty',
+                                   'uncertainty_type', 'unit_kind', 'unit_type', 'url_value']
 
     def __init__(self,
-                id=None,
-                blob_value=None,
-                clob_value=None,
-                code_kind=None,
-                code_origin=None,
-                code_type=None,
-                code_value=None,
-                comments=None,
-                conc_unit=None,
-                concentration=None,
-                date_value=None,
-                deleted=False,
-                file_value=None,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                modified_by=None,
-                modified_date=None,
-                number_of_replicates=None,
-                numeric_value=None,
-                operator_kind=None,
-                operator_type=None,
-                public_data=True,
-                recorded_by=None, # Should this and recorded_date be auto-filled-in here?
-                recorded_date=None,
-                sig_figs=None,
-                string_value=None,
-                uncertainty=None,
-                uncertainty_type=None,
-                unit_kind=None,
-                unit_type=None,
-                url_value=None,
-                version=None):
-        super(AbstractValue, self).__init__(id=id, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 id=None,
+                 blob_value=None,
+                 clob_value=None,
+                 code_kind=None,
+                 code_origin=None,
+                 code_type=None,
+                 code_value=None,
+                 comments=None,
+                 conc_unit=None,
+                 concentration=None,
+                 date_value=None,
+                 deleted=False,
+                 file_value=None,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 modified_by=None,
+                 modified_date=None,
+                 number_of_replicates=None,
+                 numeric_value=None,
+                 operator_kind=None,
+                 operator_type=None,
+                 public_data=True,
+                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
+                 recorded_date=None,
+                 sig_figs=None,
+                 string_value=None,
+                 uncertainty=None,
+                 uncertainty_type=None,
+                 unit_kind=None,
+                 unit_type=None,
+                 url_value=None,
+                 version=None):
+        super(AbstractValue, self).__init__(id=id, deleted=deleted,
+                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
         self.blob_value = blob_value
         self.clob_value = clob_value
         self.code_kind = code_kind
@@ -919,7 +966,8 @@ class AbstractValue(BaseModel):
         self.operator_type = operator_type
         self.public_data = public_data
         self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(datetime.now()) if recorded_date is None else recorded_date
+        self.recorded_date = datetime_to_ts(
+            datetime.now()) if recorded_date is None else recorded_date
         self.sig_figs = sig_figs
         self.string_value = string_value
         self.uncertainty = uncertainty
@@ -928,33 +976,35 @@ class AbstractValue(BaseModel):
         self.unit_type = unit_type
         self.url_value = url_value
 
+
 class LsThing(AbstractThing):
     """Class for creating and interacting with ACAS LsThing objects.
     This is a 1:1 mapping of the ACAS LsThing class, just with pythonic snake_case attribute names
     """
 
-    _fields = AbstractThing._fields + ['ls_states', 'ls_labels', 'first_ls_things', 'second_ls_things']
+    _fields = AbstractThing._fields + \
+        ['ls_states', 'ls_labels', 'first_ls_things', 'second_ls_things']
 
     def __init__(self,
-                id=None,
-                code_name=None,
-                deleted=False,
-                first_ls_things=[],
-                ignored=False,
-                ls_labels=[],
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                ls_states=[],
-                modified_by=None,
-                modified_date=None,
-                recorded_by=None,
-                recorded_date=None,
-                second_ls_things=[],
-                version=None):
+                 id=None,
+                 code_name=None,
+                 deleted=False,
+                 first_ls_things=[],
+                 ignored=False,
+                 ls_labels=[],
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 ls_states=[],
+                 modified_by=None,
+                 modified_date=None,
+                 recorded_by=None,
+                 recorded_date=None,
+                 second_ls_things=[],
+                 version=None):
         super(LsThing, self).__init__(id=id, code_name=code_name, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                        ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date, 
-                        recorded_by=recorded_by, recorded_date=recorded_date, version=version)
+                                      ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
+                                      recorded_by=recorded_by, recorded_date=recorded_date, version=version)
         self.ls_states = ls_states
         self.ls_labels = ls_labels
         self.first_ls_things = first_ls_things
@@ -995,7 +1045,7 @@ class LsThing(AbstractThing):
             second_itx_dicts.append(itx.as_dict())
         my_dict['second_ls_things'] = second_itx_dicts
         return my_dict
-    
+
     @classmethod
     def from_dict(cls, data):
         """Deserialize LsThing object from python dict format.
@@ -1007,7 +1057,7 @@ class LsThing(AbstractThing):
         :rtype: LsThing
         """
         my_obj = super(LsThing, cls).from_dict(data)
-        ls_states = [] 
+        ls_states = []
         for state_dict in my_obj.ls_states:
             state_obj = LsThingState.from_dict(state_dict)
             ls_states.append(state_obj)
@@ -1028,7 +1078,7 @@ class LsThing(AbstractThing):
             second_itxs.append(itx_obj)
         my_obj.second_ls_things = second_itxs
         return my_obj
-    
+
     def save(self, client):
         """Persist this LsThing to an ACAS server's database
 
@@ -1043,6 +1093,7 @@ class LsThing(AbstractThing):
             resp_dict = client.save_ls_thing_list([self.as_camel_dict()])
         return LsThing.from_camel_dict(resp_dict[0])
 
+
 class LsThingLabel(AbstractLabel):
     """Class to create and interact with ACAS LsThingLabels
     """
@@ -1050,25 +1101,26 @@ class LsThingLabel(AbstractLabel):
     _fields = AbstractLabel._fields + ['ls_thing']
 
     def __init__(self,
-                id=None,
-                deleted=False,
-                ignored=False,
-                image_file=None,
-                label_text=None,
-                ls_type=None,
-                ls_kind=None,
-                ls_thing=None,
-                ls_transaction=None,
-                modified_date=None,
-                physically_labled=False,
-                preferred=False,
-                recorded_by=None, # Should this and recorded_date be auto-filled-in here?
-                recorded_date=None,
-                version=None):
-        super(LsThingLabel, self).__init__(id=id, deleted=deleted, image_file=image_file, ignored=ignored, label_text=label_text, ls_type=ls_type,  
-                        ls_kind=ls_kind, ls_transaction=ls_transaction, modified_date=modified_date, physically_labled=physically_labled, 
-                        preferred=preferred, recorded_by=recorded_by, recorded_date=recorded_date, version=version)
+                 id=None,
+                 deleted=False,
+                 ignored=False,
+                 image_file=None,
+                 label_text=None,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_thing=None,
+                 ls_transaction=None,
+                 modified_date=None,
+                 physically_labled=False,
+                 preferred=False,
+                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
+                 recorded_date=None,
+                 version=None):
+        super(LsThingLabel, self).__init__(id=id, deleted=deleted, image_file=image_file, ignored=ignored, label_text=label_text, ls_type=ls_type,
+                                           ls_kind=ls_kind, ls_transaction=ls_transaction, modified_date=modified_date, physically_labled=physically_labled,
+                                           preferred=preferred, recorded_by=recorded_by, recorded_date=recorded_date, version=version)
         self.ls_thing = ls_thing
+
 
 class LsThingState(AbstractState):
     """Class to create and interact with ACAS LsThingStates
@@ -1077,23 +1129,23 @@ class LsThingState(AbstractState):
     _fields = AbstractState._fields + ['ls_values', 'ls_thing']
 
     def __init__(self,
-                id=None,
-                comments=None,
-                deleted=False,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                ls_values=[],
-                ls_thing=None,
-                modified_by=None,
-                modified_date=None,
-                recorded_by=None,
-                recorded_date=None,
-                version=None):
+                 id=None,
+                 comments=None,
+                 deleted=False,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 ls_values=[],
+                 ls_thing=None,
+                 modified_by=None,
+                 modified_date=None,
+                 recorded_by=None,
+                 recorded_date=None,
+                 version=None):
         super(LsThingState, self).__init__(id=id, comments=comments, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                        ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
-                        recorded_by=recorded_by,recorded_date=recorded_date,version=None)
+                                           ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
+                                           recorded_by=recorded_by, recorded_date=recorded_date, version=None)
         self.ls_values = ls_values
         self.ls_thing = ls_thing
 
@@ -1111,12 +1163,13 @@ class LsThingState(AbstractState):
     @classmethod
     def from_dict(cls, data):
         my_obj = super(LsThingState, cls).from_dict(data)
-        ls_values = [] 
+        ls_values = []
         for value_dict in my_obj.ls_values:
             value_obj = LsThingValue.from_dict(value_dict)
             ls_values.append(value_obj)
         my_obj.ls_values = ls_values
         return my_obj
+
 
 class LsThingValue(AbstractValue):
     """Class to interact with and save ACAS LsThingValues
@@ -1125,81 +1178,83 @@ class LsThingValue(AbstractValue):
     _fields = AbstractValue._fields + ['ls_state']
 
     def __init__(self,
-                id=None,
-                blob_value=None,
-                clob_value=None,
-                code_kind=None,
-                code_origin=None,
-                code_type=None,
-                code_value=None,
-                comments=None,
-                conc_unit=None,
-                concentration=None,
-                date_value=None,
-                deleted=False,
-                file_value=None,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_state=None,
-                ls_transaction=None,
-                modified_by=None,
-                modified_date=None,
-                number_of_replicates=None,
-                numeric_value=None,
-                operator_kind=None,
-                operator_type=None,
-                public_data=True,
-                recorded_by=None,
-                recorded_date=None,
-                sig_figs=None,
-                string_value=None,
-                uncertainty=None,
-                uncertainty_type=None,
-                unit_kind=None,
-                unit_type=None,
-                url_value=None,
-                version=None):
-        super(LsThingValue, self).__init__(id=id,blob_value=blob_value,clob_value=clob_value,code_kind=code_kind,code_origin=code_origin,
-                        code_type=code_type,code_value=code_value,comments=comments,conc_unit=conc_unit,
-                        concentration=concentration,date_value=date_value,deleted=deleted,file_value=file_value,ignored=ignored,
-                        ls_type=ls_type,ls_kind=ls_kind,ls_transaction=ls_transaction,modified_by=modified_by,
-                        modified_date=modified_date,number_of_replicates=number_of_replicates,numeric_value=numeric_value,
-                        operator_kind=operator_kind,operator_type=operator_type,public_data=public_data,recorded_by=recorded_by,
-                        recorded_date=recorded_date,sig_figs=sig_figs,string_value=string_value,uncertainty=uncertainty,
-                        uncertainty_type=uncertainty_type,unit_kind=unit_kind,unit_type=unit_type,url_value=url_value,
-                        version=version)
+                 id=None,
+                 blob_value=None,
+                 clob_value=None,
+                 code_kind=None,
+                 code_origin=None,
+                 code_type=None,
+                 code_value=None,
+                 comments=None,
+                 conc_unit=None,
+                 concentration=None,
+                 date_value=None,
+                 deleted=False,
+                 file_value=None,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_state=None,
+                 ls_transaction=None,
+                 modified_by=None,
+                 modified_date=None,
+                 number_of_replicates=None,
+                 numeric_value=None,
+                 operator_kind=None,
+                 operator_type=None,
+                 public_data=True,
+                 recorded_by=None,
+                 recorded_date=None,
+                 sig_figs=None,
+                 string_value=None,
+                 uncertainty=None,
+                 uncertainty_type=None,
+                 unit_kind=None,
+                 unit_type=None,
+                 url_value=None,
+                 version=None):
+        super(LsThingValue, self).__init__(id=id, blob_value=blob_value, clob_value=clob_value, code_kind=code_kind, code_origin=code_origin,
+                                           code_type=code_type, code_value=code_value, comments=comments, conc_unit=conc_unit,
+                                           concentration=concentration, date_value=date_value, deleted=deleted, file_value=file_value, ignored=ignored,
+                                           ls_type=ls_type, ls_kind=ls_kind, ls_transaction=ls_transaction, modified_by=modified_by,
+                                           modified_date=modified_date, number_of_replicates=number_of_replicates, numeric_value=numeric_value,
+                                           operator_kind=operator_kind, operator_type=operator_type, public_data=public_data, recorded_by=recorded_by,
+                                           recorded_date=recorded_date, sig_figs=sig_figs, string_value=string_value, uncertainty=uncertainty,
+                                           uncertainty_type=uncertainty_type, unit_kind=unit_kind, unit_type=unit_type, url_value=url_value,
+                                           version=version)
         self.ls_state = ls_state
+
 
 class ItxLsThingLsThing(AbstractThing):
     """Class to manage ACAS ItxLsThingLsThings, which are rich "interactions" or links between LsThings.
     """
 
-    _fields = AbstractThing._fields + ['ls_states', 'first_ls_thing', 'second_ls_thing']
+    _fields = AbstractThing._fields + \
+        ['ls_states', 'first_ls_thing', 'second_ls_thing']
 
     def __init__(self,
-                id=None,
-                code_name=None,
-                deleted=False,
-                first_ls_thing=None,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                ls_states=[],
-                modified_by=None,
-                modified_date=None,
-                recorded_by=None,
-                recorded_date=None,
-                second_ls_thing=None,
-                version=None):
+                 id=None,
+                 code_name=None,
+                 deleted=False,
+                 first_ls_thing=None,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 ls_states=[],
+                 modified_by=None,
+                 modified_date=None,
+                 recorded_by=None,
+                 recorded_date=None,
+                 second_ls_thing=None,
+                 version=None):
         super(ItxLsThingLsThing, self).__init__(id=id, code_name=code_name, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                        ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date, 
-                        recorded_by=recorded_by, recorded_date=recorded_date, version=version)
+                                                ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
+                                                recorded_by=recorded_by, recorded_date=recorded_date, version=version)
         self.ls_states = ls_states
         self.first_ls_thing = first_ls_thing
         self.second_ls_thing = second_ls_thing
-    
+
     def as_dict(self):
         my_dict = super(ItxLsThingLsThing, self).as_dict()
         state_dicts = []
@@ -1211,11 +1266,11 @@ class ItxLsThingLsThing(AbstractThing):
         if self.second_ls_thing:
             my_dict['second_ls_thing'] = self.second_ls_thing.as_dict()
         return my_dict
-    
+
     @classmethod
     def from_dict(cls, data):
         my_obj = super(ItxLsThingLsThing, cls).from_dict(data)
-        ls_states = [] 
+        ls_states = []
         for state_dict in my_obj.ls_states:
             state_obj = LsThingState.from_dict(state_dict)
             ls_states.append(state_obj)
@@ -1226,31 +1281,32 @@ class ItxLsThingLsThing(AbstractThing):
             my_obj.second_ls_thing = LsThing.from_dict(my_obj.second_ls_thing)
         return my_obj
 
+
 class ItxLsThingLsThingState(AbstractState):
 
     _fields = AbstractState._fields + ['ls_values', 'itx_ls_thing_ls_thing']
 
     def __init__(self,
-                id=None,
-                comments=None,
-                deleted=False,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_transaction=None,
-                ls_values=[],
-                itx_ls_thing_ls_thing=None,
-                modified_by=None,
-                modified_date=None,
-                recorded_by=None,
-                recorded_date=None,
-                version=None):
+                 id=None,
+                 comments=None,
+                 deleted=False,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_transaction=None,
+                 ls_values=[],
+                 itx_ls_thing_ls_thing=None,
+                 modified_by=None,
+                 modified_date=None,
+                 recorded_by=None,
+                 recorded_date=None,
+                 version=None):
         super(ItxLsThingLsThingState, self).__init__(id=id, comments=comments, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                        ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
-                        recorded_by=recorded_by,recorded_date=recorded_date,version=None)
+                                                     ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
+                                                     recorded_by=recorded_by, recorded_date=recorded_date, version=None)
         self.ls_values = ls_values
         self.itx_ls_thing_ls_thing = itx_ls_thing_ls_thing
-    
+
     def as_dict(self):
         my_dict = super(ItxLsThingLsThingState, self).as_dict()
         value_dicts = []
@@ -1258,66 +1314,67 @@ class ItxLsThingLsThingState(AbstractState):
             value_dicts.append(value.as_dict())
         my_dict['ls_values'] = value_dicts
         return my_dict
-    
+
     @classmethod
     def from_dict(cls, data):
         my_obj = super(ItxLsThingLsThingState, cls).from_dict(data)
-        ls_values = [] 
+        ls_values = []
         for value_dict in my_obj.ls_values:
             value_obj = ItxLsThingLsThingValue.from_dict(value_dict)
             ls_values.append(value_obj)
         my_obj.ls_values = ls_values
         return my_obj
 
+
 class ItxLsThingLsThingValue(AbstractValue):
 
     _fields = AbstractValue._fields + ['ls_state']
 
     def __init__(self,
-                id=None,
-                blob_value=None,
-                clob_value=None,
-                code_kind=None,
-                code_origin=None,
-                code_type=None,
-                code_value=None,
-                comments=None,
-                conc_unit=None,
-                concentration=None,
-                date_value=None,
-                deleted=False,
-                file_value=None,
-                ignored=False,
-                ls_type=None,
-                ls_kind=None,
-                ls_state=None,
-                ls_transaction=None,
-                modified_by=None,
-                modified_date=None,
-                number_of_replicates=None,
-                numeric_value=None,
-                operator_kind=None,
-                operator_type=None,
-                public_data=True,
-                recorded_by=None,
-                recorded_date=None,
-                sig_figs=None,
-                string_value=None,
-                uncertainty=None,
-                uncertainty_type=None,
-                unit_kind=None,
-                unit_type=None,
-                url_value=None,
-                version=None):
-        super(ItxLsThingLsThingValue, self).__init__(id=id,blob_value=blob_value,clob_value=clob_value,code_kind=code_kind,code_origin=code_origin,
-                        code_type=code_type,code_value=code_value,comments=comments,conc_unit=conc_unit,
-                        concentration=concentration,date_value=date_value,deleted=deleted,file_value=file_value,ignored=ignored,
-                        ls_type=ls_type,ls_kind=ls_kind,ls_transaction=ls_transaction,modified_by=modified_by,
-                        modified_date=modified_date,number_of_replicates=number_of_replicates,numeric_value=numeric_value,
-                        operator_kind=operator_kind,operator_type=operator_type,public_data=public_data,recorded_by=recorded_by,
-                        recorded_date=recorded_date,sig_figs=sig_figs,string_value=string_value,uncertainty=uncertainty,
-                        uncertainty_type=uncertainty_type,unit_kind=unit_kind,unit_type=unit_type,url_value=url_value,
-                        version=version)
+                 id=None,
+                 blob_value=None,
+                 clob_value=None,
+                 code_kind=None,
+                 code_origin=None,
+                 code_type=None,
+                 code_value=None,
+                 comments=None,
+                 conc_unit=None,
+                 concentration=None,
+                 date_value=None,
+                 deleted=False,
+                 file_value=None,
+                 ignored=False,
+                 ls_type=None,
+                 ls_kind=None,
+                 ls_state=None,
+                 ls_transaction=None,
+                 modified_by=None,
+                 modified_date=None,
+                 number_of_replicates=None,
+                 numeric_value=None,
+                 operator_kind=None,
+                 operator_type=None,
+                 public_data=True,
+                 recorded_by=None,
+                 recorded_date=None,
+                 sig_figs=None,
+                 string_value=None,
+                 uncertainty=None,
+                 uncertainty_type=None,
+                 unit_kind=None,
+                 unit_type=None,
+                 url_value=None,
+                 version=None):
+        super(ItxLsThingLsThingValue, self).__init__(id=id, blob_value=blob_value, clob_value=clob_value, code_kind=code_kind, code_origin=code_origin,
+                                                     code_type=code_type, code_value=code_value, comments=comments, conc_unit=conc_unit,
+                                                     concentration=concentration, date_value=date_value, deleted=deleted, file_value=file_value, ignored=ignored,
+                                                     ls_type=ls_type, ls_kind=ls_kind, ls_transaction=ls_transaction, modified_by=modified_by,
+                                                     modified_date=modified_date, number_of_replicates=number_of_replicates, numeric_value=numeric_value,
+                                                     operator_kind=operator_kind, operator_type=operator_type, public_data=public_data, recorded_by=recorded_by,
+                                                     recorded_date=recorded_date, sig_figs=sig_figs, string_value=string_value, uncertainty=uncertainty,
+                                                     uncertainty_type=uncertainty_type, unit_kind=unit_kind, unit_type=unit_type, url_value=url_value,
+                                                     version=version)
         self.ls_state = ls_state
 
 
@@ -1337,24 +1394,24 @@ class SimpleLsThing(BaseModel):
                   sequence of code_names with incrementing numbers.
      - recorded_by: The username of the person that recorded or saved this LsThing to ACAS. This is used for auditing and tracking
                     down the provenance of data.
-    
+
     Identifiers (mapped onto LsThingLabels):
-     - ids: IDs, often unique identifiers that can be used to reference this LsThing or to align this LsThing with entries in 
+     - ids: IDs, often unique identifiers that can be used to reference this LsThing or to align this LsThing with entries in
             external data sources.
      - names: Human-readable names for this LsThing.
      - aliases: Additional non-primary identifiers. Notably different from `ids` and `names`, `aliases` allow for multiple
                 labels of the same category (i.e. same ls_kind).
-    
+
     Metadata and Results (mapped onto LsThingStates and LsThingValues):
      - metadata: Section for saving metadata about this entity. Highly flexible.
      - results: Section for saving data or results about this entity. Also highly flexible.
-    
+
     State Tables (mapped onto LsThingStates and LsThingValues):
      - Stores tabular data with multiple "rows" of data with defined "columns".
-    
+
     Links (Mapped onto ItxLsThingLsThing): Express relationships to other entities.
 
-    Example storing "Toto" from the Wizard of Oz: 
+    Example storing "Toto" from the Wizard of Oz:
     ```
     {
         'ls_type': 'animal',
@@ -1410,12 +1467,12 @@ class SimpleLsThing(BaseModel):
     ```
     """
     _fields = ['ls_type', 'ls_kind', 'code_name', 'names', 'ids', 'aliases', 'metadata', 'results', 'links', 'recorded_by',
-                'state_tables']
-    
+               'state_tables']
+
     ROW_NUM_KEY = 'row number'
 
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names={}, ids={}, aliases={}, metadata={}, results={}, links=[], recorded_by=None,
-                preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None):
+                 preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None):
         self.preferred_label_kind = preferred_label_kind
         # if ls_thing passed in, just parse from it and ignore the rest
         if ls_thing:
@@ -1428,7 +1485,8 @@ class SimpleLsThing(BaseModel):
             self.links = links
             self._init_metadata = copy.deepcopy(metadata)
             self.recorded_by = recorded_by
-            self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind, code_name=self.code_name, recorded_by=self.recorded_by)
+            self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind,
+                                     code_name=self.code_name, recorded_by=self.recorded_by)
             self.names = names
             self.ids = ids
             self.aliases = aliases
@@ -1446,7 +1504,7 @@ class SimpleLsThing(BaseModel):
             self.state_tables = state_tables
             self._state_table_states = defaultdict(dict)
             self._state_table_values = defaultdict(lambda: defaultdict(dict))
-    
+
     def populate_from_ls_thing(self, ls_thing):
         """Translates an LsThing object into the "simple" dictionary
 
@@ -1459,19 +1517,24 @@ class SimpleLsThing(BaseModel):
         self.recorded_by = ls_thing.recorded_by
         self._ls_thing = ls_thing
         # Split out labels by ls_type into three categories
-        self._name_labels = {label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'name' and label.ignored == False}
-        self._id_labels = {label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'id' and label.ignored == False}
+        self._name_labels = {
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'name' and label.ignored is False}
+        self._id_labels = {
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'id' and label.ignored is False}
         self._alias_labels = defaultdict(list)
         for label in ls_thing.ls_labels:
-            if label.ls_type == 'alias' and label.ignored == False:
+            if label.ls_type == 'alias' and label.ignored is False:
                 self._alias_labels[label.ls_kind].append(label)
         # Names and IDs are simple - only expect one label for each ls_kind
-        self.names = {ls_kind : label.label_text for ls_kind, label in self._name_labels.items()}
-        self.ids = {ls_kind : label.label_text for ls_kind, label in self._id_labels.items()}
+        self.names = {ls_kind: label.label_text for ls_kind,
+                      label in self._name_labels.items()}
+        self.ids = {ls_kind: label.label_text for ls_kind,
+                    label in self._id_labels.items()}
         # Aliases can have multiple labels with the same ls_kind
         self.aliases = defaultdict(list)
         for ls_kind, label_list in self._alias_labels.items():
-            self.aliases[ls_kind].extend([label.label_text for label in label_list])
+            self.aliases[ls_kind].extend(
+                [label.label_text for label in label_list])
         # State Tables: Multiple non-ignored states with the same lsType and lsKind
         all_states = {}
         for ls_state in ls_thing.ls_states:
@@ -1486,35 +1549,42 @@ class SimpleLsThing(BaseModel):
         self.state_tables = defaultdict(dict)
         for key, state_list in all_states.items():
             for state in state_list:
-                if state.ignored == False:
+                if state.ignored is False:
                     vals_dict = parse_values_into_dict(state.ls_values)
                     # Row number must be present to recognize as a state table
                     if ROW_NUM_KEY in vals_dict:
                         row_num = vals_dict[ROW_NUM_KEY]
                         self._state_table_states[key][row_num] = state
-                        self.state_tables[key][row_num] = parse_values_into_dict(state.ls_values)
-                        self._state_table_values[key][row_num] = get_lsKind_to_lsvalue(state.ls_values)
+                        self.state_tables[key][row_num] = parse_values_into_dict(
+                            state.ls_values)
+                        self._state_table_values[key][row_num] = get_lsKind_to_lsvalue(
+                            state.ls_values)
         # "Normal" states, which are unique by type + kind
-        single_states = [state for state_list in all_states.values() for state in state_list if len(state_list) == 1]
+        single_states = [state for state_list in all_states.values()
+                         for state in state_list if len(state_list) == 1]
         # metadata
-        self._metadata_states = {state.ls_kind: state for state in single_states if state.ls_type == 'metadata' and state.ignored == False}
-        self._metadata_values = {state_kind : {value.ls_kind if (value.unit_kind==None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})": value for value in state.ls_values if value.ignored == False} for state_kind, state in self._metadata_states.items()}
+        self._metadata_states = {
+            state.ls_kind: state for state in single_states if state.ls_type == 'metadata' and state.ignored is False}
+        self._metadata_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
+                                              value for value in state.ls_values if value.ignored is False} for state_kind, state in self._metadata_states.items()}
         self.metadata = parse_states_into_dict(self._metadata_states)
         self._init_metadata = copy.deepcopy(self.metadata)
         # results
-        self._results_states = {state.ls_kind: state for state in single_states if state.ls_type == 'results' and state.ignored == False}
-        self._results_values = {state_kind : {value.ls_kind if (value.unit_kind==None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})": value for value in state.ls_values if value.ignored == False} for state_kind, state in self._results_states.items()}
+        self._results_states = {
+            state.ls_kind: state for state in single_states if state.ls_type == 'results' and state.ignored is False}
+        self._results_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
+                                             value for value in state.ls_values if value.ignored is False} for state_kind, state in self._results_states.items()}
         self.results = parse_states_into_dict(self._results_states)
         self._init_results = copy.deepcopy(self.results)
         # Parse interactions into Links
         parsed_links = []
         for itx in ls_thing.first_ls_things:
-            if itx.ignored == False and itx.first_ls_thing.ignored == False:
-                link = SimpleLink(itx_ls_thing_ls_thing = itx)
+            if itx.ignored is False and itx.first_ls_thing.ignored is False:
+                link = SimpleLink(itx_ls_thing_ls_thing=itx)
                 parsed_links.append(link)
         for itx in ls_thing.second_ls_things:
-            if itx.ignored == False and itx.second_ls_thing.ignored == False:
-                link = SimpleLink(itx_ls_thing_ls_thing = itx)
+            if itx.ignored is False and itx.second_ls_thing.ignored is False:
+                link = SimpleLink(itx_ls_thing_ls_thing=itx)
                 parsed_links.append(link)
         self.links = parsed_links
 
@@ -1525,15 +1595,17 @@ class SimpleLsThing(BaseModel):
             if val_value is not None:
                 # Handle lists within the value dict
                 if isinstance(val_value, list):
-                    new_ls_val = [make_ls_value(LsThingValue, val_kind, val, self.recorded_by) for val in val_value]
+                    new_ls_val = [make_ls_value(
+                        LsThingValue, val_kind, val, self.recorded_by) for val in val_value]
                     ls_values.extend(new_ls_val)
                 else:
-                    new_ls_val = make_ls_value(LsThingValue, val_kind, val_value, self.recorded_by)
+                    new_ls_val = make_ls_value(
+                        LsThingValue, val_kind, val_value, self.recorded_by)
                     ls_values.append(new_ls_val)
                 values_obj_dict[val_kind] = new_ls_val
         state.ls_values = ls_values
         return state, values_obj_dict
-    
+
     def as_dict(self):
         my_dict = super(SimpleLsThing, self).as_dict()
         link_dicts = []
@@ -1562,10 +1634,10 @@ class SimpleLsThing(BaseModel):
         my_dict['results'] = results
 
         return my_dict
-    
+
     def get_preferred_label(self):
         return self._ls_thing.get_preferred_label()
-    
+
     def pretty_print(self):
         my_dict = {}
         my_dict['Links'] = {}
@@ -1575,7 +1647,7 @@ class SimpleLsThing(BaseModel):
             if preferredLabel:
                 if preferredLabel.label_text:
                     my_dict['Links'][link.verb] = preferredLabel.label_text
-    
+
         # Check metadata for CodeValues and convert them to dicts
         for key, val in self.metadata.items():
             my_dict[key] = {}
@@ -1585,7 +1657,6 @@ class SimpleLsThing(BaseModel):
                 my_dict[key][k] = v
 
         # Check results for CodeValues and convert them to dicts
-        results = {}
         for key, val in self.results.items():
             my_dict[key] = {}
             for k, v in val.items():
@@ -1605,20 +1676,27 @@ class SimpleLsThing(BaseModel):
         :param user: Username to record as having made these changes, defaults to self.recorded_by
         :type user: str, optional
         """
-        #TODO redo recorded_by logic to allow passing in of an updater
+        # TODO redo recorded_by logic to allow passing in of an updater
         if not user:
             user = self.recorded_by
-        #Detect value updates, apply ignored / modified by /modified date and create new value
-        metadata_ls_states = update_ls_states_from_dict(LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user)
-        results_ls_states = update_ls_states_from_dict(LsThingState, 'results', LsThingValue, self.results, self._results_states, self._results_values, user)
-        state_tables_ls_states = update_state_table_states_from_dict(LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user)
-        self._ls_thing.ls_states = metadata_ls_states + results_ls_states + state_tables_ls_states
+        # Detect value updates, apply ignored / modified by /modified date and create new value
+        metadata_ls_states = update_ls_states_from_dict(
+            LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user)
+        results_ls_states = update_ls_states_from_dict(
+            LsThingState, 'results', LsThingValue, self.results, self._results_states, self._results_values, user)
+        state_tables_ls_states = update_state_table_states_from_dict(
+            LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user)
+        self._ls_thing.ls_states = metadata_ls_states + \
+            results_ls_states + state_tables_ls_states
         # Same thing for labels
-        id_ls_labels = update_ls_labels_from_dict(LsThingLabel, 'id', self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
-        names_ls_labels = update_ls_labels_from_dict(LsThingLabel, 'name', self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
-        alias_ls_labels = update_ls_labels_from_dict(LsThingLabel, 'alias', self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
+        id_ls_labels = update_ls_labels_from_dict(
+            LsThingLabel, 'id', self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
+        names_ls_labels = update_ls_labels_from_dict(
+            LsThingLabel, 'name', self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
+        alias_ls_labels = update_ls_labels_from_dict(
+            LsThingLabel, 'alias', self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
         self._ls_thing.ls_labels = id_ls_labels + names_ls_labels + alias_ls_labels
-        #Transform links into interactions
+        # Transform links into interactions
         first_ls_things = []
         second_ls_things = []
         for link in self.links:
@@ -1627,13 +1705,13 @@ class SimpleLsThing(BaseModel):
             if link.forwards:
                 second_ls_things.append(link._itx_ls_thing_ls_thing)
             else:
-                first_ls_things.append(link._itx_ls_thing_ls_thing)                
+                first_ls_things.append(link._itx_ls_thing_ls_thing)
         self._ls_thing.first_ls_things = first_ls_things
         self._ls_thing.second_ls_things = second_ls_things
-    
+
     def _cleanup_after_save(self):
         self.populate_from_ls_thing(self._ls_thing)
-    
+
     def save(self, client):
         """Persist changes to the ACAS server.
 
@@ -1644,7 +1722,7 @@ class SimpleLsThing(BaseModel):
         # Persist
         self._ls_thing = self._ls_thing.save(client)
         self._cleanup_after_save()
-    
+
     @classmethod
     def get_by_code(cls, code_name, client=None, ls_type=None, ls_kind=None):
         """Fetch a SimpleLsThing object from the ACAS server by ls_type + ls_kind + code_name
@@ -1666,7 +1744,7 @@ class SimpleLsThing(BaseModel):
             ls_kind = cls.ls_kind
         ls_thing = client.get_ls_thing(ls_type, ls_kind, code_name)
         return cls(ls_thing=ls_thing)
-    
+
     @classmethod
     def save_list(cls, client, models):
         """Persist a list of new SimpleLsThing objects to the ACAS server
@@ -1684,13 +1762,10 @@ class SimpleLsThing(BaseModel):
         for model in models:
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
-        #logger.info('THINGS TO SAVE')
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
-        #logger.info(camel_dict)
         saved_ls_things = client.save_ls_thing_list(camel_dict)
-        #logger.info(saved_ls_things)
         return [cls(ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
-    
+
     @classmethod
     def update_list(cls, client, models, clear_links=False):
         """Persist updates for a list of existing SimpleLsThing objects to the ACAS server
@@ -1740,13 +1815,13 @@ class SimpleLsThing(BaseModel):
         :param results: Dictioanry of results to associate with the link itself, defaults to {}
         :type results: dict, optional
         """
-        self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type, 
-                                    recorded_by=recorded_by, metadata=metadata, results=results))
-    
+        self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type,
+                                     recorded_by=recorded_by, metadata=metadata, results=results))
+
     def upload_file_values(self, client):
         """Loop through the values for file values and check if the value is a base64 string or
         a dict object.  If its either, then upload the file and replace the value
-        with the relative path on the server (just the file name), required for the 
+        with the relative path on the server (just the file name), required for the
         service route to properly handle the file on save of the LsThing.
 
         :param client: Authenticated instance of acasclient.client
@@ -1754,6 +1829,7 @@ class SimpleLsThing(BaseModel):
         """
         def isBase64(s):
             return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
+
         def _upload_file_values_from_state_dict(state_dict):
             for state_kind, values_dict in state_dict.items():
                 for value_kind, file_val in values_dict.items():
@@ -1761,7 +1837,8 @@ class SimpleLsThing(BaseModel):
                         if file_val:
                             val = pathlib.Path(file_val)
                             uploaded_files = client.upload_files([val])
-                            state_dict[state_kind][value_kind] = FileValue(uploaded_files['files'][0]['name'])
+                            state_dict[state_kind][value_kind] = FileValue(
+                                uploaded_files['files'][0]['name'])
             return state_dict
         self.metadata = _upload_file_values_from_state_dict(self.metadata)
         self.results = _upload_file_values_from_state_dict(self.results)
@@ -1801,12 +1878,12 @@ class SimpleLink(BaseModel):
         }
     }
     ```
-    
+
     """
     _fields = ['verb', 'subject', 'object', 'metadata', 'results']
 
     def __init__(self, verb=None, subject=None, object=None, metadata={}, results={}, recorded_by=None, itx_ls_thing_ls_thing=None,
-                        subject_type=None, object_type=None):
+                 subject_type=None, object_type=None):
         """
         Create a link of form: "{subject} {verb} {object}" where {subject} and {object} are instances of SimpleLsThing
         examples: "{batch} {instantiates} {parent}", "{literature reference} {contains} {pdb structure}"
@@ -1817,13 +1894,17 @@ class SimpleLink(BaseModel):
             self.code_name = itx_ls_thing_ls_thing.code_name
             self.subject = None
             # metadata
-            self._metadata_states = {state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'metadata' and state.ignored == False}
-            self._metadata_values = {state_kind : {value.ls_kind: value for value in state.ls_values} for state_kind, state in self._metadata_states.items()}
+            self._metadata_states = {
+                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'metadata' and state.ignored is False}
+            self._metadata_values = {state_kind: {value.ls_kind: value for value in state.ls_values}
+                                     for state_kind, state in self._metadata_states.items()}
             self.metadata = parse_states_into_dict(self._metadata_states)
             self._init_metadata = copy.deepcopy(self.metadata)
             # results
-            self._results_states = {state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'results' and state.ignored == False}
-            self._results_values = {state_kind : {value.ls_kind: value for value in state.ls_values} for state_kind, state in self._results_states.items()}
+            self._results_states = {
+                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'results' and state.ignored is False}
+            self._results_values = {state_kind: {value.ls_kind: value for value in state.ls_values}
+                                    for state_kind, state in self._results_states.items()}
             self.results = parse_states_into_dict(self._results_states)
             self._init_results = copy.deepcopy(self.results)
             # Interaction passed in will often be missing either the first_ls_thing or the second_ls_thing
@@ -1833,14 +1914,17 @@ class SimpleLink(BaseModel):
                 # First LsThing is the "parent" so we are looking "forward" and the verb is the ls_type
                 self.forwards = True
                 self.verb = itx_ls_thing_ls_thing.ls_type
-                self.object = SimpleLsThing(ls_thing=itx_ls_thing_ls_thing.second_ls_thing)
+                self.object = SimpleLsThing(
+                    ls_thing=itx_ls_thing_ls_thing.second_ls_thing)
             if itx_ls_thing_ls_thing.first_ls_thing and not itx_ls_thing_ls_thing.second_ls_thing:
                 # Second LsThing is the "parent", so we are looking "backward" and the verb needs to be reversed
                 self.forwards = False
                 self.verb = opposite(itx_ls_thing_ls_thing.ls_type)
-                self.object = SimpleLsThing(ls_thing=itx_ls_thing_ls_thing.first_ls_thing)
+                self.object = SimpleLsThing(
+                    ls_thing=itx_ls_thing_ls_thing.first_ls_thing)
             if itx_ls_thing_ls_thing.first_ls_thing and itx_ls_thing_ls_thing.second_ls_thing:
-                raise ValueError('Parsing non-nested interactions has not been implemented yet!')
+                raise ValueError(
+                    'Parsing non-nested interactions has not been implemented yet!')
         else:
             self.verb = verb
             self.subject = subject
@@ -1883,28 +1967,33 @@ class SimpleLink(BaseModel):
             # print("First: ", first_type)
             # print("Second: ", second_type)
             ls_kind = '{}_{}'.format(first_type, second_type)
-            self._itx_ls_thing_ls_thing = ItxLsThingLsThing(ls_type=ls_type,ls_kind=ls_kind, recorded_by=self.recorded_by,
+            self._itx_ls_thing_ls_thing = ItxLsThingLsThing(ls_type=ls_type, ls_kind=ls_kind, recorded_by=self.recorded_by,
                                                             first_ls_thing=first_ls_thing, second_ls_thing=second_ls_thing)
             # Parse metadata into states and values
             self._metadata_states = {}
             self._metadata_values = {}
             for state_kind, values_dict in metadata.items():
-                metadata_state = ItxLsThingLsThingState(ls_type='metadata', ls_kind=state_kind, recorded_by=self.recorded_by)
+                metadata_state = ItxLsThingLsThingState(
+                    ls_type='metadata', ls_kind=state_kind, recorded_by=self.recorded_by)
                 self._metadata_values[state_kind] = {}
-                metadata_state, values_obj_dict = self._convert_values_to_objects(values_dict, metadata_state)
+                metadata_state, values_obj_dict = self._convert_values_to_objects(
+                    values_dict, metadata_state)
                 self._metadata_values[state_kind] = values_obj_dict
                 self._metadata_states[state_kind] = metadata_state
             # Parse results into states and values
             self._results_states = {}
             self._results_values = {}
             for state_kind, values_dict in results.items():
-                results_state = ItxLsThingLsThingState(ls_type='results', ls_kind=state_kind, recorded_by=self.recorded_by)
+                results_state = ItxLsThingLsThingState(
+                    ls_type='results', ls_kind=state_kind, recorded_by=self.recorded_by)
                 self._results_values[state_kind] = {}
-                results_state, values_obj_dict = self._convert_values_to_objects(values_dict, results_state)
+                results_state, values_obj_dict = self._convert_values_to_objects(
+                    values_dict, results_state)
                 self._results_values[state_kind] = values_obj_dict
                 self._results_states[state_kind] = results_state
-            self._itx_ls_thing_ls_thing.ls_states = list(self._metadata_states.values()) + list(self._results_states.values())
-        
+            self._itx_ls_thing_ls_thing.ls_states = list(
+                self._metadata_states.values()) + list(self._results_states.values())
+
     def _convert_values_to_objects(self, values_dict, state):
         """Converts simple dictionary values into ItxLsThingLsThingLsValues
 
@@ -1921,15 +2010,16 @@ class SimpleLink(BaseModel):
             if val_value is not None:
                 # Handle lists within the value dict
                 if isinstance(val_value, list):
-                    new_ls_val = [make_ls_value(ItxLsThingLsThingValue, val_kind, val, self.recorded_by) for val in val_value]
+                    new_ls_val = [make_ls_value(
+                        ItxLsThingLsThingValue, val_kind, val, self.recorded_by) for val in val_value]
                     ls_values.extend(new_ls_val)
                 else:
-                    new_ls_val = make_ls_value(ItxLsThingLsThingValue, val_kind, val_value, self.recorded_by)
+                    new_ls_val = make_ls_value(
+                        ItxLsThingLsThingValue, val_kind, val_value, self.recorded_by)
                     ls_values.append(new_ls_val)
             values_obj_dict[val_kind] = new_ls_val
         state.ls_values = ls_values
         return state, values_obj_dict
-    
 
     def as_dict(self):
         my_dict = super(SimpleLink, self).as_dict()

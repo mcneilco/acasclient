@@ -2,12 +2,12 @@
  the "first" LsThing and the "second" LsThing.
  The convention is for the interaction lsType to be a directional verb.
  This helps indicate which LsThing should be the "first" and "second".
- i.e. If we have an LsThing "rock" and an LsThing "scissors", 
+ i.e. If we have an LsThing "rock" and an LsThing "scissors",
  we'd use the Interaction "beats" to indicate "rock beats scissors".
 
  To be able to store the same type of relationship consistently, we must always save
  the "forward" direction of the interaction.
- i.e. If we are saving "rock beats scissors", we should never save "scissors is beaten by rock" 
+ i.e. If we are saving "rock beats scissors", we should never save "scissors is beaten by rock"
  or "scissors loses to rock".
 
  To simplify this, lsthing.SimpleLsThing and lsthing.SimpleLink implement ways to add links
@@ -30,9 +30,11 @@ INTERACTION_VERBS_DICT = {
     'owns': 'is owned by'
 }
 
+
 def opposite(verb):
     "Returns the opposite of verb"
-    inverse_dict = {value: key for key, value in INTERACTION_VERBS_DICT.items()}
+    inverse_dict = {value: key for key,
+                    value in INTERACTION_VERBS_DICT.items()}
     if verb in INTERACTION_VERBS_DICT:
         return INTERACTION_VERBS_DICT[verb]
     elif verb in inverse_dict:

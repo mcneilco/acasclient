@@ -20,78 +20,78 @@ def create_project_thing(code, name=None, alias=None):
     if alias is None:
         alias = name
     ls_thing = {
-            "lsType": "project",
-            "lsKind": "project",
-            "recordedBy": "bob",
-            "recordedDate": 1586877284571,
-            "lsLabels": [
-                {
-                    "lsType": "name",
-                    "lsKind": "project name",
-                    "labelText": name,
-                    "ignored": False,
-                    "preferred": True,
-                    "recordedDate": 1586877284571,
-                    "recordedBy": "bob",
-                    "physicallyLabled": False,
-                    "thingType": "project",
-                    "thingKind": "project"
-                },
-                {
-                    "lsType": "name",
-                    "lsKind": "project alias",
-                    "labelText": alias,
-                    "ignored": False,
-                    "preferred": False,
-                    "recordedDate": 1586877284571,
-                    "recordedBy": "bob",
-                    "physicallyLabled": False,
-                    "thingType": "project",
-                    "thingKind": "project"
-                }
-            ],
-            "lsStates": [
-                {
-                    "lsType": "metadata",
-                    "lsKind": "project metadata",
-                    "lsValues": [
-                        {
-                            "lsType": "dateValue",
-                            "lsKind": "start date",
-                            "ignored": False,
-                            "recordedDate": 1586877284571,
-                            "recordedBy": "bob",
-                            "dateValue": 1586877284571
-                        }, {
-                            "lsType": "codeValue",
-                            "lsKind": "project status",
-                            "ignored": False,
-                            "recordedDate": 1586877284571,
-                            "recordedBy": "bob",
-                            "codeKind": "status",
-                            "codeType": "project",
-                            "codeOrigin": "ACAS DDICT",
-                            "codeValue": "active"
-                        }, {
-                            "lsType": "codeValue",
-                            "lsKind": "is restricted",
-                            "ignored": False,
-                            "recordedDate": 1586877284571,
-                            "recordedBy": "bob",
-                            "codeKind": "restricted",
-                            "codeType": "project",
-                            "codeOrigin": "ACAS DDICT",
-                            "codeValue": "false"
-                        }
-                    ],
-                    "ignored": False,
-                    "recordedDate": 1586877284571,
-                    "recordedBy": "bob"
-                }
-            ],
-            "lsTags": [],
-            "codeName": code
-        }
+        "lsType": "project",
+        "lsKind": "project",
+        "recordedBy": "bob",
+        "recordedDate": 1586877284571,
+        "lsLabels": [
+            {
+                "lsType": "name",
+                "lsKind": "project name",
+                "labelText": name,
+                "ignored": False,
+                "preferred": True,
+                "recordedDate": 1586877284571,
+                "recordedBy": "bob",
+                "physicallyLabled": False,
+                "thingType": "project",
+                "thingKind": "project"
+            },
+            {
+                "lsType": "name",
+                "lsKind": "project alias",
+                "labelText": alias,
+                "ignored": False,
+                "preferred": False,
+                "recordedDate": 1586877284571,
+                "recordedBy": "bob",
+                "physicallyLabled": False,
+                "thingType": "project",
+                "thingKind": "project"
+            }
+        ],
+        "lsStates": [
+            {
+                "lsType": "metadata",
+                "lsKind": "project metadata",
+                "lsValues": [
+                    {
+                        "lsType": "dateValue",
+                        "lsKind": "start date",
+                        "ignored": False,
+                        "recordedDate": 1586877284571,
+                        "recordedBy": "bob",
+                        "dateValue": 1586877284571
+                    }, {
+                        "lsType": "codeValue",
+                        "lsKind": "project status",
+                        "ignored": False,
+                        "recordedDate": 1586877284571,
+                        "recordedBy": "bob",
+                        "codeKind": "status",
+                        "codeType": "project",
+                        "codeOrigin": "ACAS DDICT",
+                        "codeValue": "active"
+                    }, {
+                        "lsType": "codeValue",
+                        "lsKind": "is restricted",
+                        "ignored": False,
+                        "recordedDate": 1586877284571,
+                        "recordedBy": "bob",
+                        "codeKind": "restricted",
+                        "codeType": "project",
+                        "codeOrigin": "ACAS DDICT",
+                        "codeValue": "false"
+                    }
+                ],
+                "ignored": False,
+                "recordedDate": 1586877284571,
+                "recordedBy": "bob"
+            }
+        ],
+        "lsTags": [],
+        "codeName": code
+    }
     return ls_thing
 
 
@@ -102,7 +102,7 @@ def create_thing_with_blob_value(code):
     # Get a file to load
     file_name = 'blob_test.png'
     blob_test_path = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', file_name)
+        .joinpath('test_acasclient', file_name)
     f = open(blob_test_path, "rb")
     bytes_array = f.read()
 
@@ -128,6 +128,7 @@ def create_thing_with_blob_value(code):
     # Return thing file and bytes array for testing
     return ls_thing, file_name, bytes_array
 
+
 class TestAcasclient(unittest.TestCase):
     """Tests for `acasclient` package."""
 
@@ -151,8 +152,7 @@ class TestAcasclient(unittest.TestCase):
             'acas')
         self.assertIn("username", creds)
         self.assertIn("password", creds)
-        self.assertIn("url"
-        , creds)
+        self.assertIn("url", creds)
         self.assertEqual(creds['username'], 'bob')
         self.assertEqual(creds['password'], 'secret')
         creds = acasclient.creds_from_file(file_credentials,
@@ -606,32 +606,32 @@ class TestAcasclient(unittest.TestCase):
         """Test cmpd search request."""
 
         molStructure = (
-                "NSC 1390\n"
-                "\n"
-                "\n"
-                " 10 11  0  0  0  0  0  0  0  0999 V2000\n"
-                "   -4.4591   -4.9405    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -3.1600   -2.6905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -3.1600   -7.1905    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -0.4344   -2.9770    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "    0.4473   -4.1905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -1.8610   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -1.8610   -4.9405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -3.1600   -5.6905    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -0.4344   -5.4040    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "   -4.4591   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
-                "  1  8  1  0  0  0  0\n"
-                "  1 10  1  0  0  0  0\n"
-                "  2 10  2  0  0  0  0\n"
-                "  2  6  1  0  0  0  0\n"
-                "  3  8  2  0  0  0  0\n"
-                "  4  5  1  0  0  0  0\n"
-                "  4  6  1  0  0  0  0\n"
-                "  5  9  2  0  0  0  0\n"
-                "  6  7  2  0  0  0  0\n"
-                "  7  8  1  0  0  0  0\n"
-                "  7  9  1  0  0  0  0\n"
-                "M  END")
+            "NSC 1390\n"
+            "\n"
+            "\n"
+            " 10 11  0  0  0  0  0  0  0  0999 V2000\n"
+            "   -4.4591   -4.9405    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -3.1600   -2.6905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -3.1600   -7.1905    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -0.4344   -2.9770    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "    0.4473   -4.1905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -1.8610   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -1.8610   -4.9405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -3.1600   -5.6905    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -0.4344   -5.4040    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "   -4.4591   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"
+            "  1  8  1  0  0  0  0\n"
+            "  1 10  1  0  0  0  0\n"
+            "  2 10  2  0  0  0  0\n"
+            "  2  6  1  0  0  0  0\n"
+            "  3  8  2  0  0  0  0\n"
+            "  4  5  1  0  0  0  0\n"
+            "  4  6  1  0  0  0  0\n"
+            "  5  9  2  0  0  0  0\n"
+            "  6  7  2  0  0  0  0\n"
+            "  7  8  1  0  0  0  0\n"
+            "  7  9  1  0  0  0  0\n"
+            "M  END")
         search_results = self.client.\
             cmpd_search(molStructure=molStructure)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
@@ -866,11 +866,11 @@ class TestAcasclient(unittest.TestCase):
         test_012_upload_file_file = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
         mappings = [{
-                        "dbProperty": "Parent Stereo Category",
-                        "defaultVal": "unknown",
-                        "required": True,
-                        "sdfProperty": None
-                    }]
+            "dbProperty": "Parent Stereo Category",
+            "defaultVal": "unknown",
+            "required": True,
+            "sdfProperty": None
+        }]
         registration_result = self.client.register_sdf(test_012_upload_file_file, "bob",
                                                        mappings)
         self.assertIn('2 new lots', registration_result['summary'])
@@ -1035,8 +1035,8 @@ class TestAcasclient(unittest.TestCase):
         ls_thing = create_project_thing(codeAndName, codeAndName, alias)
         self.client.save_ls_thing(ls_thing)
         results = self.client.get_thing_codes_by_labels('project',
-                                              'project',
-                                              [codeAndName])
+                                                        'project',
+                                                        [codeAndName])
         self.assertEqual(results[0]["preferredName"], codeAndName)
 
         # Searching by alias should work but still return preferredNames
@@ -1097,12 +1097,12 @@ class TestAcasclient(unittest.TestCase):
             codes.append(code)
 
         value_listings = [{
-                    "stateType": "metadata",
-                    "stateKind": "project metadata",
-                    "valueType": "codeValue",
-                    "valueKind": "status",
-                    "operator": "="
-                }]
+            "stateType": "metadata",
+            "stateKind": "project metadata",
+            "valueType": "codeValue",
+            "valueKind": "status",
+            "operator": "="
+        }]
         ls_things = self.client\
             .advanced_search_ls_things('project', 'project', 'active',
                                        value_listings=value_listings,
@@ -1149,26 +1149,26 @@ class TestAcasclient(unittest.TestCase):
         self.assertEqual(len(returnedCodes), len(codes))
         self.assertIn('codeName', ls_things[0])
 
-        #Verify that codectable format works
+        # Verify that codectable format works
         ls_things = self.client.get_ls_things_by_type_and_kind("project",
                                                                "project",
                                                                format="codetable")
         self.assertIn('code', ls_things[0])
 
-        #Verify that giving bad format gives ValueError
+        # Verify that giving bad format gives ValueError
         with self.assertRaises(ValueError):
             self.client.get_ls_things_by_type_and_kind("project",
                                                        "project",
-                                                       format="badformat")                                 
+                                                       format="badformat")
 
     def test_035_test_create_label_sequence(self):
         labelPrefix = "TESTSEQ"+str(uuid.uuid4())
-        sequence = self.client.create_label_sequence(labelPrefix, 0, 0, "-", "id_corpName", "parent_compound")
+        sequence = self.client.create_label_sequence(
+            labelPrefix, 0, 0, "-", "id_corpName", "parent_compound")
         self.assertIn('dbSequence', sequence)
         self.assertIn(labelPrefix, sequence["labelPrefix"])
         self.assertIn('id_corpName', sequence["labelTypeAndKind"])
         self.assertIn('parent_compound', sequence["thingTypeAndKind"])
-
 
     def test_036_get_all_label_sequences(self):
         sequences = self.client.get_all_label_sequences()
@@ -1180,7 +1180,8 @@ class TestAcasclient(unittest.TestCase):
     def test_037_get_label_sequence_by_types_and_kinds(self):
         labelTypeAndKind = "id_corpName"
         thingTypeAndKind = "parent_compound"
-        sequences = self.client.get_label_sequence_by_types_and_kinds(labelTypeAndKind, thingTypeAndKind)
+        sequences = self.client.get_label_sequence_by_types_and_kinds(
+            labelTypeAndKind, thingTypeAndKind)
         self.assertGreater(len(sequences), 0)
         for sequence in sequences:
             self.assertEqual(labelTypeAndKind, sequence["labelTypeAndKind"])
@@ -1188,7 +1189,8 @@ class TestAcasclient(unittest.TestCase):
 
     def test_038_get_labels(self):
         numberOfLabels = 5
-        labels = self.client.get_labels("id_codeName", "document_experiment", numberOfLabels)
+        labels = self.client.get_labels(
+            "id_codeName", "document_experiment", numberOfLabels)
         self.assertEqual(len(labels), numberOfLabels)
         for label in labels:
             self.assertIn('autoLabel', label)
@@ -1204,7 +1206,8 @@ class TestAcasclient(unittest.TestCase):
     def test_040_get_ddict_values_by_type_and_kind(self):
         codeType = "experiment metadata"
         codeKind = "file type"
-        all_ddict_values = self.client.get_ddict_values_by_type_and_kind(codeType, codeKind)
+        all_ddict_values = self.client.get_ddict_values_by_type_and_kind(
+            codeType, codeKind)
         self.assertGreater(len(all_ddict_values), 0)
         for ddict_value in all_ddict_values:
             self.assertIn('codeType', ddict_value)
@@ -1231,7 +1234,8 @@ class TestAcasclient(unittest.TestCase):
         self.assertEqual(saved_blob_value["comments"], file_name)
 
         # Get the actual blob value data by value id
-        blob_data = self.client.get_blob_data_by_value_id(saved_blob_value["id"])
+        blob_data = self.client.get_blob_data_by_value_id(
+            saved_blob_value["id"])
 
         # Assert that the returned blob data is of type bytes and is equal to the blob data sent in
         self.assertEqual(type(blob_data), bytes)

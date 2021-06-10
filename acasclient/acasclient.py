@@ -233,7 +233,8 @@ class client():
                 filesToUpload[str("file")] = base64.decodebytes(file.encode())
             elif isinstance(file, dict):
                 if isBase64(file['data']):
-                    filesToUpload[file["name"]] = base64.decodebytes(file["data"].encode())
+                    filesToUpload[file["name"]] = base64.decodebytes(
+                        file["data"].encode())
                 else:
                     filesToUpload[file["name"]] = file["data"]
             else:
@@ -504,11 +505,11 @@ class client():
         resp = self.session.get("{}{}".format(self.url, file_path))
         resp.raise_for_status()
         return {
-                'content-type': resp.headers.get('content-type', None),
-                'content-length': resp.headers.get('content-length', None),
-                'last-modified': resp.headers.get('Last-modified', None),
-                'name': PurePath(Path(file_path)).name,
-                'content': resp.content}
+            'content-type': resp.headers.get('content-type', None),
+            'content-length': resp.headers.get('content-length', None),
+            'last-modified': resp.headers.get('Last-modified', None),
+            'name': PurePath(Path(file_path)).name,
+            'content': resp.content}
 
     def get_protocols_by_label(self, label):
         """Get all experiments for a protocol from a protocol label
@@ -585,11 +586,11 @@ class client():
         if not experiment:
             return None
         source_file = get_entity_value_by_state_type_kind_value_type_kind(
-                        experiment,
-                        "metadata",
-                        "experiment metadata",
-                        "fileValue",
-                        "source file")
+            experiment,
+            "metadata",
+            "experiment metadata",
+            "fileValue",
+            "source file")
         file = None
         if source_file and "fileValue" in source_file:
             file = self.get_file("/dataFiles/{}"
@@ -624,7 +625,7 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def register_sdf(self, file, userName, mappings, prefix = None):
+    def register_sdf(self, file, userName, mappings, prefix=None):
         files = self.upload_files([file])
         request = {
             "fileName": files['files'][0]["name"],
@@ -635,14 +636,14 @@ class client():
             request["labelPrefix"] = {
                 "name": prefix,
                 "labelPrefix": prefix,
-                "labelTypeAndKind":"id_corpName",
-                "thingTypeAndKind":"parent_compound"
+                "labelTypeAndKind": "id_corpName",
+                "thingTypeAndKind": "parent_compound"
             }
         response = self.register_sdf_request(request)
         report_files = []
         for file in response[0]['reportFiles']:
             filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
-                        PurePath(Path(file)).name)
+                PurePath(Path(file)).name)
             report_files.append(self.get_file(filePath))
         return {"summary": response[0]['summary'],
                 "report_files": report_files}
@@ -760,37 +761,10 @@ class client():
 
         """
         request = {
-                    "fileInfo": {
-                        "id": id
-                    }
-                }
-        resp = self.session.post("{}/api/cmpdRegBulkLoader/purgeFile".
-                                 format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(request))
-        if resp.text == '"Error"':
-            return None
-        return resp.json()
-
-    def purge_cmpdreg_bulk_load_file(self, id):
-        """Purge a cmpdreg bulk load file
-
-        Purges a cmpdreg bulk load file
-
-        Args:
-            id (int): A bulk load file id
-
-        Returns: Dict object with file content
-            fileName (str): The name of the file that was purged
-            success (bool): Did the file purge successfully
-            summary (str): An html formatted summary of the purge results
-
-        """
-        request = {
-                    "fileInfo": {
-                        "id": id
-                    }
-                }
+            "fileInfo": {
+                "id": id
+            }
+        }
         resp = self.session.post("{}/api/cmpdRegBulkLoader/purgeFile".
                                  format(self.url),
                                  headers={'Content-Type': "application/json"},
@@ -867,7 +841,7 @@ class client():
         return resp.json()
 
     def get_ls_things_by_type_and_kind(self, ls_type, ls_kind,
-                               format='stub'):
+                                       format='stub'):
         """
         Get a list of ls thing dict objects from ls_type and ls_kind
 
@@ -880,11 +854,11 @@ class client():
             raise ValueError("format must be one of %s." % allowedFormats)
         params = {format: '1'}
         resp = self.session.get("{}/api/things/{}/{}".
-                                 format(self.url,
-                                        ls_type,
-                                        ls_kind),
-                                 params=params,
-                                 headers={'Content-Type': "application/json"})
+                                format(self.url,
+                                       ls_type,
+                                       ls_kind),
+                                params=params,
+                                headers={'Content-Type': "application/json"})
         if resp.status_code == 500:
             return None
         else:
@@ -912,7 +886,7 @@ class client():
         Args:
             ls_thing_list (str): list of ls_thing dict objects
         """
-        #TODO: generate a transaction
+        # TODO: generate a transaction
         resp = self.session.put("{}/api/bulkPutThingsSaveFile".
                                 format(self.url),
                                 headers={'Content-Type': "application/json"},
@@ -942,7 +916,7 @@ class client():
             'labelType': label_type,
             'labelKind': label_kind,
             'requests': [
-                    {"requestName": request} for request in labels_or_codes
+                {"requestName": request} for request in labels_or_codes
             ]
         }
 
@@ -972,10 +946,11 @@ class client():
             label_kind (str): label_kind to limit label searches
         Returns:
             saved_codes (dict): dict of identifier : LsThing codeName for previously saved entities
-            missing_ids (list): list of identifiers that were not found to be previously saved 
+            missing_ids (list): list of identifiers that were not found to be previously saved
         """
         # Query ACAS for list of identifiers
-        ref_name_lookup_results = self.get_thing_codes_by_labels(ls_type, ls_kind, id_list, label_type, label_kind)
+        ref_name_lookup_results = self.get_thing_codes_by_labels(
+            ls_type, ls_kind, id_list, label_type, label_kind)
         # Parse results into found and not found
         saved_codes = {}
         missing_ids = []
@@ -1032,7 +1007,8 @@ class client():
                                  params=params)
         result = resp.json()
         if type(result) is not dict:
-            msg = 'Caught error response from {}: {}'.format('/api/advancedSearch/things', result)
+            msg = 'Caught error response from {}: {}'.format(
+                '/api/advancedSearch/things', result)
             logger.error(msg)
             raise ValueError(msg)
         results = result['results']
@@ -1042,8 +1018,8 @@ class client():
             return results
 
     def create_label_sequence(self, labelPrefix, startingNumber, digits,
-                                  labelSeparator, labelTypeAndKind = None, thingTypeAndKind = None,
-                                  labelSequenceRoles =  []):
+                              labelSeparator, labelTypeAndKind=None, thingTypeAndKind=None,
+                              labelSequenceRoles=[]):
         """
         Create a label sequence
 
@@ -1081,11 +1057,11 @@ class client():
         Returns:
             a list of dict objects representing the labelSequence
         """
-       
+
         json = self.get_label_sequence_by_types_and_kinds()
         return json
 
-    def get_label_sequence_by_types_and_kinds(self, labelTypeAndKind = None, thingTypeAndKind = None):
+    def get_label_sequence_by_types_and_kinds(self, labelTypeAndKind=None, thingTypeAndKind=None):
         """
         Get label sequence by types and kinds (limited to those authorized by logged in user roles)
 
@@ -1106,8 +1082,8 @@ class client():
         if thingTypeAndKind:
             params = {**params, 'thingTypeAndKind': thingTypeAndKind}
         resp = self.session.get("{}/api/labelSequences/getAuthorizedLabelSequences".
-                                 format(self.url),
-                                 params=params)
+                                format(self.url),
+                                params=params)
         resp.raise_for_status()
         return resp.json()
 
@@ -1158,7 +1134,6 @@ class client():
                                 format(self.url, path))
         resp.raise_for_status()
         return resp.json()
-
 
     def get_blob_data_by_value_id(self, valueId):
         """

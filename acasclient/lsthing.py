@@ -591,6 +591,10 @@ class BlobValue(object):
         :type value: bytes, optional
         :param comments: Filename as a string, defaults to None
         :type comments: str, optional
+        :param id: id as an int, defaults to None
+        :type id: int, optional
+        :param ls_value: ls_value as a <acasclient.lsthing.LsThingValue>, defaults to None
+        :type ls_value: <acasclient.lsthing.LsThingValue>, optional
         """
         if ls_value is not None:
             value = ls_value.blob_value
@@ -613,6 +617,11 @@ class BlobValue(object):
         self.id = id
 
     def get_data(self, client):
+        """Get blob value data as bytes
+
+        :return: bytes of blob value from server
+        :rtype: bytes
+        """
         return client.get_blob_data_by_value_id(self.id)
 
     def __eq__(self, other: object) -> bool:

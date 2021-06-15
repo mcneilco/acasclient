@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import pathlib
+from pathlib import Path
 import re
 from collections import defaultdict
 from datetime import datetime
@@ -146,8 +147,7 @@ def parse_values_into_dict(ls_values):
             elif value.ls_type == 'fileValue':
                 val = FileValue(value.file_value)
             elif value.ls_type == 'blobValue':
-                val = BlobValue(value=value.blob_value,
-                                comments=value.comments)
+                val = BlobValue(ls_value=value)
             # In cases where there are multiple values with same ls_kind,
             # make the dictionary value into a list and append this value
             if key in values_dict:
@@ -584,7 +584,7 @@ class BlobValue(object):
     These files must be small (< 1 GB) and will be stored in a `bytea` database column.
     """
 
-    def __init__(self, value=None, comments=None):
+    def __init__(self, value=None, comments=None, id=None, ls_value=None):
         """Create a BlobValue
 
         :param value: Bytes of file content, defaults to None
@@ -592,8 +592,28 @@ class BlobValue(object):
         :param comments: Filename as a string, defaults to None
         :type comments: str, optional
         """
+        if ls_value is not None:
+            value = ls_value.blob_value
+            comments = ls_value.comments
+            id = ls_value.id
+        else:
+            if value is not None:
+                if isinstance(value, Path) or isinstance(value, str):
+                    if isinstance(value, str):
+                        value = Path(value)
+                    if comments is None:
+                        comments = value.name
+                    f = value.open('rb')
+                    bytes_array = f.read()
+                    value = [x for x in bytes_array]
+                    f.close()
+
         self.value = value
         self.comments = comments
+        self.id = id
+
+    def get_data(self, client):
+        return client.get_blob_data_by_value_id(self.id)
 
     def __eq__(self, other: object) -> bool:
         return self.value == other.value and self.comments == other.comments

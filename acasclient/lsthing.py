@@ -586,7 +586,7 @@ class BlobValue(object):
     """
     _fields = ['value', 'comments', 'id']
 
-    def __init__(self, value=None, comments=None, id=None, ls_value=None):
+    def __init__(self, value=None, comments=None, file_path=None, id=None, ls_value=None):
         """Create a BlobValue
 
         :param value: Bytes of file content, defaults to None
@@ -595,6 +595,8 @@ class BlobValue(object):
         :type comments: str, optional
         :param id: id as an int, defaults to None
         :type id: int, optional
+        :param file_path: file_path as an str or <pathlib.PosixPath>, defaults to None
+        :type file_path: Union[str, <pathlib.PosixPath>], optional
         :param ls_value: ls_value as a <acasclient.lsthing.LsThingValue>, defaults to None
         :type ls_value: <acasclient.lsthing.LsThingValue>, optional
         """
@@ -603,28 +605,81 @@ class BlobValue(object):
             comments = ls_value.comments
             id = ls_value.id
         else:
-            if value is not None:
-                if isinstance(value, Path) or isinstance(value, str):
-                    if isinstance(value, str):
-                        value = Path(value)
+            if file_path is not None:
+                if isinstance(file_path, Path) or isinstance(file_path, str):
+                    if isinstance(file_path, str):
+                        file_path = Path(file_path)
                     if comments is None:
-                        comments = value.name
-                    f = value.open('rb')
+                        comments = file_path.name
+                    if not file_path.exists():
+                        raise ValueError('File path "{}" does not exist'.format(file_path))
+                    if not file_path.is_file():
+                        raise ValueError('File path "{}" is not a file'.format(file_path))
+                    f = file_path.open('rb')
                     bytes_array = f.read()
                     value = [x for x in bytes_array]
                     f.close()
-
+                else:
+                    raise ValueError('file_path must be of str or <pathlib.PosixPath>. Provided file_path argument is of type {}'.format(type(file_path)))
         self.value = value
         self.comments = comments
         self.id = id
 
-    def get_data(self, client):
+    def download_data(self, client):
         """Get blob value data as bytes
 
+        :param client: a valid acas client
+        :type client: <acasclient.lsthing.LsThingValue>
         :return: bytes of blob value from server
         :rtype: bytes
         """
-        return client.get_blob_data_by_value_id(self.id)
+        if self.id is None:
+            raise ValueError('Cannot download data because BlobValue does not have id. Check to see if it has been saved.')
+        self.value = client.get_blob_data_by_value_id(self.id)
+        return self.value
+
+    def write_to_file(self, folder_path=None, file_name=None, full_file_path=None):
+        """Write blob value to a file (requires that BlobValue.value has valid bytes).
+           This can be achieved but running <acasclient.lsthing.BlobValue.download_data> on the BlobValue 
+
+        :param folder_path: folder_path as an str or <pathlib.PosixPath>, defaults to None
+        :type folder_path: Union[str, <pathlib.PosixPath>], optional
+        :param file_name: file_name as an str or <pathlib.PosixPath>, defaults to value.comments or full_file_path name if passed in
+        :type file_name: Union[str, <pathlib.PosixPath>], optional
+        :param full_file_path: full_file_path as an str or <pathlib.PosixPath>, defaults to None
+        :type full_file_path: Union[str, <pathlib.PosixPath>], optional
+        :return: <pathlib.PosixPath> of written data file
+        :rtype: <pathlib.PosixPath>
+        """
+        if self.value is None:
+            raise ValueError('Error writing file. BlobValue does not have a value set.')
+        if full_file_path is not None:
+            if not isinstance(full_file_path, Path) and not isinstance(full_file_path, str):
+                raise ValueError('full_file_path must be of str or <pathlib.PosixPath>. Provided full_file_path argument is of type {}'.format(type(full_file_path)))
+            if isinstance(full_file_path, str):
+                full_file_path = Path(full_file_path)
+            if not full_file_path.parents[0].exists():
+                raise ValueError('Parent directory of full_file_path path "{}" does not exist'.format(full_file_path.parents[0]))
+            if full_file_path.exists() and not full_file_path.is_file():
+                raise ValueError('File path "{}" exists and is not a file.  File path should be a file'.format(full_file_path))
+        else:
+            if folder_path is None:
+                raise ValueError('folder_path argument must be provided if full_file_path is not provided')
+            if not isinstance(folder_path, Path) and not isinstance(folder_path, str):
+                raise ValueError('folder_path must be of str or <pathlib.PosixPath>. Provided folder_path argument is of type {}'.format(type(folder_path)))
+            if isinstance(folder_path, str):
+                folder_path = Path(folder_path)
+            if not folder_path.exists():
+                raise ValueError('folder_path path "{}" does not exist'.format(folder_path))
+            if file_name is None and self.comments is None:
+                raise ValueError('file_name argument must be provided if BlobValue comments is None')
+            else:
+                if file_name is None:
+                    file_name = self.comments
+            full_file_path = Path(folder_path, file_name)
+        with open(full_file_path, 'wb') as f:
+            f.write(self.value)
+        return full_file_path
 
     def __eq__(self, other: object) -> bool:
         return self.value == other.value and self.comments == other.comments

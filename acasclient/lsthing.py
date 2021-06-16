@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from typing import Any, Dict
 from .interactions import INTERACTION_VERBS_DICT, opposite
 
 import copy
@@ -62,7 +63,7 @@ def convert_json(data, convert):
         for val in data:
             new_data.append(convert_json(val, convert) if (
                 isinstance(val, dict) or isinstance(val, list)) else val)
-    elif type(data) is dict:
+    elif isinstance(data, dict):
         new_data = {}
         for key, val in data.items():
             new_data[convert(key)] = convert_json(val, convert) if (
@@ -583,6 +584,7 @@ class BlobValue(object):
     """Class used to save files as byte arrays to ACAS.
     These files must be small (< 1 GB) and will be stored in a `bytea` database column.
     """
+    _fields = ['value', 'comments', 'id']
 
     def __init__(self, value=None, comments=None, id=None, ls_value=None):
         """Create a BlobValue
@@ -626,6 +628,18 @@ class BlobValue(object):
 
     def __eq__(self, other: object) -> bool:
         return self.value == other.value and self.comments == other.comments
+
+    def as_dict(self) -> Dict[str, Any]:
+        """
+        Return a map of attribute name and attribute values stored on the
+        instance.
+        Note: Only attributes stored in `BlobValue._fields` will be returned.
+        """
+        return {
+            field: getattr(self, field, None)
+            for field in self._fields
+        }
+
 
 
 # Model classes
@@ -1642,22 +1656,22 @@ class SimpleLsThing(BaseModel):
             link_dicts.append(link.as_dict())
         my_dict['links'] = link_dicts
 
-        # Check metadata for CodeValues and convert them to dicts
+        # Check metadata for CodeValues/BlobValue and convert them to dicts
         metadata = {}
         for key, val in self.metadata.items():
             metadata[key] = {}
             for k, v in val.items():
-                if isinstance(v, CodeValue):
+                if isinstance(v, CodeValue) or isinstance(v, BlobValue):
                     v = v.as_dict()
                 metadata[key][k] = v
         my_dict['metadata'] = metadata
 
-        # Check results for CodeValues and convert them to dicts
+        # Check results for CodeValues/BlobValue and convert them to dicts
         results = {}
         for key, val in self.results.items():
             results[key] = {}
             for k, v in val.items():
-                if isinstance(v, CodeValue):
+                if isinstance(v, CodeValue) or isinstance(v, BlobValue):
                     v = v.as_dict()
                 results[key][k] = v
         my_dict['results'] = results

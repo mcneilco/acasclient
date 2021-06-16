@@ -98,3 +98,24 @@ class TestLsThing(unittest.TestCase):
         self.assertEqual(newProject.metadata['project metadata']['procedure document'].comments, file_name)
         data = newProject.metadata['project metadata']['procedure document'].get_data(self.client)
         self.assertEqual(data, file_bytes)
+
+
+class TestBlobValue(unittest.TestCase):
+
+    def setUp(self) -> None:
+        creds = acasclient.get_default_credentials()
+        self.client = acasclient.client(creds)
+
+    def test_as_dict(self):
+        """
+        Verify `as_dict` returns the instance attributes mapped to their value.
+        """
+
+        value, comments, id = [65, 67], "blob test", None
+        blob_value = BlobValue(value=value, comments=comments, id=id)
+        blob_value_dict = blob_value.as_dict()
+
+        assert len(blob_value_dict) == len(BlobValue._fields)
+        assert blob_value_dict['value'] == value
+        assert blob_value_dict['comments'] == comments
+        assert blob_value_dict['id'] == id

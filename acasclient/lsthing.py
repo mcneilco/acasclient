@@ -1840,8 +1840,8 @@ class SimpleLsThing(BaseModel):
             ls_type = cls.ls_type
         if not ls_kind:
             ls_kind = cls.ls_kind
-        ls_thing = client.get_ls_thing(ls_type, ls_kind, code_name)
-        return cls(ls_thing=LsThing.from_camel_dict(ls_thing))
+        camel_case_dict = client.get_ls_thing(ls_type, ls_kind, code_name)
+        return cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
 
     @classmethod
     def save_list(cls, client, models):

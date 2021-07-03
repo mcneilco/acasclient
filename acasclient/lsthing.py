@@ -301,7 +301,7 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     if isinstance(val, FileValue):
         value = value_cls(ls_type="fileValue", ls_kind=value_kind, recorded_by=recorded_by,
                           file_value=val, unit_kind=unit_kind)
-    if isinstance(val, BlobValue):
+    elif isinstance(val, BlobValue):
         value = value_cls(
             ls_type="blobValue",
             ls_kind=value_kind,

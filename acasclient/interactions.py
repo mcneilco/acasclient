@@ -29,6 +29,8 @@ INTERACTION_VERBS_DICT = {
     'is input structure for': 'has input structure',
     'owns': 'is owned by',
     'is compatible with': 'is compatible with',
+    'enumerates': 'is enumerated by',
+    'precedes': 'succeeds',
 }
 
 

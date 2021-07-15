@@ -30,7 +30,7 @@ INTERACTION_VERBS_DICT = {
     'owns': 'is owned by',
     'is compatible with': 'is compatible with',
     'enumerates': 'is enumerated by',
-    'precedes': 'succeeds',
+    'precedes': 'is preceded by',
 }
 
 

@@ -146,14 +146,33 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         break
     return value
 
+class OfflineSession:
+    
+    def get(self, url, **kwargs):
+        logger.warning(f'OFFLINE: Would have called GET to {url}')
+        raise NotImplementedError
+    
+    def post(self, url, **kwargs):
+        logger.warning(f'OFFLINE: Would have called POST to {url} with kwargs: {kwargs}')
+        raise NotImplementedError
+    
+    def put(self, url, **kwargs):
+        logger.warning(f'OFFLINE: Would have called PUT to {url} with kwargs: {kwargs}')
+        raise NotImplementedError
 
 class client():
 
-    def __init__(self, creds):
-        self.username = creds['username']
-        self.password = creds['password']
-        self.url = creds['url']
-        self.session = self.getSession()
+    def __init__(self, creds, offline=False):
+        self.offline = offline
+        if not offline:
+            self.username = creds['username']
+            self.password = creds['password']
+            self.url = creds['url']
+            self.session = self.getSession()
+        else:
+            self.username = 'OFFLINE'
+            self.url = 'OFFLINE'
+            self.session = OfflineSession()
 
     def getSession(self):
         data = {

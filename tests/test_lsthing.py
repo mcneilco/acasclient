@@ -235,8 +235,8 @@ class TestLsThing(unittest.TestCase):
             "start_date": time.time(),
             "procedure_document": file_path
         }
-        newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.save(self.client)
+        newProject = Project(self.client, **meta_dict)
+        newProject.save()
         self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
         
         # Then update with a different file
@@ -245,7 +245,7 @@ class TestLsThing(unittest.TestCase):
         file_bytes = self._get_bytes(file_path)
         new_blob_val = BlobValue(file_path=file_path)
         newProject.metadata['project metadata']['procedure document'] = new_blob_val
-        newProject.save(self.client)
+        newProject.save()
         self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
 
 
@@ -268,3 +268,31 @@ class TestBlobValue(unittest.TestCase):
         assert blob_value_dict['value'] == value
         assert blob_value_dict['comments'] == comments
         assert blob_value_dict['id'] == id
+
+class TestOfflineLsThing(unittest.TestCase):
+
+    def setUp(self):
+        """Set up test fixtures, if any."""
+        self.client = acasclient.client(creds=None, offline=True)
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+    
+    def test_001_instantiate_thing(self):
+        """Test creating a SimpleLsThing in offline mode"""
+        name = str(uuid.uuid4())
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time()
+        }
+        newProject = Project(self.client, **meta_dict)
+        self.assertIsNone(newProject.code_name)
+        self.assertIsNone(newProject._ls_thing.id)
+        self.assertTrue(newProject.metadata["project metadata"]["is restricted"].code)
+        try:
+            newProject.save()
+        except NotImplementedError:
+            pass

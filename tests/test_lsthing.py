@@ -166,6 +166,52 @@ class TestLsThing(unittest.TestCase):
             newProject = Project(recorded_by=self.client.username, **meta_dict)
         except ValueError as err:
             self.assertIn("not a file", err.args[0])
+    
+    def test_002_update_blob_value(self):
+        """Test saving simple ls thing with blob value, then updating the blobValue."""
+        # Helpers
+        def _get_path(file_name):
+            path = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', file_name)
+            return path
+        
+        def _get_bytes(file_path):
+            with open(file_path, "rb") as in_file:
+                file_bytes = in_file.read()
+            return file_bytes
+        
+        def _check_equal(blob_value, orig_file_name, orig_bytes):
+            self.assertEqual(blob_value.comments, orig_file_name)
+            data = blob_value.download_data(self.client)
+            self.assertEqual(data, orig_bytes)
+        
+        # Create a project with first blobValue
+        name = str(uuid.uuid4())
+        file_name = 'blob_test.png'
+        file_path = _get_path(file_name)
+        file_bytes = _get_bytes(file_path)
+
+        # Save with Path path
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time(),
+            "procedure_document": file_path
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject.save(self.client)
+        _check_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+        
+        # Then update with a different file
+        file_name = '1_1_Generic.xlsx'
+        file_path = _get_path(file_name)
+        file_bytes = _get_bytes(file_path)
+        new_blob_val = BlobValue(file_path=file_path)
+        newProject.metadata['project metadata']['procedure document'] = new_blob_val
+        newProject.save(self.client)
+        _check_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+
 
 
 class TestBlobValue(unittest.TestCase):

@@ -211,7 +211,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
     elif isinstance(val, FileValue):
         return ls_value.file_value == val
     elif isinstance(val, BlobValue):
-        return ls_value.blob_value == BlobValue(val.value, val.comments)
+        return  BlobValue(ls_value.blob_value, ls_value.comments) == val
     elif isinstance(val, clob):
         return ls_value.clob_value == str(val)
     elif type(val) == str:

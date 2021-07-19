@@ -682,6 +682,8 @@ class BlobValue(object):
         return full_file_path
 
     def __eq__(self, other: object) -> bool:
+        if other is None:
+            return False
         return self.value == other.value and self.comments == other.comments
 
     def as_dict(self) -> Dict[str, Any]:
@@ -1570,7 +1572,8 @@ class SimpleLsThing(BaseModel):
     ROW_NUM_KEY = 'row number'
 
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names={}, ids={}, aliases={}, metadata={}, results={}, links=[], recorded_by=None,
-                 preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None):
+                 preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None, client=None):
+        self._client = client
         self.preferred_label_kind = preferred_label_kind
         # if ls_thing passed in, just parse from it and ignore the rest
         if ls_thing:
@@ -1685,6 +1688,14 @@ class SimpleLsThing(BaseModel):
                 link = SimpleLink(itx_ls_thing_ls_thing=itx)
                 parsed_links.append(link)
         self.links = parsed_links
+
+    def set_client(self, client):
+        """
+        Set ACAS database client.
+        :param client: ACAS database client.
+        :type client: acasclient.client
+        """
+        self._client = client
 
     def _convert_values_to_objects(self, values_dict, state):
         values_obj_dict = {}
@@ -1841,7 +1852,9 @@ class SimpleLsThing(BaseModel):
         if not ls_kind:
             ls_kind = cls.ls_kind
         camel_case_dict = client.get_ls_thing(ls_type, ls_kind, code_name)
-        return cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
+        simple_ls_thing = cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
+        simple_ls_thing.set_client(client=client)
+        return simple_ls_thing
 
     @classmethod
     def save_list(cls, client, models):

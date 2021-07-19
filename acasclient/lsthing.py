@@ -1932,9 +1932,6 @@ class SimpleLsThing(BaseModel):
         a dict object.  If its either, then upload the file and replace the value
         with the relative path on the server (just the file name), required for the
         service route to properly handle the file on save of the LsThing.
-
-        :param client: Authenticated instance of acasclient.client, defaults to self._client
-        :type client: acasclient.client, optional
         """
         def isBase64(s):
             return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)

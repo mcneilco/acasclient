@@ -1690,14 +1690,6 @@ class SimpleLsThing(BaseModel):
                 parsed_links.append(link)
         self.links = parsed_links
 
-    def set_client(self, client):
-        """
-        Set ACAS database client.
-        :param client: ACAS database client.
-        :type client: acasclient.client
-        """
-        self._client = client
-
     def _convert_values_to_objects(self, values_dict, state):
         values_obj_dict = {}
         ls_values = []
@@ -1848,8 +1840,7 @@ class SimpleLsThing(BaseModel):
         if not ls_kind:
             ls_kind = cls.ls_kind
         camel_case_dict = client.get_ls_thing(ls_type, ls_kind, code_name)
-        simple_ls_thing = cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
-        simple_ls_thing.set_client(client=client)
+        simple_ls_thing = cls(client=client, ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
         return simple_ls_thing
 
     @classmethod
@@ -1871,7 +1862,7 @@ class SimpleLsThing(BaseModel):
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
         saved_ls_things = client.save_ls_thing_list(camel_dict)
-        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing), client=client) for ls_thing in saved_ls_things]
+        return [cls(client=client, ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
 
     @classmethod
     def update_list(cls, client, models, clear_links=False):
@@ -1896,7 +1887,7 @@ class SimpleLsThing(BaseModel):
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
         saved_ls_things = client.update_ls_thing_list(camel_dict)
-        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing), client=client) for ls_thing in saved_ls_things]
+        return [cls(client=client, ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
 
     def get_file_hash(self, file_path):
         BLOCKSIZE = 65536

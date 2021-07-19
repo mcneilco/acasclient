@@ -1775,13 +1775,11 @@ class SimpleLsThing(BaseModel):
 
         return my_dict
 
-    def _prepare_for_save(self, client, user=None):
+    def _prepare_for_save(self, user=None):
         """Translates all changes made to the "simple dict" attributes of this object
         into the underlying LsThing / LsState / LsValue / LsLabel data models, to prepare
         for saving updates to the ACAS server.
 
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
         :param user: Username to record as having made these changes, defaults to self.recorded_by
         :type user: str, optional
         """
@@ -1821,13 +1819,17 @@ class SimpleLsThing(BaseModel):
     def _cleanup_after_save(self):
         self.populate_from_ls_thing(self._ls_thing)
 
-    def save(self, client):
+    def save(self, client=None):
         """Persist changes to the ACAS server.
 
-        :param client: Authenticated instances of acasclient.client
-        :type client: acasclient.client
+        :param client: Authenticated instances of acasclient.client, defaults to self.client
+        :type client: acasclient.client, optional
         """
-        self._prepare_for_save(client)
+        if not client and self._client:
+            client = self._client
+        if not client:
+            raise AttributeError("Cannot call `save` without `client` or `self._client` set.")
+        self._prepare_for_save()
         # Persist
         self._ls_thing = self._ls_thing.save(client)
         self._cleanup_after_save()
@@ -1871,11 +1873,11 @@ class SimpleLsThing(BaseModel):
             return []
 
         for model in models:
-            model._prepare_for_save(client)
+            model._prepare_for_save()
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
         saved_ls_things = client.save_ls_thing_list(camel_dict)
-        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
+        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing), client=client) for ls_thing in saved_ls_things]
 
     @classmethod
     def update_list(cls, client, models, clear_links=False):
@@ -1896,11 +1898,11 @@ class SimpleLsThing(BaseModel):
                 # clear out the links (interactions) to avoid updating the same linked `LsThing`
                 # multiple times if two or more `model`s contain links to the same `LsThing`
                 model.links = []
-            model._prepare_for_save(client)
+            model._prepare_for_save()
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
         saved_ls_things = client.update_ls_thing_list(camel_dict)
-        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
+        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing), client=client) for ls_thing in saved_ls_things]
 
     def get_file_hash(self, file_path):
         BLOCKSIZE = 65536
@@ -1929,15 +1931,19 @@ class SimpleLsThing(BaseModel):
         self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type,
                                      recorded_by=recorded_by, metadata=metadata, results=results))
 
-    def upload_file_values(self, client):
+    def upload_file_values(self, client=None):
         """Loop through the values for file values and check if the value is a base64 string or
         a dict object.  If its either, then upload the file and replace the value
         with the relative path on the server (just the file name), required for the
         service route to properly handle the file on save of the LsThing.
 
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
+        :param client: Authenticated instance of acasclient.client, defaults to self._client
+        :type client: acasclient.client, optional
         """
+        if not client and self._client:
+            client = self._client
+        if not client:
+            raise AttributeError("Cannot call `upload_file_values` without `client` or `self._client` set.")
         def isBase64(s):
             return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
 

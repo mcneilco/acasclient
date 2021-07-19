@@ -44,7 +44,24 @@ class TestLsThing(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+    
+    # Helpers
+    def _get_path(self, file_name):
+        path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name)
+        return path
+    
+    def _get_bytes(self, file_path):
+        with open(file_path, "rb") as in_file:
+            file_bytes = in_file.read()
+        return file_bytes
+    
+    def _check_blob_equal(self, blob_value, orig_file_name, orig_bytes):
+        self.assertEqual(blob_value.comments, orig_file_name)
+        data = blob_value.download_data(self.client)
+        self.assertEqual(data, orig_bytes)
 
+    # Tests
     def test_000_simple_ls_thing_save(self):
         """Test saving simple ls thing."""
         name = str(uuid.uuid4())
@@ -83,9 +100,7 @@ class TestLsThing(unittest.TestCase):
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
-        self.assertEqual(newProject.metadata['project metadata']['procedure document'].comments, file_name)
-        data = newProject.metadata['project metadata']['procedure document'].download_data(self.client)
-        self.assertEqual(data, file_bytes)
+        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
 
         # Save with string path
         meta_dict = {
@@ -97,9 +112,7 @@ class TestLsThing(unittest.TestCase):
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
-        self.assertEqual(newProject.metadata['project metadata']['procedure document'].comments, file_name)
-        data = newProject.metadata['project metadata']['procedure document'].download_data(self.client)
-        self.assertEqual(data, file_bytes)
+        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
 
         # Write to a file by providing a full file path
         custom_file_name = "my.png"
@@ -166,6 +179,37 @@ class TestLsThing(unittest.TestCase):
             newProject = Project(recorded_by=self.client.username, **meta_dict)
         except ValueError as err:
             self.assertIn("not a file", err.args[0])
+    
+    def test_002_update_blob_value(self):
+        """Test saving simple ls thing with blob value, then updating the blobValue."""
+        
+        # Create a project with first blobValue
+        name = str(uuid.uuid4())
+        file_name = 'blob_test.png'
+        file_path = self._get_path(file_name)
+        file_bytes = self._get_bytes(file_path)
+
+        # Save with Path path
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time(),
+            "procedure_document": file_path
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject.save(self.client)
+        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+        
+        # Then update with a different file
+        file_name = '1_1_Generic.xlsx'
+        file_path = self._get_path(file_name)
+        file_bytes = self._get_bytes(file_path)
+        new_blob_val = BlobValue(file_path=file_path)
+        newProject.metadata['project metadata']['procedure document'] = new_blob_val
+        newProject.save(self.client)
+        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+
 
 
 class TestBlobValue(unittest.TestCase):

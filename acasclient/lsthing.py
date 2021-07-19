@@ -1571,9 +1571,10 @@ class SimpleLsThing(BaseModel):
 
     ROW_NUM_KEY = 'row number'
 
-    def __init__(self, ls_type=None, ls_kind=None, code_name=None, names={}, ids={}, aliases={}, metadata={}, results={}, links=[], recorded_by=None,
-                 preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None, client=None):
+    def __init__(self, client, ls_type=None, ls_kind=None, code_name=None, names={}, ids={}, aliases={}, metadata={}, results={}, links=[], recorded_by=None,
+                 preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None):
         self._client = client
+        self._current_user = client.username
         self.preferred_label_kind = preferred_label_kind
         # if ls_thing passed in, just parse from it and ignore the rest
         if ls_thing:
@@ -1585,7 +1586,7 @@ class SimpleLsThing(BaseModel):
             self.code_name = code_name
             self.links = links
             self._init_metadata = copy.deepcopy(metadata)
-            self.recorded_by = recorded_by
+            self.recorded_by = recorded_by if recorded_by else self._current_user
             self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind,
                                      code_name=self.code_name, recorded_by=self.recorded_by)
             self.names = names
@@ -1780,12 +1781,12 @@ class SimpleLsThing(BaseModel):
         into the underlying LsThing / LsState / LsValue / LsLabel data models, to prepare
         for saving updates to the ACAS server.
 
-        :param user: Username to record as having made these changes, defaults to self.recorded_by
+        :param user: Username to record as having made these changes, defaults to self._current_user
         :type user: str, optional
         """
-        # TODO redo recorded_by logic to allow passing in of an updater
+        # Default to username of authenticated ACASClient session, unless an override username is passed in
         if not user:
-            user = self.recorded_by
+            user = self._current_user
         # Detect value updates, apply ignored / modified by /modified date and create new value
         metadata_ls_states = update_ls_states_from_dict(
             LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user)
@@ -1819,19 +1820,12 @@ class SimpleLsThing(BaseModel):
     def _cleanup_after_save(self):
         self.populate_from_ls_thing(self._ls_thing)
 
-    def save(self, client=None):
+    def save(self):
         """Persist changes to the ACAS server.
-
-        :param client: Authenticated instances of acasclient.client, defaults to self.client
-        :type client: acasclient.client, optional
         """
-        if not client and self._client:
-            client = self._client
-        if not client:
-            raise AttributeError("Cannot call `save` without `client` or `self._client` set.")
         self._prepare_for_save()
         # Persist
-        self._ls_thing = self._ls_thing.save(client)
+        self._ls_thing = self._ls_thing.save(self._client)
         self._cleanup_after_save()
 
     @classmethod
@@ -1928,10 +1922,12 @@ class SimpleLsThing(BaseModel):
         :param results: Dictioanry of results to associate with the link itself, defaults to {}
         :type results: dict, optional
         """
+        if not recorded_by:
+            recorded_by = self._current_user
         self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type,
                                      recorded_by=recorded_by, metadata=metadata, results=results))
 
-    def upload_file_values(self, client=None):
+    def upload_file_values(self):
         """Loop through the values for file values and check if the value is a base64 string or
         a dict object.  If its either, then upload the file and replace the value
         with the relative path on the server (just the file name), required for the
@@ -1940,10 +1936,6 @@ class SimpleLsThing(BaseModel):
         :param client: Authenticated instance of acasclient.client, defaults to self._client
         :type client: acasclient.client, optional
         """
-        if not client and self._client:
-            client = self._client
-        if not client:
-            raise AttributeError("Cannot call `upload_file_values` without `client` or `self._client` set.")
         def isBase64(s):
             return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
 
@@ -1953,7 +1945,7 @@ class SimpleLsThing(BaseModel):
                     if isinstance(file_val, FileValue):
                         if file_val:
                             val = pathlib.Path(file_val)
-                            uploaded_files = client.upload_files([val])
+                            uploaded_files = self._client.upload_files([val])
                             state_dict[state_kind][value_kind] = FileValue(
                                 uploaded_files['files'][0]['name'])
             return state_dict

@@ -185,6 +185,25 @@ class TestLsThing(unittest.TestCase):
         self.assertIsNotNone(new_project.code_name)
         self.assertIsNotNone(new_project._ls_thing.id)
         self.assertIsNotNone(new_project._client)
+    
+    def test_002_get_by_code(self):
+        """Test saving simple ls thing and fetching it by code_name."""
+        name = str(uuid.uuid4())
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time()
+        }
+        proj = Project(self.client, **meta_dict)
+        proj.save()
+        self.assertIsNotNone(proj.code_name)
+        self.assertIsNotNone(proj._ls_thing.id)
+        # Fetch by codename
+        new_proj = Project.get_by_code(proj.code_name, client=self.client)
+        self.assertIsNotNone(new_proj._ls_thing.id)
+        self.assertEqual(proj.code_name, new_proj.code_name)
+        self.assertIsNotNone(new_proj._client)
 
 
 class TestBlobValue(unittest.TestCase):

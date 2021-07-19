@@ -19,7 +19,8 @@ class Project(SimpleLsThing):
     ls_kind = 'project'
     preferred_label_kind = 'project name'
 
-    def __init__(self, client, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, recorded_by=None):
+    def __init__(self, client, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, recorded_by=None,
+                    ls_thing=None):
         names = {'project name': name, "project alias": alias}
         metadata = {
             'project metadata': {
@@ -30,7 +31,7 @@ class Project(SimpleLsThing):
             }
         }
         super(Project, self).__init__(client, ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
-                                      preferred_label_kind=self.preferred_label_kind, metadata=metadata)
+                                      preferred_label_kind=self.preferred_label_kind, metadata=metadata, ls_thing=ls_thing)
 
 
 class TestLsThing(unittest.TestCase):
@@ -166,6 +167,24 @@ class TestLsThing(unittest.TestCase):
             newProject = Project(self.client, **meta_dict)
         except ValueError as err:
             self.assertIn("not a file", err.args[0])
+    
+    def test_001_simple_ls_thing_save_list(self):
+        """Test saving simple ls thing as list."""
+        name = str(uuid.uuid4())
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time()
+        }
+        proj = Project(self.client, **meta_dict)
+        self.assertIsNone(proj.code_name)
+        self.assertIsNone(proj._ls_thing.id)
+        new_projects = Project.save_list(self.client, [proj])
+        new_project = new_projects[0]
+        self.assertIsNotNone(new_project.code_name)
+        self.assertIsNotNone(new_project._ls_thing.id)
+        self.assertIsNotNone(new_project._client)
 
 
 class TestBlobValue(unittest.TestCase):

@@ -19,7 +19,7 @@ class Project(SimpleLsThing):
     ls_kind = 'project'
     preferred_label_kind = 'project name'
 
-    def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, recorded_by=None):
+    def __init__(self, client, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, recorded_by=None):
         names = {'project name': name, "project alias": alias}
         metadata = {
             'project metadata': {
@@ -29,7 +29,7 @@ class Project(SimpleLsThing):
                 'procedure document': BlobValue(file_path=procedure_document)
             }
         }
-        super(Project, self).__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
+        super(Project, self).__init__(client, ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
                                       preferred_label_kind=self.preferred_label_kind, metadata=metadata)
 
 
@@ -54,10 +54,10 @@ class TestLsThing(unittest.TestCase):
             "status": "active",
             "start_date": time.time()
         }
-        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject = Project(self.client, **meta_dict)
         self.assertIsNone(newProject.code_name)
         self.assertIsNone(newProject._ls_thing.id)
-        newProject.save(self.client)
+        newProject.save()
         self.assertIsNotNone(newProject.code_name)
         self.assertIsNotNone(newProject._ls_thing.id)
 
@@ -81,8 +81,8 @@ class TestLsThing(unittest.TestCase):
             "start_date": time.time(),
             "procedure_document": blob_test_path
         }
-        newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.save(self.client)
+        newProject = Project(self.client, recorded_by=self.client.username, **meta_dict)
+        newProject.save()
         self.assertEqual(newProject.metadata['project metadata']['procedure document'].comments, file_name)
         data = newProject.metadata['project metadata']['procedure document'].download_data(self.client)
         self.assertEqual(data, file_bytes)
@@ -95,8 +95,8 @@ class TestLsThing(unittest.TestCase):
             "start_date": time.time(),
             "procedure_document": str(blob_test_path)
         }
-        newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.save(self.client)
+        newProject = Project(self.client, **meta_dict)
+        newProject.save()
         self.assertEqual(newProject.metadata['project metadata']['procedure document'].comments, file_name)
         data = newProject.metadata['project metadata']['procedure document'].download_data(self.client)
         self.assertEqual(data, file_bytes)
@@ -146,9 +146,9 @@ class TestLsThing(unittest.TestCase):
             "procedure_document": "SOMEGARBAGEPATH"
         }
         with self.assertRaises(ValueError):
-            newProject = Project(recorded_by=self.client.username, **meta_dict)
+            newProject = Project(self.client, **meta_dict)
         try:
-            newProject = Project(recorded_by=self.client.username, **meta_dict)
+            newProject = Project(self.client, **meta_dict)
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
 
@@ -161,9 +161,9 @@ class TestLsThing(unittest.TestCase):
             "procedure_document": self.tempdir
         }
         with self.assertRaises(ValueError):
-            newProject = Project(recorded_by=self.client.username, **meta_dict)
+            newProject = Project(self.client, **meta_dict)
         try:
-            newProject = Project(recorded_by=self.client.username, **meta_dict)
+            newProject = Project(self.client, **meta_dict)
         except ValueError as err:
             self.assertIn("not a file", err.args[0])
 

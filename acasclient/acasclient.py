@@ -964,7 +964,8 @@ class client():
 
     def advanced_search_ls_things(self, ls_type, ls_kind, search_string,
                                   value_listings=[], codes_only=False,
-                                  max_results=1000):
+                                  max_results=1000, combine_terms_with_and=False,
+                                  format='stub'):
         """
         Query ACAS for deeply specified conditions
 
@@ -980,6 +981,8 @@ class client():
                     "valueKind": "librarian search status",
                     "operator": "="
                 }
+            combine_terms_with_and (bool): Whether to combine terms with 'and'
+            format (str): ACAS format to fetch data in
         Returns:
             if codes_only:
                 list of code_name strings
@@ -992,12 +995,14 @@ class client():
                 'maxResults': max_results,
                 'lsType': ls_type,
                 'lsKind': ls_kind,
-                'values': value_listings
+                'values': value_listings,
+                'combineTermsWithAnd': combine_terms_with_and,
             }
         }
         params = {}
         if codes_only:
-            params = {'format': 'codetable'}
+            format = 'codetable'
+        params['format'] = format
         resp = self.session.post('{}/api/advancedSearch/things/{}/{}'.
                                  format(self.url,
                                         ls_type,

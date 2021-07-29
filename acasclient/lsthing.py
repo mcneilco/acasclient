@@ -576,12 +576,23 @@ class FileValue(object):
     """
     _fields = ['value', 'comments']
 
-    def __init__(self, value=None, comments=None, ls_value=None):
+    def __init__(self, value=None, comments=None, ls_value=None, file_path=None):
         if ls_value is not None:
             value = ls_value.file_value
             comments = ls_value.comments
-        if value is not None and comments is None:
-            comments = Path(value).name
+        if file_path is not None:
+            if isinstance(file_path, Path) or isinstance(file_path, str):
+                if isinstance(value, str):
+                    file_path = Path(value)
+                if comments is None:
+                    comments = file_path.name
+                if not file_path.exists():
+                    raise ValueError('File path "{}" does not exist'.format(file_path))
+                if not file_path.is_file():
+                    raise ValueError('File path "{}" is not a file'.format(file_path))
+                value = str(file_path)
+            else:
+                raise ValueError('file_path must be of str or <pathlib.PosixPath>. Provided file_path argument is of type {}'.format(type(value)))
         self.value = value
         self.comments = comments
     
@@ -590,20 +601,24 @@ class FileValue(object):
             return False
         return self.value == other.value and self.comments == other.comments
     
-    def download_to_disk(self, client, out_dir='./'):
+    def download_to_disk(self, client, folder_path='./'):
         """Download file from ACAS and save to disk
 
         :param client: a valid acas client
         :type client: <acasclient.lsthing.LsThingValue>
-        :param out_dir: local directory path to write file into
-        :type out_dir: Union[str, <pathlib.PosixPath>], optional
+        :param folder_path: local directory path to write file into
+        :type folder_path: Union[str, <pathlib.PosixPath>], optional
         :return: local filepath to written file
         :rtype: str
         """
+        if isinstance(folder_path, str):
+            folder_path = Path(folder_path)
+        if not folder_path.exists():
+            raise ValueError('folder_path path "{}" does not exist'.format(folder_path))
         acas_file = client.get_file(f'/dataFiles/{self.value}')
         if self.comments:
             acas_file["name"] = self.comments
-        return str(client.write_file(acas_file, out_dir))
+        return str(client.write_file(acas_file, folder_path))
     
     def as_dict(self) -> Dict[str, Any]:
         """

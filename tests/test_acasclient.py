@@ -1118,6 +1118,46 @@ class TestAcasclient(unittest.TestCase):
                                        max_results=1000)
         self.assertIn(codes[0], return_codes)
 
+        # Use 'codetable' data 'format'; 'codes_only' is False
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', 'active',
+                                       value_listings=value_listings,
+                                       codes_only=False,
+                                       max_results=1000,
+                                       combine_terms_with_and=True,
+                                       format='codetable')
+        return_codes = [res['code'] for res in results]
+        self.assertIn(codes[0], return_codes)
+
+        # Test 'combine_terms_with_and'
+        value_listings[0]['value'] = 'active'
+        value_listings.append({
+            "stateType": "metadata",
+            "stateKind": "project metadata",
+            "valueType": "codeValue",
+            "valueKind": "project is restricted",
+            "operator": "=",
+            'value': 'true'  # Default is false
+        })
+
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       value_listings=value_listings,
+                                       codes_only=True,
+                                       max_results=1000,
+                                       combine_terms_with_and=False)
+        assert len(results) >= 3
+
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       value_listings=value_listings,
+                                       codes_only=True,
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 0
+
+
+
     def test_033_get_all_lots(self):
         """Test get all lots request."""
 

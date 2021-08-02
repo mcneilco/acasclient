@@ -146,7 +146,7 @@ def parse_values_into_dict(ls_values):
             elif value.ls_type == 'urlValue':
                 val = value.url_value
             elif value.ls_type == 'fileValue':
-                val = FileValue(value.file_value)
+                val = FileValue(ls_value=value)
             elif value.ls_type == 'blobValue':
                 val = BlobValue(ls_value=value)
             # In cases where there are multiple values with same ls_kind,
@@ -209,7 +209,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
             or (isinstance(ls_value, list) and not isinstance(val, list)):
         return False
     elif isinstance(val, FileValue):
-        return ls_value.file_value == val
+        return FileValue(ls_value.file_value, ls_value.comments) == val
     elif isinstance(val, BlobValue):
         return  BlobValue(ls_value.blob_value, ls_value.comments) == val
     elif isinstance(val, clob):
@@ -300,7 +300,7 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     value_kind = get_value_kind_without_extras(value_kind)
     if isinstance(val, FileValue):
         value = value_cls(ls_type="fileValue", ls_kind=value_kind, recorded_by=recorded_by,
-                          file_value=val, unit_kind=unit_kind)
+                          file_value=val.value, comments=val.comments, unit_kind=unit_kind)
     elif isinstance(val, BlobValue):
         value = value_cls(
             ls_type="blobValue",
@@ -570,15 +570,66 @@ class clob(str):
     pass
 
 
-class FileValue(str):
+class FileValue(object):
     """Class used to save files to ACAS. ACAS has a folder of uploaded files on the filesystem, and stores references
     to the file paths as LsValues with ls_type='fileValue', file_value=filepath
-
-    :param str: filepath to file
-    :type str: str
     """
-    pass
+    _fields = ['value', 'comments']
 
+    def __init__(self, value=None, comments=None, ls_value=None, file_path=None):
+        if ls_value is not None:
+            value = ls_value.file_value
+            comments = ls_value.comments
+        if file_path is not None:
+            if isinstance(file_path, Path) or isinstance(file_path, str):
+                if isinstance(value, str):
+                    file_path = Path(value)
+                if comments is None:
+                    comments = file_path.name
+                if not file_path.exists():
+                    raise ValueError('File path "{}" does not exist'.format(file_path))
+                if not file_path.is_file():
+                    raise ValueError('File path "{}" is not a file'.format(file_path))
+                value = str(file_path)
+            else:
+                raise ValueError('file_path must be of str or <pathlib.PosixPath>. Provided file_path argument is of type {}'.format(type(value)))
+        self.value = value
+        self.comments = comments
+    
+    def __eq__(self, other: object) -> bool:
+        if other is None:
+            return False
+        return self.value == other.value and self.comments == other.comments
+    
+    def download_to_disk(self, client, folder_path='./'):
+        """Download file from ACAS and save to disk
+
+        :param client: a valid acas client
+        :type client: <acasclient.lsthing.LsThingValue>
+        :param folder_path: local directory path to write file into
+        :type folder_path: Union[str, <pathlib.PosixPath>], optional
+        :return: local filepath to written file
+        :rtype: str
+        """
+        if isinstance(folder_path, str):
+            folder_path = Path(folder_path)
+        if not folder_path.exists():
+            raise ValueError('folder_path path "{}" does not exist'.format(folder_path))
+        acas_file = client.get_file(f'/dataFiles/{self.value}')
+        if self.comments:
+            acas_file["name"] = self.comments
+        return str(client.write_file(acas_file, folder_path))
+    
+    def as_dict(self) -> Dict[str, Any]:
+        """
+        Return a map of attribute name and attribute values stored on the
+        instance.
+        Note: Only attributes stored in `FileValue._fields` will be returned.
+        """
+        return {
+            field: getattr(self, field, None)
+            for field in self._fields
+        }
 
 class BlobValue(object):
     """Class used to save files as byte arrays to ACAS.
@@ -1946,10 +1997,12 @@ class SimpleLsThing(BaseModel):
                 for value_kind, file_val in values_dict.items():
                     if isinstance(file_val, FileValue):
                         if file_val:
-                            val = pathlib.Path(file_val)
+                            val = pathlib.Path(file_val.value)
                             uploaded_files = client.upload_files([val])
+                            uploaded_file = uploaded_files['files'][0]
                             state_dict[state_kind][value_kind] = FileValue(
-                                uploaded_files['files'][0]['name'])
+                                value=uploaded_file['name'],
+                                comments=uploaded_file["originalName"])
             return state_dict
         self.metadata = _upload_file_values_from_state_dict(self.metadata)
         self.results = _upload_file_values_from_state_dict(self.results)

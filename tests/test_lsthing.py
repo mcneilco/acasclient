@@ -2,9 +2,10 @@
 
 """Tests for `acasclient` package."""
 
+import os
 import unittest
 from acasclient import acasclient
-from acasclient.lsthing import SimpleLsThing, CodeValue, BlobValue
+from acasclient.lsthing import SimpleLsThing, CodeValue, BlobValue, FileValue
 from pathlib import Path
 import tempfile
 import time
@@ -19,14 +20,15 @@ class Project(SimpleLsThing):
     ls_kind = 'project'
     preferred_label_kind = 'project name'
 
-    def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, recorded_by=None):
+    def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None):
         names = {'project name': name, "project alias": alias}
         metadata = {
             'project metadata': {
                 'start date': start_date,
                 'project status': CodeValue(status, "project", "status", "ACAS DDICT"),
                 'is restricted': CodeValue(str(is_restricted).lower(), "project", "restricted", "ACAS DDICT"),
-                'procedure document': BlobValue(file_path=procedure_document)
+                'procedure document': BlobValue(file_path=procedure_document),
+                'pdf document': FileValue(value=pdf_document)
             }
         }
         super(Project, self).__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
@@ -44,6 +46,9 @@ class TestLsThing(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+        dummy_file = Path('dummy.pdf')
+        if dummy_file.exists():
+            os.remove(dummy_file)
     
     # Helpers
     def _get_path(self, file_name):
@@ -60,6 +65,14 @@ class TestLsThing(unittest.TestCase):
         self.assertEqual(blob_value.comments, orig_file_name)
         data = blob_value.download_data(self.client)
         self.assertEqual(data, orig_bytes)
+    
+    def _check_file(self, file_path, orig_file_name, orig_file_path):
+        # Check file names match
+        self.assertEqual(Path(file_path).name, orig_file_name)
+        # Check file contents match
+        new_bytes = self._get_bytes(file_path)
+        orig_bytes = self._get_bytes(orig_file_path)
+        self.assertEqual(new_bytes, orig_bytes)
 
     # Tests
     def test_000_simple_ls_thing_save(self):
@@ -210,6 +223,57 @@ class TestLsThing(unittest.TestCase):
         newProject.save(self.client)
         self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
 
+    def test_003_simple_ls_thing_save_with_file_value(self):
+        """Test saving simple ls thing with file value."""
+        name = str(uuid.uuid4())
+        file_name = 'dummy.pdf'
+        file_test_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name)
+
+        # # Get the file bytes for testing
+        # in_file = open(file_test_path, "rb")
+        # file_bytes = in_file.read()
+        # in_file.close()
+
+        # Save with Path path
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time(),
+            "pdf_document": file_test_path
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject.upload_file_values(self.client)
+        newProject.save(self.client)
+        # Write file locally and compare
+        fv = newProject.metadata['project metadata']['pdf document']
+        downloaded_path = fv.download_to_disk(self.client)
+        self._check_file(downloaded_path, file_name, file_test_path)
+
+        # Save with string path
+        meta_dict = {
+            "name": name,
+            "is_restricted": True,
+            "status": "active",
+            "start_date": time.time(),
+            "pdf_document": str(file_test_path)
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject.upload_file_values(self.client)
+        newProject.save(self.client)
+        # Write file locally and compare
+        fv = newProject.metadata['project metadata']['pdf document']
+        downloaded_path = fv.download_to_disk(self.client)
+        self._check_file(downloaded_path, file_name, file_test_path)
+
+        # Write to a bad folder path fails gracefully
+        with self.assertRaises(ValueError):
+            output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
+        try:
+            output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
+        except ValueError as err:
+            self.assertIn("does not exist", err.args[0])
 
 
 class TestBlobValue(unittest.TestCase):

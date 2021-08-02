@@ -624,7 +624,7 @@ class FileValue(object):
         """
         Return a map of attribute name and attribute values stored on the
         instance.
-        Note: Only attributes stored in `BlobValue._fields` will be returned.
+        Note: Only attributes stored in `FileValue._fields` will be returned.
         """
         return {
             field: getattr(self, field, None)

@@ -1923,6 +1923,7 @@ class SimpleLsThing(BaseModel):
             return []
 
         for model in models:
+            model.upload_file_values(client)
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]

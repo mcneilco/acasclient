@@ -287,7 +287,9 @@ class TestLsThing(unittest.TestCase):
             START_DATE_KEY: time.time(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.metadata[PDF_DOCUMENT_KEY] = FileValue(file_path=file_test_path)
+        newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT] = FileValue(file_path=file_test_path)
+        self.assertIsNotNone(newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT].value)
+        self.assertIsNotNone(newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT].comments)
         newProject.save(self.client)
         # Write file locally and compare
         fv = newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT]
@@ -302,7 +304,9 @@ class TestLsThing(unittest.TestCase):
             START_DATE_KEY: time.time(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.metadata[PDF_DOCUMENT_KEY] = FileValue(file_path=str(file_test_path))
+        newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT] = FileValue(file_path=str(file_test_path))
+        self.assertIsNotNone(newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT].value)
+        self.assertIsNotNone(newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT].comments)
         newProject.save(self.client)
         # Write file locally and compare
         fv = newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT]

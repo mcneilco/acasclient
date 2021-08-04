@@ -14,21 +14,40 @@ import uuid
 # "bob" user name registered
 # "PROJ-00000001" registered
 
+# Constants
+ACAS_DDICT = 'ACAS DDICT'
+PROJECT_METADATA = 'project metadata'
+PROJECT = 'project'
+PROJECT_NAME = 'project name'
+PROJECT_ALIAS = 'project alias'
+STATUS = 'status'
+PROJECT_STATUS = 'project status'
+PROCEDURE_DOCUMENT = 'procedure document'
+IS_RESTRICTED = 'is restricted'
+RESTRICTED = 'restricted'
+PDF_DOCUMENT = 'pdf document'
+START_DATE = 'start date'
+NAME_KEY = 'name'
+IS_RESTRICTED_KEY = 'is_restricted'
+STATUS_KEY = 'status'
+START_DATE_KEY = 'start_date'
+PDF_DOCUMENT_KEY = 'pdf_document'
+PROCEDURE_DOCUMENT_KEY = 'procedure_document'
 
 class Project(SimpleLsThing):
-    ls_type = 'project'
-    ls_kind = 'project'
-    preferred_label_kind = 'project name'
+    ls_type = PROJECT
+    ls_kind = PROJECT
+    preferred_label_kind = PROJECT_NAME
 
     def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None):
-        names = {'project name': name, "project alias": alias}
+        names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
-            'project metadata': {
-                'start date': start_date,
-                'project status': CodeValue(status, "project", "status", "ACAS DDICT"),
-                'is restricted': CodeValue(str(is_restricted).lower(), "project", "restricted", "ACAS DDICT"),
-                'procedure document': BlobValue(file_path=procedure_document),
-                'pdf document': FileValue(value=pdf_document)
+            PROJECT_METADATA: {
+                START_DATE: start_date,
+                PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
+                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
+                PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
+                PDF_DOCUMENT: FileValue(value=pdf_document)
             }
         }
         super(Project, self).__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
@@ -79,10 +98,10 @@ class TestLsThing(unittest.TestCase):
         """Test saving simple ls thing."""
         name = str(uuid.uuid4())
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time()
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time()
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         self.assertIsNone(newProject.code_name)
@@ -105,71 +124,71 @@ class TestLsThing(unittest.TestCase):
 
         # Save with Path path
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "procedure_document": blob_test_path
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PROCEDURE_DOCUMENT_KEY: blob_test_path
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
-        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+        self._check_blob_equal(newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT], file_name, file_bytes)
 
         # Save with string path
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "procedure_document": str(blob_test_path)
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PROCEDURE_DOCUMENT_KEY: str(blob_test_path)
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
-        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+        self._check_blob_equal(newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT], file_name, file_bytes)
 
         # Write to a file by providing a full file path
         custom_file_name = "my.png"
-        output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(full_file_path=Path(self.tempdir, custom_file_name))
+        output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(full_file_path=Path(self.tempdir, custom_file_name))
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, custom_file_name)
 
         # Write to a file by providing a full file path as a string
         custom_file_name = "my.png"
-        output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(full_file_path=str(Path(self.tempdir, custom_file_name)))
+        output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(full_file_path=str(Path(self.tempdir, custom_file_name)))
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, custom_file_name)
 
         # Write to a file by providing a folder
-        output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path=self.tempdir)
+        output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(folder_path=self.tempdir)
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, file_name)
 
         # Write to a file by providing a folder as a string
-        output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path=str(self.tempdir))
+        output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(folder_path=str(self.tempdir))
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, file_name)
         
 
         # Write to a file by providing a folder and custom file name 
-        output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path=self.tempdir, file_name=custom_file_name)
+        output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(folder_path=self.tempdir, file_name=custom_file_name)
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, custom_file_name)
 
         # Write to a bad folder path fails gracefully
         with self.assertRaises(ValueError):
-            output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path="GARBAGE")
+            output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(folder_path="GARBAGE")
         try:
-            output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path="GARBAGE")
+            output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(folder_path="GARBAGE")
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
         
         # Make sure a bad path fails gracefully
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "procedure_document": "SOMEGARBAGEPATH"
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PROCEDURE_DOCUMENT_KEY: "SOMEGARBAGEPATH"
         }
         with self.assertRaises(ValueError):
             newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -180,11 +199,11 @@ class TestLsThing(unittest.TestCase):
 
         # Make sure passing a directory fails gracefully
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "procedure_document": self.tempdir
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PROCEDURE_DOCUMENT_KEY: self.tempdir
         }
         with self.assertRaises(ValueError):
             newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -204,24 +223,24 @@ class TestLsThing(unittest.TestCase):
 
         # Save with Path path
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "procedure_document": file_path
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PROCEDURE_DOCUMENT_KEY: file_path
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
-        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+        self._check_blob_equal(newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT], file_name, file_bytes)
         
         # Then update with a different file
         file_name = '1_1_Generic.xlsx'
         file_path = self._get_path(file_name)
         file_bytes = self._get_bytes(file_path)
         new_blob_val = BlobValue(file_path=file_path)
-        newProject.metadata['project metadata']['procedure document'] = new_blob_val
+        newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT] = new_blob_val
         newProject.save(self.client)
-        self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
+        self._check_blob_equal(newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT], file_name, file_bytes)
 
     def test_003_simple_ls_thing_save_with_file_value(self):
         """Test saving simple ls thing with file value."""
@@ -230,40 +249,63 @@ class TestLsThing(unittest.TestCase):
         file_test_path = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name)
 
-        # # Get the file bytes for testing
-        # in_file = open(file_test_path, "rb")
-        # file_bytes = in_file.read()
-        # in_file.close()
-
-        # Save with Path path
+        # Save with Path value
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "pdf_document": file_test_path
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PDF_DOCUMENT_KEY: file_test_path
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.upload_file_values(self.client)
         newProject.save(self.client)
         # Write file locally and compare
-        fv = newProject.metadata['project metadata']['pdf document']
+        fv = newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT]
         downloaded_path = fv.download_to_disk(self.client)
         self._check_file(downloaded_path, file_name, file_test_path)
 
-        # Save with string path
+        # Save with string value
         meta_dict = {
-            "name": name,
-            "is_restricted": True,
-            "status": "active",
-            "start_date": time.time(),
-            "pdf_document": str(file_test_path)
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+            PDF_DOCUMENT_KEY: str(file_test_path)
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
-        newProject.upload_file_values(self.client)
         newProject.save(self.client)
         # Write file locally and compare
-        fv = newProject.metadata['project metadata']['pdf document']
+        fv = newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT]
+        downloaded_path = fv.download_to_disk(self.client)
+        self._check_file(downloaded_path, file_name, file_test_path)
+
+        # Save with Path file_path
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject.metadata[PDF_DOCUMENT_KEY] = FileValue(file_path=file_test_path)
+        newProject.save(self.client)
+        # Write file locally and compare
+        fv = newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT]
+        downloaded_path = fv.download_to_disk(self.client)
+        self._check_file(downloaded_path, file_name, file_test_path)
+
+        # Save with string file_path
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time(),
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        newProject.metadata[PDF_DOCUMENT_KEY] = FileValue(file_path=str(file_test_path))
+        newProject.save(self.client)
+        # Write file locally and compare
+        fv = newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT]
         downloaded_path = fv.download_to_disk(self.client)
         self._check_file(downloaded_path, file_name, file_test_path)
 

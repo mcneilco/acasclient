@@ -582,8 +582,8 @@ class FileValue(object):
             comments = ls_value.comments
         if file_path is not None:
             if isinstance(file_path, Path) or isinstance(file_path, str):
-                if isinstance(value, str):
-                    file_path = Path(value)
+                if isinstance(file_path, str):
+                    file_path = Path(file_path)
                 if comments is None:
                     comments = file_path.name
                 if not file_path.exists():

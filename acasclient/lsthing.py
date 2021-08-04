@@ -1949,6 +1949,7 @@ class SimpleLsThing(BaseModel):
                 # clear out the links (interactions) to avoid updating the same linked `LsThing`
                 # multiple times if two or more `model`s contain links to the same `LsThing`
                 model.links = []
+            model.upload_file_values(client)
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]

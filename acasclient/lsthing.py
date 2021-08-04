@@ -1878,6 +1878,7 @@ class SimpleLsThing(BaseModel):
         :param client: Authenticated instances of acasclient.client
         :type client: acasclient.client
         """
+        self.upload_file_values(client)
         self._prepare_for_save(client)
         # Persist
         self._ls_thing = self._ls_thing.save(client)
@@ -1996,7 +1997,7 @@ class SimpleLsThing(BaseModel):
             for state_kind, values_dict in state_dict.items():
                 for value_kind, file_val in values_dict.items():
                     if isinstance(file_val, FileValue):
-                        if file_val:
+                        if file_val and file_val.value:
                             val = pathlib.Path(file_val.value)
                             uploaded_files = client.upload_files([val])
                             uploaded_file = uploaded_files['files'][0]

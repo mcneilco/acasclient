@@ -178,6 +178,8 @@ def get_lsKind_to_lsvalue(ls_values_raw):
     lsKind_to_lsvalue = dict()
     for ls_value in ls_values:
         key = ls_value.ls_kind
+        if ls_value.unit_kind:
+            key = f'{key} ({ls_value.unit_kind})'
         if key in lsKind_to_lsvalue:
             lsKind_to_lsvalue[key].append(ls_value)
         else:
@@ -185,6 +187,8 @@ def get_lsKind_to_lsvalue(ls_values_raw):
 
     for ls_value in ls_values:
         key = ls_value.ls_kind
+        if ls_value.unit_kind:
+            key = f'{key} ({ls_value.unit_kind})'
         val = lsKind_to_lsvalue[key]
         if len(val) == 1:
             lsKind_to_lsvalue[key] = val[0]
@@ -595,12 +599,12 @@ class FileValue(object):
                 raise ValueError('file_path must be of str or <pathlib.PosixPath>. Provided file_path argument is of type {}'.format(type(value)))
         self.value = value
         self.comments = comments
-    
+
     def __eq__(self, other: object) -> bool:
         if other is None:
             return False
         return self.value == other.value and self.comments == other.comments
-    
+
     def download_to_disk(self, client, folder_path='./'):
         """Download file from ACAS and save to disk
 
@@ -619,7 +623,7 @@ class FileValue(object):
         if self.comments:
             acas_file["name"] = self.comments
         return str(client.write_file(acas_file, folder_path))
-    
+
     def as_dict(self) -> Dict[str, Any]:
         """
         Return a map of attribute name and attribute values stored on the
@@ -691,7 +695,7 @@ class BlobValue(object):
 
     def write_to_file(self, folder_path=None, file_name=None, full_file_path=None):
         """Write blob value to a file (requires that BlobValue.value has valid bytes).
-           This can be achieved but running <acasclient.lsthing.BlobValue.download_data> on the BlobValue 
+           This can be achieved but running <acasclient.lsthing.BlobValue.download_data> on the BlobValue
 
         :param folder_path: folder_path as an str or <pathlib.PosixPath>, defaults to None
         :type folder_path: Union[str, <pathlib.PosixPath>], optional

@@ -3,13 +3,16 @@
 """Tests for `acasclient` package."""
 
 import os
-import unittest
-from acasclient import acasclient
-from acasclient.lsthing import SimpleLsThing, CodeValue, BlobValue, FileValue
-from pathlib import Path
 import tempfile
 import time
+import unittest
 import uuid
+from pathlib import Path
+
+from acasclient import acasclient
+from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
+                                SimpleLsThing, get_lsKind_to_lsvalue)
+
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
@@ -49,23 +52,23 @@ class TestLsThing(unittest.TestCase):
         dummy_file = Path('dummy.pdf')
         if dummy_file.exists():
             os.remove(dummy_file)
-    
+
     # Helpers
     def _get_path(self, file_name):
         path = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name)
         return path
-    
+
     def _get_bytes(self, file_path):
         with open(file_path, "rb") as in_file:
             file_bytes = in_file.read()
         return file_bytes
-    
+
     def _check_blob_equal(self, blob_value, orig_file_name, orig_bytes):
         self.assertEqual(blob_value.comments, orig_file_name)
         data = blob_value.download_data(self.client)
         self.assertEqual(data, orig_bytes)
-    
+
     def _check_file(self, file_path, orig_file_name, orig_file_path):
         # Check file names match
         self.assertEqual(Path(file_path).name, orig_file_name)
@@ -148,9 +151,9 @@ class TestLsThing(unittest.TestCase):
         output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path=str(self.tempdir))
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, file_name)
-        
 
-        # Write to a file by providing a folder and custom file name 
+
+        # Write to a file by providing a folder and custom file name
         output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path=self.tempdir, file_name=custom_file_name)
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, custom_file_name)
@@ -162,7 +165,7 @@ class TestLsThing(unittest.TestCase):
             output_file = newProject.metadata['project metadata']['procedure document'].write_to_file(folder_path="GARBAGE")
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
-        
+
         # Make sure a bad path fails gracefully
         meta_dict = {
             "name": name,
@@ -192,10 +195,10 @@ class TestLsThing(unittest.TestCase):
             newProject = Project(recorded_by=self.client.username, **meta_dict)
         except ValueError as err:
             self.assertIn("not a file", err.args[0])
-    
+
     def test_002_update_blob_value(self):
         """Test saving simple ls thing with blob value, then updating the blobValue."""
-        
+
         # Create a project with first blobValue
         name = str(uuid.uuid4())
         file_name = 'blob_test.png'
@@ -213,7 +216,7 @@ class TestLsThing(unittest.TestCase):
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
         self._check_blob_equal(newProject.metadata['project metadata']['procedure document'], file_name, file_bytes)
-        
+
         # Then update with a different file
         file_name = '1_1_Generic.xlsx'
         file_path = self._get_path(file_name)
@@ -274,6 +277,32 @@ class TestLsThing(unittest.TestCase):
             output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
+
+    def test_004_get_lskind_to_ls_values(self):
+        """
+        Verify `get_lskind_to_lsvalue` adds the `unit_kind` if present to the
+        `lskind` value.
+        """
+
+        # No unit_kind in LsThingValue
+        lsthing_value = LsThingValue(
+            ls_type='foo',
+            ls_kind='bar',
+            numeric_value=4.5,
+        )
+        lskind_to_lsvalue = get_lsKind_to_lsvalue([lsthing_value])
+        assert len(lskind_to_lsvalue) == 1
+        assert 'bar' in lskind_to_lsvalue
+
+        # No unit_kind in LsThingValue
+        lsthing_value = LsThingValue(
+            ls_type='foo',
+            ls_kind='bar',
+            numeric_value=4.5,
+            unit_kind='baz')
+        lskind_to_lsvalue = get_lsKind_to_lsvalue([lsthing_value])
+        assert len(lskind_to_lsvalue) == 1
+        assert 'bar (baz)' in lskind_to_lsvalue
 
 
 class TestBlobValue(unittest.TestCase):

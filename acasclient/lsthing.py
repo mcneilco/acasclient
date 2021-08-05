@@ -116,6 +116,22 @@ def parse_states_into_dict(ls_states_dict):
     return state_dict
 
 
+def _get_ls_value_key(ls_value):
+    """
+    Key to uniquely identify a `LsThingValue`.
+
+    :param ls_value: Ls thing value object.
+    :type ls_value: LsThingValue
+    :return: LsThingValue key.
+    :rtype: str
+    """
+
+    key = ls_value.ls_kind
+    if ls_value.unit_kind:
+        key = f'{key} ({ls_value.unit_kind})'
+    return key
+
+
 def parse_values_into_dict(ls_values):
     """Parse a list of LsValues into a dict of { value_kind: value }
     If there are multiple non-ignored LsValues with the same type, the value in the returned dict
@@ -129,9 +145,7 @@ def parse_values_into_dict(ls_values):
     values_dict = {}
     for value in ls_values:
         if not value.ignored and not value.deleted:
-            key = value.ls_kind
-            if value.unit_kind is not None and value.unit_kind != "":
-                key = f'{key} ({value.unit_kind})'
+            key = _get_ls_value_key(value)
             if value.ls_type == 'stringValue':
                 val = value.string_value
             elif value.ls_type == 'codeValue':
@@ -177,14 +191,14 @@ def get_lsKind_to_lsvalue(ls_values_raw):
     ls_values = [v for v in ls_values_raw if not v.ignored and not v.deleted]
     lsKind_to_lsvalue = dict()
     for ls_value in ls_values:
-        key = ls_value.ls_kind
+        key = _get_ls_value_key(ls_value)
         if key in lsKind_to_lsvalue:
             lsKind_to_lsvalue[key].append(ls_value)
         else:
             lsKind_to_lsvalue[key] = [ls_value]
 
     for ls_value in ls_values:
-        key = ls_value.ls_kind
+        key = _get_ls_value_key(ls_value)
         val = lsKind_to_lsvalue[key]
         if len(val) == 1:
             lsKind_to_lsvalue[key] = val[0]
@@ -595,12 +609,12 @@ class FileValue(object):
                 raise ValueError('file_path must be of str or <pathlib.PosixPath>. Provided file_path argument is of type {}'.format(type(value)))
         self.value = value
         self.comments = comments
-    
+
     def __eq__(self, other: object) -> bool:
         if other is None:
             return False
         return self.value == other.value and self.comments == other.comments
-    
+
     def download_to_disk(self, client, folder_path='./'):
         """Download file from ACAS and save to disk
 
@@ -619,7 +633,7 @@ class FileValue(object):
         if self.comments:
             acas_file["name"] = self.comments
         return str(client.write_file(acas_file, folder_path))
-    
+
     def as_dict(self) -> Dict[str, Any]:
         """
         Return a map of attribute name and attribute values stored on the
@@ -691,7 +705,7 @@ class BlobValue(object):
 
     def write_to_file(self, folder_path=None, file_name=None, full_file_path=None):
         """Write blob value to a file (requires that BlobValue.value has valid bytes).
-           This can be achieved but running <acasclient.lsthing.BlobValue.download_data> on the BlobValue 
+           This can be achieved but running <acasclient.lsthing.BlobValue.download_data> on the BlobValue
 
         :param folder_path: folder_path as an str or <pathlib.PosixPath>, defaults to None
         :type folder_path: Union[str, <pathlib.PosixPath>], optional

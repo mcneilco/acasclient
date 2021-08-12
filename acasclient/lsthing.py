@@ -596,8 +596,8 @@ class FileValue(object):
             comments = ls_value.comments
         if file_path is not None:
             if isinstance(file_path, Path) or isinstance(file_path, str):
-                if isinstance(value, str):
-                    file_path = Path(value)
+                if isinstance(file_path, str):
+                    file_path = Path(file_path)
                 if comments is None:
                     comments = file_path.name
                 if not file_path.exists():
@@ -1892,6 +1892,7 @@ class SimpleLsThing(BaseModel):
         :param client: Authenticated instances of acasclient.client
         :type client: acasclient.client
         """
+        self.upload_file_values(client)
         self._prepare_for_save(client)
         # Persist
         self._ls_thing = self._ls_thing.save(client)
@@ -1936,6 +1937,7 @@ class SimpleLsThing(BaseModel):
             return []
 
         for model in models:
+            model.upload_file_values(client)
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
@@ -1961,6 +1963,7 @@ class SimpleLsThing(BaseModel):
                 # clear out the links (interactions) to avoid updating the same linked `LsThing`
                 # multiple times if two or more `model`s contain links to the same `LsThing`
                 model.links = []
+            model.upload_file_values(client)
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
@@ -2010,7 +2013,7 @@ class SimpleLsThing(BaseModel):
             for state_kind, values_dict in state_dict.items():
                 for value_kind, file_val in values_dict.items():
                     if isinstance(file_val, FileValue):
-                        if file_val:
+                        if file_val and file_val.value:
                             val = pathlib.Path(file_val.value)
                             uploaded_files = client.upload_files([val])
                             uploaded_file = uploaded_files['files'][0]

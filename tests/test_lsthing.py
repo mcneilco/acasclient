@@ -37,12 +37,16 @@ START_DATE_KEY = 'start_date'
 PDF_DOCUMENT_KEY = 'pdf_document'
 PROCEDURE_DOCUMENT_KEY = 'procedure_document'
 
+FWD_ITX = 'relates to'
+BACK_ITX = 'is related to'
+
 class Project(SimpleLsThing):
     ls_type = PROJECT
     ls_kind = PROJECT
     preferred_label_kind = PROJECT_NAME
 
-    def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None):
+    def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
+                 ls_thing=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
             PROJECT_METADATA: {
@@ -54,7 +58,7 @@ class Project(SimpleLsThing):
             }
         }
         super(Project, self).__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
-                                      preferred_label_kind=self.preferred_label_kind, metadata=metadata)
+                                      preferred_label_kind=self.preferred_label_kind, metadata=metadata, ls_thing=ls_thing)
 
 
 class TestLsThing(unittest.TestCase):
@@ -348,7 +352,80 @@ class TestLsThing(unittest.TestCase):
         lskind_to_lsvalue = get_lsKind_to_lsvalue([lsthing_value])
         assert len(lskind_to_lsvalue) == 1
         assert 'bar (baz)' in lskind_to_lsvalue
-
+    
+    def test_005_create_interactions(self):
+        name = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time()
+        }
+        name_2 = str(uuid.uuid4())
+        meta_dict_2 = {
+            NAME_KEY: name_2,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: "active",
+            START_DATE_KEY: time.time()
+        }
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_1.save(self.client)
+        proj_2 = Project(recorded_by=self.client.username, **meta_dict_2)
+        proj_2.save(self.client)
+        # add an interaction
+        proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username)
+        assert len(proj_1.links) == 1
+        # save the interaction
+        proj_1.save(self.client)
+        # Fetch project 1 and look at the interaction
+        fresh_proj_1 = Project.get_by_code(proj_1.code_name, self.client, Project.ls_type, Project.ls_kind)
+        assert len(fresh_proj_1.links) == 1
+        assert len(fresh_proj_1._ls_thing.second_ls_things) == 1
+        # check if save populated second_ls_things properly
+        # FIXME: save is not properly populating second_ls_things
+        #assert len(proj_1._ls_thing.second_ls_things) == 1
+        itx_ls_thing_ls_thing = fresh_proj_1._ls_thing.second_ls_things[0]
+        assert itx_ls_thing_ls_thing.id is not None
+        # Fetch project 2 again and look at the interaction in reverse
+        fresh_proj_2 = Project.get_by_code(proj_2.code_name, self.client, Project.ls_type, Project.ls_kind)
+        assert len(fresh_proj_2.links) == 1
+        back_itx = fresh_proj_2.links[0]
+        assert back_itx.verb == BACK_ITX
+        # Run advanced search by interaction
+        # Forward interaction query
+        second_itx_listings = [
+            {
+                "interactionType": FWD_ITX,
+                "thingType": Project.ls_type,
+                "thingKind": Project.ls_kind,
+                "operator": "=",
+                "thingCodeName": proj_2.code_name
+            }]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       second_itx_listings=second_itx_listings,
+                                       codes_only=True,
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 1
+        assert results[0] == proj_1.code_name
+        # Backwards interaction query
+        first_itx_listings = [
+            {
+                "interactionType": FWD_ITX,
+                "thingType": Project.ls_type,
+                "thingKind": Project.ls_kind,
+                "operator": "=",
+                "thingCodeName": proj_1.code_name
+            }]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       first_itx_listings=first_itx_listings,
+                                       codes_only=True,
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 1
+        assert results[0] == proj_2.code_name
 
 class TestBlobValue(unittest.TestCase):
 

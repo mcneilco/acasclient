@@ -1156,6 +1156,22 @@ class TestAcasclient(unittest.TestCase):
                                        combine_terms_with_and=True)
         assert len(results) == 0
 
+        # Test with Labels
+        label_listings = [
+            {
+                "labelType": "name",
+                "labelKind": "project name",
+                "operator": "=",
+                "labelText": codes[0]
+            }]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       label_listings=label_listings,
+                                       codes_only=True,
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 1
+
 
 
     def test_033_get_all_lots(self):

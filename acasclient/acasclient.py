@@ -963,7 +963,9 @@ class client():
         return saved_codes, missing_ids
 
     def advanced_search_ls_things(self, ls_type, ls_kind, search_string,
-                                  value_listings=[], codes_only=False,
+                                  value_listings=[], label_listings=[],
+                                  first_itx_listings=[], second_itx_listings=[],
+                                  codes_only=False,
                                   max_results=1000, combine_terms_with_and=False,
                                   format='stub'):
         """
@@ -996,6 +998,9 @@ class client():
                 'lsType': ls_type,
                 'lsKind': ls_kind,
                 'values': value_listings,
+                'labels': label_listings,
+                'firstInteractions': first_itx_listings,
+                'secondInteractions': second_itx_listings,
                 'combineTermsWithAnd': combine_terms_with_and,
             }
         }

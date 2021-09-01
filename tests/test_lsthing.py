@@ -326,6 +326,14 @@ class TestLsThing(unittest.TestCase):
             output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
+        
+        # Test updating other values on a saved Thing
+        saved_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
+        saved_project.metadata[PROJECT_METADATA][STATUS_KEY] = 'inactive'
+        saved_project.save(self.client)
+
+        # Test updating FileValue on a saved Thing
+        #TODO
 
     def test_004_get_lskind_to_ls_values(self):
         """

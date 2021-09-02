@@ -54,7 +54,7 @@ class Project(SimpleLsThing):
                 PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
                 IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
-                PDF_DOCUMENT: FileValue(value=pdf_document)
+                PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
         }
         super(Project, self).__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,
@@ -72,9 +72,11 @@ class TestLsThing(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-        dummy_file = Path('dummy.pdf')
-        if dummy_file.exists():
-            os.remove(dummy_file)
+        files_to_delete = ['dummy.pdf', 'dummy2.pdf']
+        for f in files_to_delete:
+            file = Path(f)
+            if file.exists():
+                os.remove(file)
 
     # Helpers
     def _get_path(self, file_name):
@@ -254,6 +256,9 @@ class TestLsThing(unittest.TestCase):
         file_name = 'dummy.pdf'
         file_test_path = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name)
+        file_name_2 = 'dummy2.pdf'
+        file_test_path_2 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name_2)
 
         # Save with Path value
         meta_dict = {
@@ -326,6 +331,19 @@ class TestLsThing(unittest.TestCase):
             output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
+        
+        # Test updating other values on a saved Thing
+        saved_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
+        saved_project.metadata[PROJECT_METADATA][STATUS_KEY] = 'inactive'
+        saved_project.save(self.client)
+
+        # Test updating FileValue on a saved Thing
+        saved_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
+        saved_project.metadata[PROJECT_METADATA][PDF_DOCUMENT] = FileValue(file_path=file_test_path_2)
+        saved_project.save(self.client)
+        fv = saved_project.metadata[PROJECT_METADATA][PDF_DOCUMENT]
+        downloaded_path = fv.download_to_disk(self.client)
+        self._check_file(downloaded_path, file_name_2, file_test_path_2)
 
     def test_004_get_lskind_to_ls_values(self):
         """

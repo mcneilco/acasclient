@@ -295,6 +295,25 @@ def get_value_kind_without_extras(string):
     return re.sub(r"\[[^)]*\]", "", re.sub(r"(.*)\((.*)\)(.*)", r"\1\3", re.sub(r"\{[^}]*\}", "", string))).strip()
 
 
+def _upload_file_value(file_value, client):
+    """Upload a single FileValue to the ACAS server and return an updated FileValue
+    containing the on-server file path.
+
+    :param file_value: FileValue to be uploaded
+    :type file_value: FileValue
+    :param client: Authenticated acasclient.client
+    :type client: acasclient.client
+    :return: Updated FileValue
+    :rtype: FileValue
+    """
+    val = pathlib.Path(file_value.value)
+    uploaded_files = client.upload_files([val])
+    uploaded_file = uploaded_files['files'][0]
+    return FileValue(
+        value=uploaded_file['name'],
+        comments=uploaded_file["originalName"])
+
+
 def make_ls_value(value_cls, value_kind, val, recorded_by):
     """Construct an LsValue of class `value_cls` that can be recognized and persisted by ACAS
 
@@ -354,7 +373,7 @@ def make_ls_value(value_cls, value_kind, val, recorded_by):
     return value
 
 
-def update_ls_states_from_dict(state_class, state_type, value_class, state_value_simple_dict, ls_states_dict, ls_values_dict, edit_user):
+def update_ls_states_from_dict(state_class, state_type, value_class, state_value_simple_dict, ls_states_dict, ls_values_dict, edit_user, client, upload_files):
     """Translates updates between the "simple dict" data model and the more complex LsState / LsValue data model.
     If a new state is needed, this method will create a new LsState. Otherwise it will update existing LsStates in place.
     This method includes a nested update of all underlying LsValues as well.
@@ -373,6 +392,10 @@ def update_ls_states_from_dict(state_class, state_type, value_class, state_value
     :type ls_values_dict: dict
     :param edit_user: Username to be associated with changes, for auditing purposes
     :type edit_user: str
+    :param client: Authenticated acasclient.client instance
+    :type client: acasclient.client
+    :param upload_files: Whether to upload new FileValues, defaults to True
+    :type upload_files: bool
     :return: list of LsStates with updates applied
     :rtype: list
     """
@@ -389,13 +412,13 @@ def update_ls_states_from_dict(state_class, state_type, value_class, state_value
         except KeyError:
             current_values = {}
         ls_values = update_ls_values_from_dict(
-            value_class, values_dict, current_values, edit_user)
+            value_class, values_dict, current_values, edit_user, client, upload_files)
         state.ls_values = ls_values
         ls_states.append(state)
     return ls_states
 
 
-def update_state_table_states_from_dict(state_class, value_class, state_table_simple_dict, state_table_states, state_table_values, edit_user):
+def update_state_table_states_from_dict(state_class, value_class, state_table_simple_dict, state_table_states, state_table_values, edit_user, client, upload_files):
     """Translates updates between the "state table simple dict" data model and the more complex LsState model.
     If a new state is needed, this method will create a new LsState. Otherwise it will update existing LsStates in place.
     This method includes a nested update of all underlying LsValues as well.
@@ -415,6 +438,10 @@ def update_state_table_states_from_dict(state_class, value_class, state_table_si
     :type state_table_values: dict
     :param edit_user: Username to be associated with changes, for auditing purposes
     :type edit_user: str
+    :param client: Authenticated acasclient.client instance
+    :type client: acasclient.client
+    :param upload_files: Whether to upload new FileValues, defaults to True
+    :type upload_files: bool
     :return: list of LsStates with updates applied
     :rtype: list
     """
@@ -436,13 +463,13 @@ def update_state_table_states_from_dict(state_class, value_class, state_table_si
             except KeyError:
                 current_values = {}
             ls_values = update_ls_values_from_dict(
-                value_class, values_dict, current_values, edit_user)
+                value_class, values_dict, current_values, edit_user, client, upload_files)
             state.ls_values = ls_values
             ls_states.append(state)
     return ls_states
 
 
-def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, edit_user):
+def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, edit_user, client, upload_files):
     """Translates updates from the "simple dict" data model into the more complex LsValue data model
 
     :param value_class: class of LsValue being handled. Used when creating new LsValues
@@ -453,6 +480,10 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
     :type ls_values_dict: dict
     :param edit_user: Username to be associated with changes, for auditing purposes
     :type edit_user: str
+    :param client: Authenticated acasclient.client instance
+    :type client: acasclient.client
+    :param upload_files: Whether to upload new FileValues, defaults to True
+    :type upload_files: bool
     :return: list of LsValues with updates applied
     :rtype: list
     """
@@ -471,6 +502,10 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
                 else:
                     new_val_null = pd.isnull(val_value)
                 if not new_val_null:
+                    # If enabled, check if new value is a FileValue and needs to first be uploaded to ACAS
+                    if upload_files and isinstance(val_value, FileValue) and val_value.value:
+                        val_value = _upload_file_value(val_value, client)
+                        simple_value_dict[val_kind] = val_value
                     # Handle lists within the value dict
                     if new_val_is_list:
                         new_ls_vals = [make_ls_value(
@@ -496,6 +531,10 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
                 ls_values.append(old_ls_val)
         else:
             if val_value is not None:
+                # If enabled, check if new value is a FileValue and needs to first be uploaded to ACAS
+                if upload_files and isinstance(val_value, FileValue) and val_value.value:
+                    val_value = _upload_file_value(val_value, client)
+                    simple_value_dict[val_kind] = val_value
                 # New value of an ls_kind not seen before
                 # Handle lists within the value dict
                 if new_val_is_list:
@@ -1840,7 +1879,7 @@ class SimpleLsThing(BaseModel):
 
         return my_dict
 
-    def _prepare_for_save(self, client, user=None):
+    def _prepare_for_save(self, client, user=None, upload_files=True):
         """Translates all changes made to the "simple dict" attributes of this object
         into the underlying LsThing / LsState / LsValue / LsLabel data models, to prepare
         for saving updates to the ACAS server.
@@ -1849,17 +1888,22 @@ class SimpleLsThing(BaseModel):
         :type client: acasclient.client
         :param user: Username to record as having made these changes, defaults to self.recorded_by
         :type user: str, optional
+        :param upload_files: Whether or not to automatically upload files to ACAS for new FileValues, defaults to True.
+        :type upload_files: bool
         """
         # TODO redo recorded_by logic to allow passing in of an updater
         if not user:
             user = self.recorded_by
         # Detect value updates, apply ignored / modified by /modified date and create new value
         metadata_ls_states = update_ls_states_from_dict(
-            LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user)
+            LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user,
+            client, upload_files)
         results_ls_states = update_ls_states_from_dict(
-            LsThingState, 'results', LsThingValue, self.results, self._results_states, self._results_values, user)
+            LsThingState, 'results', LsThingValue, self.results, self._results_states, self._results_values, user,
+            client, upload_files)
         state_tables_ls_states = update_state_table_states_from_dict(
-            LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user)
+            LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user,
+            client, upload_files)
         self._ls_thing.ls_states = metadata_ls_states + \
             results_ls_states + state_tables_ls_states
         # Same thing for labels
@@ -1892,7 +1936,6 @@ class SimpleLsThing(BaseModel):
         :param client: Authenticated instances of acasclient.client
         :type client: acasclient.client
         """
-        self.upload_file_values(client)
         self._prepare_for_save(client)
         # Persist
         self._ls_thing = self._ls_thing.save(client)
@@ -1937,7 +1980,6 @@ class SimpleLsThing(BaseModel):
             return []
 
         for model in models:
-            model.upload_file_values(client)
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
@@ -1963,7 +2005,6 @@ class SimpleLsThing(BaseModel):
                 # clear out the links (interactions) to avoid updating the same linked `LsThing`
                 # multiple times if two or more `model`s contain links to the same `LsThing`
                 model.links = []
-            model.upload_file_values(client)
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
         camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
@@ -2014,12 +2055,8 @@ class SimpleLsThing(BaseModel):
                 for value_kind, file_val in values_dict.items():
                     if isinstance(file_val, FileValue):
                         if file_val and file_val.value:
-                            val = pathlib.Path(file_val.value)
-                            uploaded_files = client.upload_files([val])
-                            uploaded_file = uploaded_files['files'][0]
-                            state_dict[state_kind][value_kind] = FileValue(
-                                value=uploaded_file['name'],
-                                comments=uploaded_file["originalName"])
+                            file_val = _upload_file_value(file_val, client)
+                            state_dict[state_kind][value_kind] = file_val
             return state_dict
         self.metadata = _upload_file_values_from_state_dict(self.metadata)
         self.results = _upload_file_values_from_state_dict(self.results)

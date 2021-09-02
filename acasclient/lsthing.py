@@ -2055,12 +2055,8 @@ class SimpleLsThing(BaseModel):
                 for value_kind, file_val in values_dict.items():
                     if isinstance(file_val, FileValue):
                         if file_val and file_val.value:
-                            val = pathlib.Path(file_val.value)
-                            uploaded_files = client.upload_files([val])
-                            uploaded_file = uploaded_files['files'][0]
-                            state_dict[state_kind][value_kind] = FileValue(
-                                value=uploaded_file['name'],
-                                comments=uploaded_file["originalName"])
+                            file_val = _upload_file_value(file_val, client)
+                            state_dict[state_kind][value_kind] = file_val
             return state_dict
         self.metadata = _upload_file_values_from_state_dict(self.metadata)
         self.results = _upload_file_values_from_state_dict(self.results)

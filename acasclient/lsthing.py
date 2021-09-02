@@ -392,6 +392,10 @@ def update_ls_states_from_dict(state_class, state_type, value_class, state_value
     :type ls_values_dict: dict
     :param edit_user: Username to be associated with changes, for auditing purposes
     :type edit_user: str
+    :param client: Authenticated acasclient.client instance
+    :type client: acasclient.client
+    :param upload_files: Whether to upload new FileValues, defaults to True
+    :type upload_files: bool
     :return: list of LsStates with updates applied
     :rtype: list
     """
@@ -434,6 +438,10 @@ def update_state_table_states_from_dict(state_class, value_class, state_table_si
     :type state_table_values: dict
     :param edit_user: Username to be associated with changes, for auditing purposes
     :type edit_user: str
+    :param client: Authenticated acasclient.client instance
+    :type client: acasclient.client
+    :param upload_files: Whether to upload new FileValues, defaults to True
+    :type upload_files: bool
     :return: list of LsStates with updates applied
     :rtype: list
     """
@@ -472,6 +480,10 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
     :type ls_values_dict: dict
     :param edit_user: Username to be associated with changes, for auditing purposes
     :type edit_user: str
+    :param client: Authenticated acasclient.client instance
+    :type client: acasclient.client
+    :param upload_files: Whether to upload new FileValues, defaults to True
+    :type upload_files: bool
     :return: list of LsValues with updates applied
     :rtype: list
     """

@@ -54,7 +54,7 @@ class Project(SimpleLsThing):
                 PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
                 IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
-                PDF_DOCUMENT: FileValue(value=pdf_document)
+                PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
         }
         super(Project, self).__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, recorded_by=recorded_by,

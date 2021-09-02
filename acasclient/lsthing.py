@@ -295,6 +295,25 @@ def get_value_kind_without_extras(string):
     return re.sub(r"\[[^)]*\]", "", re.sub(r"(.*)\((.*)\)(.*)", r"\1\3", re.sub(r"\{[^}]*\}", "", string))).strip()
 
 
+def _upload_file_value(file_value, client):
+    """Upload a single FileValue to the ACAS server and return an updated FileValue
+    containing the on-server file path.
+
+    :param file_value: FileValue to be uploaded
+    :type file_value: FileValue
+    :param client: Authenticated acasclient.client
+    :type client: acasclient.client
+    :return: Updated FileValue
+    :rtype: FileValue
+    """
+    val = pathlib.Path(file_value.value)
+    uploaded_files = client.upload_files([val])
+    uploaded_file = uploaded_files['files'][0]
+    return FileValue(
+        value=uploaded_file['name'],
+        comments=uploaded_file["originalName"])
+
+
 def make_ls_value(value_cls, value_kind, val, recorded_by):
     """Construct an LsValue of class `value_cls` that can be recognized and persisted by ACAS
 
@@ -473,12 +492,8 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
                 if not new_val_null:
                     # If enabled, check if new value is a FileValue and needs to first be uploaded to ACAS
                     if upload_files and isinstance(val_value, FileValue) and val_value.value:
-                        val = pathlib.Path(val_value.value)
-                        uploaded_files = client.upload_files([val])
-                        uploaded_file = uploaded_files['files'][0]
-                        val_value = FileValue(
-                            value=uploaded_file['name'],
-                            comments=uploaded_file["originalName"])
+                        val_value = _upload_file_value(val_value, client)
+                        simple_value_dict[val_kind] = val_value
                     # Handle lists within the value dict
                     if new_val_is_list:
                         new_ls_vals = [make_ls_value(
@@ -504,6 +519,10 @@ def update_ls_values_from_dict(value_class, simple_value_dict, ls_values_dict, e
                 ls_values.append(old_ls_val)
         else:
             if val_value is not None:
+                # If enabled, check if new value is a FileValue and needs to first be uploaded to ACAS
+                if upload_files and isinstance(val_value, FileValue) and val_value.value:
+                    val_value = _upload_file_value(val_value, client)
+                    simple_value_dict[val_kind] = val_value
                 # New value of an ls_kind not seen before
                 # Handle lists within the value dict
                 if new_val_is_list:

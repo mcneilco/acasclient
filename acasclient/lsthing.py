@@ -1193,26 +1193,26 @@ class LsThing(AbstractThing):
                  id=None,
                  code_name=None,
                  deleted=False,
-                 first_ls_things=[],
+                 first_ls_things=None,
                  ignored=False,
-                 ls_labels=[],
+                 ls_labels=None,
                  ls_type=None,
                  ls_kind=None,
                  ls_transaction=None,
-                 ls_states=[],
+                 ls_states=None,
                  modified_by=None,
                  modified_date=None,
                  recorded_by=None,
                  recorded_date=None,
-                 second_ls_things=[],
+                 second_ls_things=None,
                  version=None):
         super(LsThing, self).__init__(id=id, code_name=code_name, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
                                       ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
                                       recorded_by=recorded_by, recorded_date=recorded_date, version=version)
-        self.ls_states = ls_states
-        self.ls_labels = ls_labels
-        self.first_ls_things = first_ls_things
-        self.second_ls_things = second_ls_things
+        self.ls_states = ls_states or []
+        self.ls_labels = ls_labels or []
+        self.first_ls_things = first_ls_things or []
+        self.second_ls_things = second_ls_things or []
 
     def get_preferred_label(self):
         """Get the first non-ignored LsThingLabel with `preferred=True`
@@ -1340,7 +1340,7 @@ class LsThingState(AbstractState):
                  ls_type=None,
                  ls_kind=None,
                  ls_transaction=None,
-                 ls_values=[],
+                 ls_values=None,
                  ls_thing=None,
                  modified_by=None,
                  modified_date=None,
@@ -1350,7 +1350,7 @@ class LsThingState(AbstractState):
         super(LsThingState, self).__init__(id=id, comments=comments, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
                                            ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
                                            recorded_by=recorded_by, recorded_date=recorded_date, version=None)
-        self.ls_values = ls_values
+        self.ls_values = ls_values or []
         self.ls_thing = ls_thing
 
     def as_dict(self):
@@ -1445,7 +1445,7 @@ class ItxLsThingLsThing(AbstractThing):
                  ls_type=None,
                  ls_kind=None,
                  ls_transaction=None,
-                 ls_states=[],
+                 ls_states=None,
                  modified_by=None,
                  modified_date=None,
                  recorded_by=None,
@@ -1455,7 +1455,7 @@ class ItxLsThingLsThing(AbstractThing):
         super(ItxLsThingLsThing, self).__init__(id=id, code_name=code_name, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
                                                 ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
                                                 recorded_by=recorded_by, recorded_date=recorded_date, version=version)
-        self.ls_states = ls_states
+        self.ls_states = ls_states or []
         self.first_ls_thing = first_ls_thing
         self.second_ls_thing = second_ls_thing
 
@@ -1498,7 +1498,7 @@ class ItxLsThingLsThingState(AbstractState):
                  ls_type=None,
                  ls_kind=None,
                  ls_transaction=None,
-                 ls_values=[],
+                 ls_values=None,
                  itx_ls_thing_ls_thing=None,
                  modified_by=None,
                  modified_date=None,
@@ -1508,7 +1508,7 @@ class ItxLsThingLsThingState(AbstractState):
         super(ItxLsThingLsThingState, self).__init__(id=id, comments=comments, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
                                                      ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
                                                      recorded_by=recorded_by, recorded_date=recorded_date, version=None)
-        self.ls_values = ls_values
+        self.ls_values = ls_values or []
         self.itx_ls_thing_ls_thing = itx_ls_thing_ls_thing
 
     def as_dict(self):
@@ -1675,8 +1675,9 @@ class SimpleLsThing(BaseModel):
 
     ROW_NUM_KEY = 'row number'
 
-    def __init__(self, ls_type=None, ls_kind=None, code_name=None, names={}, ids={}, aliases={}, metadata={}, results={}, links=[], recorded_by=None,
-                 preferred_label_kind=None, state_tables=defaultdict(dict), ls_thing=None, client=None):
+    def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
+                 preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
+        metadata = metadata or {}
         self._client = client
         self.preferred_label_kind = preferred_label_kind
         # if ls_thing passed in, just parse from it and ignore the rest
@@ -1687,26 +1688,26 @@ class SimpleLsThing(BaseModel):
             self.ls_type = ls_type
             self.ls_kind = ls_kind
             self.code_name = code_name
-            self.links = links
+            self.links = links or []
             self._init_metadata = copy.deepcopy(metadata)
             self.recorded_by = recorded_by
             self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind,
                                      code_name=self.code_name, recorded_by=self.recorded_by)
-            self.names = names
-            self.ids = ids
-            self.aliases = aliases
+            self.names = names or {}
+            self.ids = ids or None
+            self.aliases = aliases or {}
             # Create empty dicts for LsLabels, LsStates, and LsValues
             # These will be populated by the "_prepare_for_save" method
             self._name_labels = {}
             self._id_labels = {}
             self._alias_labels = defaultdict(list)
             self.metadata = metadata
-            self.results = results
+            self.results = results or {}
             self._metadata_states = {}
             self._metadata_values = {}
             self._results_states = {}
             self._results_values = {}
-            self.state_tables = state_tables
+            self.state_tables = state_tables or defaultdict(dict)
             self._state_table_states = defaultdict(dict)
             self._state_table_values = defaultdict(lambda: defaultdict(dict))
 
@@ -2021,7 +2022,7 @@ class SimpleLsThing(BaseModel):
                 buf = file_ref.read(BLOCKSIZE)
         return(hasher.hexdigest())
 
-    def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata={}, results={}):
+    def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata=None, results=None):
         """Create a new link between this SimpleLsThing and another SimpleLsThing `linked_thing`
 
         :param verb: The nature of the link. This should be defined in `interactions.py`, defaults to None
@@ -2036,7 +2037,7 @@ class SimpleLsThing(BaseModel):
         :type results: dict, optional
         """
         self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type,
-                                     recorded_by=recorded_by, metadata=metadata, results=results))
+            recorded_by=recorded_by, metadata=metadata or {}, results=results or {}))
 
     def upload_file_values(self, client):
         """Loop through the values for file values and check if the value is a base64 string or
@@ -2100,12 +2101,14 @@ class SimpleLink(BaseModel):
     """
     _fields = ['verb', 'subject', 'object', 'metadata', 'results']
 
-    def __init__(self, verb=None, subject=None, object=None, metadata={}, results={}, recorded_by=None, itx_ls_thing_ls_thing=None,
+    def __init__(self, verb=None, subject=None, object=None, metadata=None, results=None, recorded_by=None, itx_ls_thing_ls_thing=None,
                  subject_type=None, object_type=None):
         """
         Create a link of form: "{subject} {verb} {object}" where {subject} and {object} are instances of SimpleLsThing
         examples: "{batch} {instantiates} {parent}", "{literature reference} {contains} {pdb structure}"
         """
+        metadata = metadata or {}
+        results = results or {}
         # if ItxLsThingLsThing passed in, parse it and ignore the rest
         if itx_ls_thing_ls_thing:
             self._itx_ls_thing_ls_thing = itx_ls_thing_ls_thing

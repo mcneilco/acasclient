@@ -1677,7 +1677,6 @@ class SimpleLsThing(BaseModel):
 
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
                  preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
-        metadata = metadata or {}
         self._client = client
         self.preferred_label_kind = preferred_label_kind
         # if ls_thing passed in, just parse from it and ignore the rest
@@ -1694,14 +1693,14 @@ class SimpleLsThing(BaseModel):
             self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind,
                                      code_name=self.code_name, recorded_by=self.recorded_by)
             self.names = names or {}
-            self.ids = ids or None
+            self.ids = ids or {}
             self.aliases = aliases or {}
             # Create empty dicts for LsLabels, LsStates, and LsValues
             # These will be populated by the "_prepare_for_save" method
             self._name_labels = {}
             self._id_labels = {}
             self._alias_labels = defaultdict(list)
-            self.metadata = metadata
+            self.metadata = metadata or {}
             self.results = results or {}
             self._metadata_states = {}
             self._metadata_values = {}
@@ -2107,8 +2106,6 @@ class SimpleLink(BaseModel):
         Create a link of form: "{subject} {verb} {object}" where {subject} and {object} are instances of SimpleLsThing
         examples: "{batch} {instantiates} {parent}", "{literature reference} {contains} {pdb structure}"
         """
-        metadata = metadata or {}
-        results = results or {}
         # if ItxLsThingLsThing passed in, parse it and ignore the rest
         if itx_ls_thing_ls_thing:
             self._itx_ls_thing_ls_thing = itx_ls_thing_ls_thing
@@ -2151,8 +2148,8 @@ class SimpleLink(BaseModel):
             self.subject = subject
             self.object = object
             self.recorded_by = recorded_by
-            self.metadata = metadata
-            self.results = results
+            self.metadata = metadata or {}
+            self.results = results or {}
             self._init_metadata = copy.deepcopy(metadata)
             self._init_results = copy.deepcopy(results)
             # If verb is recognized as one of our "forward" verbs, save the relationship normally

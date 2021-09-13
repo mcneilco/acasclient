@@ -1688,6 +1688,7 @@ class SimpleLsThing(BaseModel):
             self.ls_kind = ls_kind
             self.code_name = code_name
             self.links = links or []
+            metadata = metadata or {}
             self._init_metadata = copy.deepcopy(metadata)
             self.recorded_by = recorded_by
             self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind,
@@ -1700,7 +1701,7 @@ class SimpleLsThing(BaseModel):
             self._name_labels = {}
             self._id_labels = {}
             self._alias_labels = defaultdict(list)
-            self.metadata = metadata or {}
+            self.metadata = metadata
             self.results = results or {}
             self._metadata_states = {}
             self._metadata_values = {}
@@ -2148,8 +2149,10 @@ class SimpleLink(BaseModel):
             self.subject = subject
             self.object = object
             self.recorded_by = recorded_by
-            self.metadata = metadata or {}
-            self.results = results or {}
+            metadata = metadata or {}
+            self.metadata = metadata
+            results = results or {}
+            self.results = results
             self._init_metadata = copy.deepcopy(metadata)
             self._init_results = copy.deepcopy(results)
             # If verb is recognized as one of our "forward" verbs, save the relationship normally

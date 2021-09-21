@@ -1632,10 +1632,12 @@ class SimpleLsThing(BaseModel):
             'Character Name': ['Toto', 'Rex']
         },
         'metadata': {
-            'Birth Date': -1139961600000
-            'Death Date': -767923200000,
-            'Birth City': 'Chicago'
-            'Death City': 'Hollywood'
+            'Vital Records': {
+                'Birth Date': -1139961600000
+                'Death Date': -767923200000,
+                'Birth City': 'Chicago'
+                'Death City': 'Hollywood'
+            }
         },
         'state_tables': {
             ('credits', 'Film'): {
@@ -1650,8 +1652,12 @@ class SimpleLsThing(BaseModel):
             }
         }
         'results': {
-            'Total Film Appearances': 16,
-            'Wikipedia Page': 'https://en.wikipedia.org/wiki/Terry_(dog)'
+            'Wikipedia': {
+                'Wikipedia Page': 'https://en.wikipedia.org/wiki/Terry_(dog)'
+            }
+            'IMDB': {
+                'Total Film Appearances': 16,
+            }
         },
         'links': [
             {

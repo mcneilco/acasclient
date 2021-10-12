@@ -2028,7 +2028,7 @@ class SimpleLsThing(BaseModel):
                 buf = file_ref.read(BLOCKSIZE)
         return(hasher.hexdigest())
 
-    def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata=None, results=None, **kwargs):
+    def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata=None, results=None, subject_type=None, **kwargs):
         """Create a new link between this SimpleLsThing and another SimpleLsThing `linked_thing`
 
         :param verb: The nature of the link. This should be defined in `interactions.py`, defaults to None
@@ -2042,8 +2042,10 @@ class SimpleLsThing(BaseModel):
         :param results: Dictionary of results to associate with the link itself, defaults to {}
         :type results: dict, optional
         """
+        if not subject_type:
+            subject_type = self.ls_type
         self.links.append(SimpleLink(verb=verb, object=linked_thing, recorded_by=recorded_by, metadata=metadata or {},
-            results=results or {}, **kwargs))
+            subject_type=subject_type, results=results or {}, **kwargs))
 
     def upload_file_values(self, client):
         """Loop through the values for file values and check if the value is a base64 string or

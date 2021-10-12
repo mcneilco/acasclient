@@ -2028,7 +2028,7 @@ class SimpleLsThing(BaseModel):
                 buf = file_ref.read(BLOCKSIZE)
         return(hasher.hexdigest())
 
-    def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata=None, results=None):
+    def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata=None, results=None, subject_type=None, **kwargs):
         """Create a new link between this SimpleLsThing and another SimpleLsThing `linked_thing`
 
         :param verb: The nature of the link. This should be defined in `interactions.py`, defaults to None
@@ -2039,11 +2039,15 @@ class SimpleLsThing(BaseModel):
         :type recorded_by: str, optional
         :param metadata: Dictionary of metadata to associate with the link itself, defaults to {}
         :type metadata: dict, optional
-        :param results: Dictioanry of results to associate with the link itself, defaults to {}
+        :param results: Dictionary of results to associate with the link itself, defaults to {}
         :type results: dict, optional
+        :param subject_type: The type of the subject of the link, defaults to the ls_type of itself
+        :type subject_type: str, optional
         """
-        self.links.append(SimpleLink(verb=verb, object=linked_thing, subject_type=self.ls_type,
-            recorded_by=recorded_by, metadata=metadata or {}, results=results or {}))
+        if not subject_type:
+            subject_type = self.ls_type
+        self.links.append(SimpleLink(verb=verb, object=linked_thing, recorded_by=recorded_by, metadata=metadata or {},
+            subject_type=subject_type, results=results or {}, **kwargs))
 
     def upload_file_values(self, client):
         """Loop through the values for file values and check if the value is a base64 string or
@@ -2170,12 +2174,14 @@ class SimpleLink(BaseModel):
                 if subject:
                     first_ls_thing = subject._ls_thing
                     first_type = subject.ls_type
-                else:
+                # If subject_type is provided, use it instead of the subject's ls_type
+                if subject_type:
                     first_type = subject_type
                 if object:
                     second_ls_thing = object._ls_thing
                     second_type = object.ls_type
-                else:
+                # If object_type is provided, use it instead of the objects's ls_type
+                if object_type:
                     second_type = object_type
             else:
                 # verb must be one of our "backward" verbs, so save the inverse of the relationship so we don't duplicate interaction
@@ -2184,12 +2190,14 @@ class SimpleLink(BaseModel):
                 if object:
                     first_ls_thing = object._ls_thing
                     first_type = object.ls_type
-                else:
+                # If object_type is provided, use it instead of the objects's ls_type
+                if object_type:
                     first_type = object_type
                 if subject:
                     second_ls_thing = subject._ls_thing
                     second_type = subject.ls_type
-                else:
+                # If subject_type is provided, use it instead of the subject's ls_type
+                if subject_type:
                     second_type = subject_type
             # print("First: ", first_type)
             # print("Second: ", second_type)

@@ -455,7 +455,7 @@ class TestLsThing(unittest.TestCase):
         proj_1.save(self.client)
         proj_2 = Project(recorded_by=self.client.username, **meta_dict_2)
         proj_2.save(self.client)
-        # add an interaction
+        # add an interaction and override the subject and object types
         subject_type = 'test'
         object_type = 'me'
         proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username, subject_type=subject_type, object_type=object_type)

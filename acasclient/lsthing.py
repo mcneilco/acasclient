@@ -2041,6 +2041,8 @@ class SimpleLsThing(BaseModel):
         :type metadata: dict, optional
         :param results: Dictionary of results to associate with the link itself, defaults to {}
         :type results: dict, optional
+        :param subject_type: The type of the subject of the link, defaults to the ls_type of itself
+        :type subject_type: str, optional
         """
         if not subject_type:
             subject_type = self.ls_type

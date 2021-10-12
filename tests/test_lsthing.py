@@ -399,6 +399,7 @@ class TestLsThing(unittest.TestCase):
         fresh_proj_1 = Project.get_by_code(proj_1.code_name, self.client, Project.ls_type, Project.ls_kind)
         assert len(fresh_proj_1.links) == 1
         assert len(fresh_proj_1._ls_thing.second_ls_things) == 1
+        assert fresh_proj_1._ls_thing.second_ls_things[0].ls_kind == f'{Project.ls_type}_{Project.ls_type}'
         # check if save populated second_ls_things properly
         # FIXME: save is not properly populating second_ls_things
         #assert len(proj_1._ls_thing.second_ls_things) == 1
@@ -444,6 +445,28 @@ class TestLsThing(unittest.TestCase):
                                        combine_terms_with_and=True)
         assert len(results) == 1
         assert results[0] == proj_2.code_name
+
+        # Save new ls things to test interaction subject and object type customization
+        name_3 = str(uuid.uuid4())
+        name_4 = str(uuid.uuid4())
+        meta_dict.update({'name': name_3})
+        meta_dict_2.update({'name': name_4})
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_1.save(self.client)
+        proj_2 = Project(recorded_by=self.client.username, **meta_dict_2)
+        proj_2.save(self.client)
+        # add an interaction
+        subject_type = 'test'
+        object_type = 'me'
+        proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username, subject_type=subject_type, object_type=object_type)
+        assert len(proj_1.links) == 1
+        # save the interaction
+        proj_1.save(self.client)
+        # Fetch project 1 and look at the interaction
+        fresh_proj_1 = Project.get_by_code(proj_1.code_name, self.client, Project.ls_type, Project.ls_kind)
+        assert len(fresh_proj_1.links) == 1
+        assert len(fresh_proj_1._ls_thing.second_ls_things) == 1
+        assert fresh_proj_1._ls_thing.second_ls_things[0].ls_kind == f'{subject_type}_{object_type}'
 
 class TestBlobValue(unittest.TestCase):
 

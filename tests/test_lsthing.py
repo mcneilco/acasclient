@@ -477,18 +477,19 @@ class TestLsThing(unittest.TestCase):
             ALIAS_LS_TYPE = "MyAliasType"
             
             def __init__(self, name=None, alias=None, id=None, recorded_by=None, ls_thing=None):
-                ids = {'Example Thing': id}
+                # ID "corpName" "Example Thing" will be created on save because
+                # it cooresponds to a saved label sequence with matching type and kind attributes
+                # Its important to send in a '' on initial save
+                ids = {'Example Thing': ''}
                 names = {'MyNameKind': name}
                 aliases = {'MyAliasKind': alias}
 
                 super().__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, aliases=aliases, ids=ids, recorded_by=recorded_by,
                                  metadata={}, ls_thing=ls_thing)
 
-        id = str(uuid.uuid4())
         name = str(uuid.uuid4())
         alias = str(uuid.uuid4())
         meta_dict = {
-            'id': "",
             'alias': alias,
             'name': name
         }

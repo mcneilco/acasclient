@@ -468,6 +468,38 @@ class TestLsThing(unittest.TestCase):
         assert len(fresh_proj_1._ls_thing.second_ls_things) == 1
         assert fresh_proj_1._ls_thing.second_ls_things[0].ls_kind == f'{subject_type}_{object_type}'
 
+    def test_006_simple_thing_overide_label_types(self):
+        class ExampleThing(SimpleLsThing):
+            ls_type = "parent"
+            ls_kind = "Example Thing"
+            ID_LS_TYPE = "corpName"
+            NAME_LS_TYPE = "MyNameType"
+            ALIAS_LS_TYPE = "MyAliasType"
+            
+            def __init__(self, name=None, alias=None, id=None, recorded_by=None, ls_thing=None):
+                ids = {'Example Thing': id}
+                names = {'MyNameKind': name}
+                aliases = {'MyAliasKind': alias}
+
+                super().__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, aliases=aliases, ids=ids, recorded_by=recorded_by,
+                                 metadata={}, ls_thing=ls_thing)
+
+        id = str(uuid.uuid4())
+        name = str(uuid.uuid4())
+        alias = str(uuid.uuid4())
+        meta_dict = {
+            'id': "",
+            'alias': alias,
+            'name': name
+        }
+        newExampleThing = ExampleThing(recorded_by=self.client.username, **meta_dict)
+        newExampleThing.save(self.client)
+        # Confirm that the types are being saved correctly
+        assert len(newExampleThing._ls_thing.ls_labels) == 3
+        assert newExampleThing._ls_thing.ls_labels[0].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
+        assert newExampleThing._ls_thing.ls_labels[1].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
+        assert newExampleThing._ls_thing.ls_labels[2].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]        
+
 class TestBlobValue(unittest.TestCase):
 
     def setUp(self) -> None:

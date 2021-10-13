@@ -1680,7 +1680,9 @@ class SimpleLsThing(BaseModel):
                'state_tables']
 
     ROW_NUM_KEY = 'row number'
-
+    ID_LS_TYPE = 'id'
+    NAME_LS_TYPE = 'name'
+    ALIAS_LS_TYPE = 'alias'
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
                  preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
         self._client = client
@@ -1915,11 +1917,11 @@ class SimpleLsThing(BaseModel):
             results_ls_states + state_tables_ls_states
         # Same thing for labels
         id_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, 'id', self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
+            LsThingLabel, self.ID_LS_TYPE, self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
         names_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, 'name', self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
+            LsThingLabel, self.NAME_LS_TYPE, self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
         alias_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, 'alias', self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
+            LsThingLabel, self.ALIAS_LS_TYPE, self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
         self._ls_thing.ls_labels = id_ls_labels + names_ls_labels + alias_ls_labels
         # Transform links into interactions
         first_ls_things = []

@@ -225,7 +225,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
     elif isinstance(val, FileValue):
         return FileValue(ls_value.file_value, ls_value.comments) == val
     elif isinstance(val, BlobValue):
-        return  BlobValue(ls_value.blob_value, ls_value.comments) == val
+        return BlobValue(ls_value.blob_value, ls_value.comments) == val
     elif isinstance(val, clob):
         return ls_value.clob_value == str(val)
     elif type(val) == str:
@@ -684,6 +684,7 @@ class FileValue(object):
             for field in self._fields
         }
 
+
 class BlobValue(object):
     """Class used to save files as byte arrays to ACAS.
     These files must be small (< 1 GB) and will be stored in a `bytea` database column.
@@ -800,7 +801,6 @@ class BlobValue(object):
             field: getattr(self, field, None)
             for field in self._fields
         }
-
 
 
 # Model classes
@@ -1683,6 +1683,7 @@ class SimpleLsThing(BaseModel):
     ID_LS_TYPE = 'id'
     NAME_LS_TYPE = 'name'
     ALIAS_LS_TYPE = 'alias'
+
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
                  preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
         self._client = client
@@ -2049,7 +2050,7 @@ class SimpleLsThing(BaseModel):
         if not subject_type:
             subject_type = self.ls_type
         self.links.append(SimpleLink(verb=verb, object=linked_thing, recorded_by=recorded_by, metadata=metadata or {},
-            subject_type=subject_type, results=results or {}, **kwargs))
+                          subject_type=subject_type, results=results or {}, **kwargs))
 
     def upload_file_values(self, client):
         """Loop through the values for file values and check if the value is a base64 string or

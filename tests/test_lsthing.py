@@ -499,7 +499,10 @@ class TestLsThing(unittest.TestCase):
         assert len(newExampleThing._ls_thing.ls_labels) == 3
         assert newExampleThing._ls_thing.ls_labels[0].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
         assert newExampleThing._ls_thing.ls_labels[1].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
-        assert newExampleThing._ls_thing.ls_labels[2].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]        
+        assert newExampleThing._ls_thing.ls_labels[2].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
+        fresh_example_thing = ExampleThing.get_by_code(newExampleThing.code_name, self.client, ExampleThing.ls_type, ExampleThing.ls_kind)
+        # The label sequence for example thing is in the format ET-000001 so check it fetched a new label and is in the ids field
+        assert fresh_example_thing.ids['Example Thing'].startswith('ET-')
 
 class TestBlobValue(unittest.TestCase):
 

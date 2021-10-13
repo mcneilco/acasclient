@@ -1732,12 +1732,12 @@ class SimpleLsThing(BaseModel):
         self._ls_thing = ls_thing
         # Split out labels by ls_type into three categories
         self._name_labels = {
-            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'name' and label.ignored is False}
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.NAME_LS_TYPE and label.ignored is False}
         self._id_labels = {
-            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'id' and label.ignored is False}
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.ID_LS_TYPE and label.ignored is False}
         self._alias_labels = defaultdict(list)
         for label in ls_thing.ls_labels:
-            if label.ls_type == 'alias' and label.ignored is False:
+            if label.ls_type == self.ALIAS_LS_TYPE and label.ignored is False:
                 self._alias_labels[label.ls_kind].append(label)
         # Names and IDs are simple - only expect one label for each ls_kind
         self.names = {ls_kind: label.label_text for ls_kind,

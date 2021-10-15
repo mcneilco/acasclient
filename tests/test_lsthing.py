@@ -4,7 +4,7 @@
 
 import os
 import tempfile
-import time
+from datetime import datetime
 import unittest
 import uuid
 from pathlib import Path
@@ -39,6 +39,7 @@ PROCEDURE_DOCUMENT_KEY = 'procedure_document'
 
 FWD_ITX = 'relates to'
 BACK_ITX = 'is related to'
+
 
 class Project(SimpleLsThing):
     ls_type = PROJECT
@@ -110,7 +111,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time()
+            START_DATE_KEY: datetime.now()
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         self.assertIsNone(newProject.code_name)
@@ -136,7 +137,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: blob_test_path
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -148,7 +149,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: str(blob_test_path)
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -177,7 +178,7 @@ class TestLsThing(unittest.TestCase):
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, file_name)
 
-        # Write to a file by providing a folder and custom file name 
+        # Write to a file by providing a folder and custom file name
         output_file = newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT].write_to_file(folder_path=self.tempdir, file_name=custom_file_name)
         self.assertTrue(output_file.exists())
         self.assertEqual(output_file.name, custom_file_name)
@@ -195,7 +196,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: "SOMEGARBAGEPATH"
         }
         with self.assertRaises(ValueError):
@@ -210,7 +211,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: self.tempdir
         }
         with self.assertRaises(ValueError):
@@ -234,13 +235,13 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: file_path
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.save(self.client)
         self._check_blob_equal(newProject.metadata[PROJECT_METADATA][PROCEDURE_DOCUMENT], file_name, file_bytes)
-        
+
         # Then update with a different file
         file_name = '1_1_Generic.xlsx'
         file_path = self._get_path(file_name)
@@ -265,7 +266,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PDF_DOCUMENT_KEY: file_test_path
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -280,7 +281,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
             PDF_DOCUMENT_KEY: str(file_test_path)
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -295,7 +296,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT] = FileValue(file_path=file_test_path)
@@ -312,7 +313,7 @@ class TestLsThing(unittest.TestCase):
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time(),
+            START_DATE_KEY: datetime.now(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
         newProject.metadata[PROJECT_METADATA][PDF_DOCUMENT] = FileValue(file_path=str(file_test_path))
@@ -326,12 +327,12 @@ class TestLsThing(unittest.TestCase):
 
         # Write to a bad folder path fails gracefully
         with self.assertRaises(ValueError):
-            output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
+            fv.download_to_disk(self.client, folder_path="GARBAGE")
         try:
-            output_file = fv.download_to_disk(self.client, folder_path="GARBAGE")
+            fv.download_to_disk(self.client, folder_path="GARBAGE")
         except ValueError as err:
             self.assertIn("does not exist", err.args[0])
-        
+
         # Test updating other values on a saved Thing
         saved_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
         saved_project.metadata[PROJECT_METADATA][STATUS_KEY] = 'inactive'
@@ -370,21 +371,21 @@ class TestLsThing(unittest.TestCase):
         lskind_to_lsvalue = get_lsKind_to_lsvalue([lsthing_value])
         assert len(lskind_to_lsvalue) == 1
         assert 'bar (baz)' in lskind_to_lsvalue
-    
+
     def test_005_create_interactions(self):
         name = str(uuid.uuid4())
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time()
+            START_DATE_KEY: datetime.now()
         }
         name_2 = str(uuid.uuid4())
         meta_dict_2 = {
             NAME_KEY: name_2,
             IS_RESTRICTED_KEY: True,
             STATUS_KEY: "active",
-            START_DATE_KEY: time.time()
+            START_DATE_KEY: datetime.now()
         }
         proj_1 = Project(recorded_by=self.client.username, **meta_dict)
         proj_1.save(self.client)
@@ -402,7 +403,7 @@ class TestLsThing(unittest.TestCase):
         assert fresh_proj_1._ls_thing.second_ls_things[0].ls_kind == f'{Project.ls_type}_{Project.ls_type}'
         # check if save populated second_ls_things properly
         # FIXME: save is not properly populating second_ls_things
-        #assert len(proj_1._ls_thing.second_ls_things) == 1
+        # assert len(proj_1._ls_thing.second_ls_things) == 1
         itx_ls_thing_ls_thing = fresh_proj_1._ls_thing.second_ls_things[0]
         assert itx_ls_thing_ls_thing.id is not None
         # Fetch project 2 again and look at the interaction in reverse
@@ -516,7 +517,6 @@ class TestLsThing(unittest.TestCase):
         assert newExampleThing._ls_thing.ls_labels[2].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
 
         # Confirm that the state types are being saved correctly
-                # Confirm that the label types are being saved correctly
         assert newExampleThing._ls_thing.ls_states[0].ls_type in [ExampleThing.METADATA_LS_TYPE, ExampleThing.RESULTS_LS_TYPE]
         assert newExampleThing._ls_thing.ls_states[1].ls_type in [ExampleThing.METADATA_LS_TYPE, ExampleThing.RESULTS_LS_TYPE]
 
@@ -525,7 +525,6 @@ class TestLsThing(unittest.TestCase):
         # The label sequence for example thing is in the format ET-000001 so check it fetched a new label and is in the ids field
         assert fresh_example_thing.ids['Example Thing'].startswith('ET-')
 
-        #
 
 class TestBlobValue(unittest.TestCase):
 

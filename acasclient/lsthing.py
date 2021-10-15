@@ -1683,6 +1683,8 @@ class SimpleLsThing(BaseModel):
     ID_LS_TYPE = 'id'
     NAME_LS_TYPE = 'name'
     ALIAS_LS_TYPE = 'alias'
+    METADATA_LS_TYPE = 'metadata'
+    RESULTS_LS_TYPE = 'results'
 
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
                  preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
@@ -1779,14 +1781,14 @@ class SimpleLsThing(BaseModel):
                          for state in state_list if len(state_list) == 1]
         # metadata
         self._metadata_states = {
-            state.ls_kind: state for state in single_states if state.ls_type == 'metadata' and state.ignored is False}
+            state.ls_kind: state for state in single_states if state.ls_type == self.METADATA_LS_TYPE and state.ignored is False}
         self._metadata_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
                                               value for value in state.ls_values if value.ignored is False} for state_kind, state in self._metadata_states.items()}
         self.metadata = parse_states_into_dict(self._metadata_states)
         self._init_metadata = copy.deepcopy(self.metadata)
         # results
         self._results_states = {
-            state.ls_kind: state for state in single_states if state.ls_type == 'results' and state.ignored is False}
+            state.ls_kind: state for state in single_states if state.ls_type == self.RESULTS_LS_TYPE and state.ignored is False}
         self._results_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
                                              value for value in state.ls_values if value.ignored is False} for state_kind, state in self._results_states.items()}
         self.results = parse_states_into_dict(self._results_states)
@@ -1844,7 +1846,7 @@ class SimpleLsThing(BaseModel):
                 if isinstance(v, CodeValue) or isinstance(v, BlobValue):
                     v = v.as_dict()
                 metadata[key][k] = v
-        my_dict['metadata'] = metadata
+        my_dict[self.METADATA_LS_TYPE] = metadata
 
         # Check results for CodeValues/BlobValue and convert them to dicts
         results = {}
@@ -1854,7 +1856,7 @@ class SimpleLsThing(BaseModel):
                 if isinstance(v, CodeValue) or isinstance(v, BlobValue):
                     v = v.as_dict()
                 results[key][k] = v
-        my_dict['results'] = results
+        my_dict[self.RESULTS_LS_TYPE] = results
 
         return my_dict
 
@@ -1906,10 +1908,10 @@ class SimpleLsThing(BaseModel):
             user = self.recorded_by
         # Detect value updates, apply ignored / modified by /modified date and create new value
         metadata_ls_states = update_ls_states_from_dict(
-            LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user,
+            LsThingState, self.METADATA_LS_TYPE, LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user,
             client, upload_files)
         results_ls_states = update_ls_states_from_dict(
-            LsThingState, 'results', LsThingValue, self.results, self._results_states, self._results_values, user,
+            LsThingState, self.RESULTS_LS_TYPE, LsThingValue, self.results, self._results_states, self._results_values, user,
             client, upload_files)
         state_tables_ls_states = update_state_table_states_from_dict(
             LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user,
@@ -2127,14 +2129,14 @@ class SimpleLink(BaseModel):
             self.subject = None
             # metadata
             self._metadata_states = {
-                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'metadata' and state.ignored is False}
+                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == self.METADATA_LS_TYPE and state.ignored is False}
             self._metadata_values = {state_kind: {value.ls_kind: value for value in state.ls_values}
                                      for state_kind, state in self._metadata_states.items()}
             self.metadata = parse_states_into_dict(self._metadata_states)
             self._init_metadata = copy.deepcopy(self.metadata)
             # results
             self._results_states = {
-                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'results' and state.ignored is False}
+                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == self.RESULTS_LS_TYPE and state.ignored is False}
             self._results_values = {state_kind: {value.ls_kind: value for value in state.ls_values}
                                     for state_kind, state in self._results_states.items()}
             self.results = parse_states_into_dict(self._results_states)
@@ -2212,7 +2214,7 @@ class SimpleLink(BaseModel):
             self._metadata_values = {}
             for state_kind, values_dict in metadata.items():
                 metadata_state = ItxLsThingLsThingState(
-                    ls_type='metadata', ls_kind=state_kind, recorded_by=self.recorded_by)
+                    ls_type=self.METADATA_LS_TYPE, ls_kind=state_kind, recorded_by=self.recorded_by)
                 self._metadata_values[state_kind] = {}
                 metadata_state, values_obj_dict = self._convert_values_to_objects(
                     values_dict, metadata_state)
@@ -2223,7 +2225,7 @@ class SimpleLink(BaseModel):
             self._results_values = {}
             for state_kind, values_dict in results.items():
                 results_state = ItxLsThingLsThingState(
-                    ls_type='results', ls_kind=state_kind, recorded_by=self.recorded_by)
+                    ls_type=self.RESULTS_LS_TYPE, ls_kind=state_kind, recorded_by=self.recorded_by)
                 self._results_values[state_kind] = {}
                 results_state, values_obj_dict = self._convert_values_to_objects(
                     values_dict, results_state)

@@ -468,15 +468,17 @@ class TestLsThing(unittest.TestCase):
         assert len(fresh_proj_1._ls_thing.second_ls_things) == 1
         assert fresh_proj_1._ls_thing.second_ls_things[0].ls_kind == f'{subject_type}_{object_type}'
 
-    def test_006_simple_thing_overide_label_types(self):
+    def test_006_simple_thing_overide_label_and_state_types(self):
         class ExampleThing(SimpleLsThing):
             ls_type = "parent"
             ls_kind = "Example Thing"
             ID_LS_TYPE = "corpName"
             NAME_LS_TYPE = "MyNameType"
             ALIAS_LS_TYPE = "MyAliasType"
-            
-            def __init__(self, name=None, alias=None, id=None, recorded_by=None, ls_thing=None):
+            METADATA_LS_TYPE = "MyMetaDataType"
+            RESULTS_LS_TYPE = "MyResultsType"
+
+            def __init__(self, name=None, alias=None, id=None, recorded_by=None, metadata={}, results={}, ls_thing=None):
                 # ID "corpName" "Example Thing" will be created on save because
                 # it cooresponds to a saved label sequence with matching type and kind attributes
                 # Its important to send in a '' on initial save
@@ -485,24 +487,45 @@ class TestLsThing(unittest.TestCase):
                 aliases = {'MyAliasKind': alias}
 
                 super().__init__(ls_type=self.ls_type, ls_kind=self.ls_kind, names=names, aliases=aliases, ids=ids, recorded_by=recorded_by,
-                                 metadata={}, ls_thing=ls_thing)
+                                 metadata=metadata, results=results, ls_thing=ls_thing)
 
         name = str(uuid.uuid4())
         alias = str(uuid.uuid4())
         meta_dict = {
             'alias': alias,
-            'name': name
+            'name': name,
+            'results': {
+                'experimental': {
+                    'My Result': 134,
+                    'My Result Date': datetime.now()
+                }
+            },
+            'metadata': {
+                'general': {
+                    'Species': "Rat",
+                    'Description': "This is an in vitro pharamacology assay"
+                }
+            }
         }
         newExampleThing = ExampleThing(recorded_by=self.client.username, **meta_dict)
         newExampleThing.save(self.client)
-        # Confirm that the types are being saved correctly
+        # Confirm that the label types are being saved correctly
         assert len(newExampleThing._ls_thing.ls_labels) == 3
         assert newExampleThing._ls_thing.ls_labels[0].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
         assert newExampleThing._ls_thing.ls_labels[1].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
         assert newExampleThing._ls_thing.ls_labels[2].ls_type in [ExampleThing.ID_LS_TYPE, ExampleThing.NAME_LS_TYPE, ExampleThing.ALIAS_LS_TYPE]
+
+        # Confirm that the state types are being saved correctly
+                # Confirm that the label types are being saved correctly
+        assert newExampleThing._ls_thing.ls_states[0].ls_type in [ExampleThing.METADATA_LS_TYPE, ExampleThing.RESULTS_LS_TYPE]
+        assert newExampleThing._ls_thing.ls_states[1].ls_type in [ExampleThing.METADATA_LS_TYPE, ExampleThing.RESULTS_LS_TYPE]
+
+        # Verify that the example thing picked up a corpName label sequence
         fresh_example_thing = ExampleThing.get_by_code(newExampleThing.code_name, self.client, ExampleThing.ls_type, ExampleThing.ls_kind)
         # The label sequence for example thing is in the format ET-000001 so check it fetched a new label and is in the ids field
         assert fresh_example_thing.ids['Example Thing'].startswith('ET-')
+
+        #
 
 class TestBlobValue(unittest.TestCase):
 

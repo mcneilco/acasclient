@@ -225,7 +225,7 @@ def is_equal_ls_value_simple_value(ls_value, val):
     elif isinstance(val, FileValue):
         return FileValue(ls_value.file_value, ls_value.comments) == val
     elif isinstance(val, BlobValue):
-        return  BlobValue(ls_value.blob_value, ls_value.comments) == val
+        return BlobValue(ls_value.blob_value, ls_value.comments) == val
     elif isinstance(val, clob):
         return ls_value.clob_value == str(val)
     elif type(val) == str:
@@ -684,6 +684,7 @@ class FileValue(object):
             for field in self._fields
         }
 
+
 class BlobValue(object):
     """Class used to save files as byte arrays to ACAS.
     These files must be small (< 1 GB) and will be stored in a `bytea` database column.
@@ -800,7 +801,6 @@ class BlobValue(object):
             field: getattr(self, field, None)
             for field in self._fields
         }
-
 
 
 # Model classes
@@ -1680,6 +1680,11 @@ class SimpleLsThing(BaseModel):
                'state_tables']
 
     ROW_NUM_KEY = 'row number'
+    ID_LS_TYPE = 'id'
+    NAME_LS_TYPE = 'name'
+    ALIAS_LS_TYPE = 'alias'
+    METADATA_LS_TYPE = 'metadata'
+    RESULTS_LS_TYPE = 'results'
 
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
                  preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
@@ -1730,12 +1735,12 @@ class SimpleLsThing(BaseModel):
         self._ls_thing = ls_thing
         # Split out labels by ls_type into three categories
         self._name_labels = {
-            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'name' and label.ignored is False}
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.NAME_LS_TYPE and label.ignored is False}
         self._id_labels = {
-            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == 'id' and label.ignored is False}
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.ID_LS_TYPE and label.ignored is False}
         self._alias_labels = defaultdict(list)
         for label in ls_thing.ls_labels:
-            if label.ls_type == 'alias' and label.ignored is False:
+            if label.ls_type == self.ALIAS_LS_TYPE and label.ignored is False:
                 self._alias_labels[label.ls_kind].append(label)
         # Names and IDs are simple - only expect one label for each ls_kind
         self.names = {ls_kind: label.label_text for ls_kind,
@@ -1776,14 +1781,14 @@ class SimpleLsThing(BaseModel):
                          for state in state_list if len(state_list) == 1]
         # metadata
         self._metadata_states = {
-            state.ls_kind: state for state in single_states if state.ls_type == 'metadata' and state.ignored is False}
+            state.ls_kind: state for state in single_states if state.ls_type == self.METADATA_LS_TYPE and state.ignored is False}
         self._metadata_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
                                               value for value in state.ls_values if value.ignored is False} for state_kind, state in self._metadata_states.items()}
         self.metadata = parse_states_into_dict(self._metadata_states)
         self._init_metadata = copy.deepcopy(self.metadata)
         # results
         self._results_states = {
-            state.ls_kind: state for state in single_states if state.ls_type == 'results' and state.ignored is False}
+            state.ls_kind: state for state in single_states if state.ls_type == self.RESULTS_LS_TYPE and state.ignored is False}
         self._results_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
                                              value for value in state.ls_values if value.ignored is False} for state_kind, state in self._results_states.items()}
         self.results = parse_states_into_dict(self._results_states)
@@ -1841,7 +1846,7 @@ class SimpleLsThing(BaseModel):
                 if isinstance(v, CodeValue) or isinstance(v, BlobValue):
                     v = v.as_dict()
                 metadata[key][k] = v
-        my_dict['metadata'] = metadata
+        my_dict[self.METADATA_LS_TYPE] = metadata
 
         # Check results for CodeValues/BlobValue and convert them to dicts
         results = {}
@@ -1851,7 +1856,7 @@ class SimpleLsThing(BaseModel):
                 if isinstance(v, CodeValue) or isinstance(v, BlobValue):
                     v = v.as_dict()
                 results[key][k] = v
-        my_dict['results'] = results
+        my_dict[self.RESULTS_LS_TYPE] = results
 
         return my_dict
 
@@ -1903,10 +1908,10 @@ class SimpleLsThing(BaseModel):
             user = self.recorded_by
         # Detect value updates, apply ignored / modified by /modified date and create new value
         metadata_ls_states = update_ls_states_from_dict(
-            LsThingState, 'metadata', LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user,
+            LsThingState, self.METADATA_LS_TYPE, LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user,
             client, upload_files)
         results_ls_states = update_ls_states_from_dict(
-            LsThingState, 'results', LsThingValue, self.results, self._results_states, self._results_values, user,
+            LsThingState, self.RESULTS_LS_TYPE, LsThingValue, self.results, self._results_states, self._results_values, user,
             client, upload_files)
         state_tables_ls_states = update_state_table_states_from_dict(
             LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user,
@@ -1915,11 +1920,11 @@ class SimpleLsThing(BaseModel):
             results_ls_states + state_tables_ls_states
         # Same thing for labels
         id_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, 'id', self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
+            LsThingLabel, self.ID_LS_TYPE, self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
         names_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, 'name', self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
+            LsThingLabel, self.NAME_LS_TYPE, self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
         alias_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, 'alias', self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
+            LsThingLabel, self.ALIAS_LS_TYPE, self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
         self._ls_thing.ls_labels = id_ls_labels + names_ls_labels + alias_ls_labels
         # Transform links into interactions
         first_ls_things = []
@@ -2047,7 +2052,7 @@ class SimpleLsThing(BaseModel):
         if not subject_type:
             subject_type = self.ls_type
         self.links.append(SimpleLink(verb=verb, object=linked_thing, recorded_by=recorded_by, metadata=metadata or {},
-            subject_type=subject_type, results=results or {}, **kwargs))
+                          subject_type=subject_type, results=results or {}, **kwargs))
 
     def upload_file_values(self, client):
         """Loop through the values for file values and check if the value is a base64 string or
@@ -2124,14 +2129,14 @@ class SimpleLink(BaseModel):
             self.subject = None
             # metadata
             self._metadata_states = {
-                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'metadata' and state.ignored is False}
+                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == self.METADATA_LS_TYPE and state.ignored is False}
             self._metadata_values = {state_kind: {value.ls_kind: value for value in state.ls_values}
                                      for state_kind, state in self._metadata_states.items()}
             self.metadata = parse_states_into_dict(self._metadata_states)
             self._init_metadata = copy.deepcopy(self.metadata)
             # results
             self._results_states = {
-                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == 'results' and state.ignored is False}
+                state.ls_kind: state for state in itx_ls_thing_ls_thing.ls_states if state.ls_type == self.RESULTS_LS_TYPE and state.ignored is False}
             self._results_values = {state_kind: {value.ls_kind: value for value in state.ls_values}
                                     for state_kind, state in self._results_states.items()}
             self.results = parse_states_into_dict(self._results_states)
@@ -2209,7 +2214,7 @@ class SimpleLink(BaseModel):
             self._metadata_values = {}
             for state_kind, values_dict in metadata.items():
                 metadata_state = ItxLsThingLsThingState(
-                    ls_type='metadata', ls_kind=state_kind, recorded_by=self.recorded_by)
+                    ls_type=self.METADATA_LS_TYPE, ls_kind=state_kind, recorded_by=self.recorded_by)
                 self._metadata_values[state_kind] = {}
                 metadata_state, values_obj_dict = self._convert_values_to_objects(
                     values_dict, metadata_state)
@@ -2220,7 +2225,7 @@ class SimpleLink(BaseModel):
             self._results_values = {}
             for state_kind, values_dict in results.items():
                 results_state = ItxLsThingLsThingState(
-                    ls_type='results', ls_kind=state_kind, recorded_by=self.recorded_by)
+                    ls_type=self.RESULTS_LS_TYPE, ls_kind=state_kind, recorded_by=self.recorded_by)
                 self._results_values[state_kind] = {}
                 results_state, values_obj_dict = self._convert_values_to_objects(
                     values_dict, results_state)

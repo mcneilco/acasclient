@@ -2116,6 +2116,9 @@ class SimpleLink(BaseModel):
     """
     _fields = ['verb', 'subject', 'object', 'metadata', 'results']
 
+    METADATA_LS_TYPE = 'metadata'
+    RESULTS_LS_TYPE = 'results'
+
     def __init__(self, verb=None, subject=None, object=None, metadata=None, results=None, recorded_by=None, itx_ls_thing_ls_thing=None,
                  subject_type=None, object_type=None):
         """

@@ -9,10 +9,15 @@ from pathlib import Path
 from pathlib import PurePath
 import re
 import base64
+from io import StringIO
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+VALID_SEARCH_TYPES = {"substructure", "duplicate",
+                        "duplicate_tautomer", "duplicate_no_tautomer",
+                        "stereo_ignore", "full_tautomer", "substructure",
+                        "similarity", "full"}
 
 def isBase64(s):
     return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
@@ -146,6 +151,79 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         break
     return value
 
+def sdf_iterator(iteratable):
+    data = []
+    for line in iteratable:
+        data.append(line)
+        if line.startswith("$$$$"):
+            yield "".join(data)
+            data = []
+
+def get_mol_as_dict(mol):
+    """
+    Returns a dict representation of a molecule in cluding the mol block, the ctab and the properties as a key value pair
+    """
+    lines = mol.split("\n")
+    properties = {}
+    property = None
+    ctab = None
+    ctab_complete = False
+    for line in lines:
+        if line.startswith(">"):
+            ctab_complete = True
+            if property is not None:
+                properties[property] = properties[property] = "\n".join(properties[property])
+            property = line.split("<")[1].split(">")[0].strip()
+            properties[property] = []
+        else:
+            if not ctab_complete:
+                if ctab is None:
+                    ctab = line + "\n"
+                else:
+                    ctab += line + "\n"
+            if property is not None:
+                if line.strip() != "":
+                    properties[property].append(line.strip())
+                else:
+                    properties[property] = "\n".join(properties[property])
+                    property = None
+    return {"mol": mol, "ctab": ctab, "properties": properties}
+
+def parse_file(file_content, file_extension):
+    """Parse content from a string into an extension specific format
+
+    Args:
+        file_content (str): Content of the file
+        file_extension (str): Extension of the file
+
+    Returns:
+        Parsed content of the file in a format specific to the extension
+    """
+    if file_extension == '.sdf':
+        return parse_sdf(file_content)
+    elif file_extension == '.json':
+        return json.loads(file_content)
+    else:
+        return None
+
+def parse_sdf(file_content):
+    """Parse an SDF file content
+
+    Parse an SDF file
+
+    Args:
+        file_content (bytes): Content of the file
+
+    Returns:
+        Parsed content of the file
+    """
+    sdf_data = []
+    file_content = StringIO(file_content.decode('utf-8'))
+    for e, mol in enumerate(sdf_iterator(file_content)):
+        mol_dict = get_mol_as_dict(mol)
+        sdf_data.append(mol_dict)
+    return sdf_data 
+
 
 class client():
 
@@ -269,14 +347,22 @@ class client():
                     ):
         search_request = dict(locals())
         del search_request['self']
-        VALID_SEARCH_TYPES = {"substructure", "duplicate",
-                              "duplicate_tautomer", "duplicate_no_tautomer",
-                              "stereo_ignore", "full_tautomer", "substructure",
-                              "similarity", "full"}
+
         if searchType not in VALID_SEARCH_TYPES:
             raise ValueError("cmpd_search: searchType must be one of %r."
                              % VALID_SEARCH_TYPES)
         return self.cmpd_search_request(search_request)
+
+    def cmpd_structure_search(self, searchType="substructure", percentSimilarity=90,
+                    maxResults=100, molStructure=""
+                    ):
+        search_request = dict(locals())
+        del search_request['self']
+
+        if searchType not in VALID_SEARCH_TYPES:
+            raise ValueError("cmpd_search: searchType must be one of %r."
+                             % VALID_SEARCH_TYPES)
+        return self.cmpd_structure_search_request(search_request)
 
     def get_all_lots(self):
         """Get all lots
@@ -326,6 +412,19 @@ class client():
             search_request["maxResults"] = 100
 
         resp = self.session.post("{}/cmpdreg/search/cmpds".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(search_request))
+        resp.raise_for_status()
+        return resp.json()
+
+    def cmpd_structure_search_request(self, search_request):
+        if("searchType" not in search_request):
+            search_request["searchType"] = "substructure"
+        if("percentSimilarity" not in search_request):
+            search_request["percentSimilarity"] = 90
+
+        resp = self.session.post("{}/cmpdreg/structuresearch/".
                                  format(self.url),
                                  headers={'Content-Type': "application/json"},
                                  data=json.dumps(search_request))
@@ -482,7 +581,7 @@ class client():
         file_path = self.write_file(sdf_file, dir_or_file_path)
         return file_path
 
-    def get_file(self, file_path):
+    def get_file(self, file_path, parse_content=True):
         """Get a file from ACAS
 
         Get a file from ACAS
@@ -500,16 +599,34 @@ class client():
             last-modified* (str): Date file was last mofied
             name (str): Name of the file
             content (str): Content of the file
-
+            parsed_content (depends): Parsed content of the file
         """
         resp = self.session.get("{}{}".format(self.url, file_path))
         resp.raise_for_status()
-        return {
+        name = PurePath(Path(file_path)).name
+        return_dict = {
             'content-type': resp.headers.get('content-type', None),
             'content-length': resp.headers.get('content-length', None),
             'last-modified': resp.headers.get('Last-modified', None),
-            'name': PurePath(Path(file_path)).name,
+            'name': name,
             'content': resp.content}
+
+        # Get file extension
+        file_extension = PurePath(Path(file_path)).suffix
+        
+        if parse_content:
+            try:
+                # This function returns None if the file extension is not
+                # recognized
+                return_dict['parsed_content'] = parse_file(
+                    resp.content, file_extension)
+            except Exception as e:
+                # In case there is an error parsing the file, just return the
+                # None
+                logger.warning("Could not parse file: {}".format(e))
+                return_dict['parsed_content'] = None
+
+        return return_dict
 
     def get_protocols_by_label(self, label):
         """Get all experiments for a protocol from a protocol label

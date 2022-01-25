@@ -34,6 +34,7 @@ NAME_KEY = 'name'
 IS_RESTRICTED_KEY = 'is_restricted'
 STATUS_KEY = 'status'
 START_DATE_KEY = 'start_date'
+DESCRIPTION_KEY = 'description'
 PDF_DOCUMENT_KEY = 'pdf_document'
 PROCEDURE_DOCUMENT_KEY = 'procedure_document'
 
@@ -46,12 +47,13 @@ class Project(SimpleLsThing):
     ls_kind = PROJECT
     preferred_label_kind = PROJECT_NAME
 
-    def __init__(self, name=None, alias=None, start_date=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
+    def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
                  ls_thing=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
             PROJECT_METADATA: {
                 START_DATE: start_date,
+                DESCRIPTION_KEY: description,
                 PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
                 IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
@@ -525,6 +527,180 @@ class TestLsThing(unittest.TestCase):
         # The label sequence for example thing is in the format ET-000001 so check it fetched a new label and is in the ids field
         assert fresh_example_thing.ids['Example Thing'].startswith('ET-')
 
+    def test_004_get_lskind_to_ls_values(self):
+        """
+        Verify `get_lskind_to_lsvalue` adds the `unit_kind` if present to the
+        `lskind` value.
+        """
+
+        # No unit_kind in LsThingValue
+        lsthing_value = LsThingValue(
+            ls_type='foo',
+            ls_kind='bar',
+            numeric_value=4.5,
+        )
+        lskind_to_lsvalue = get_lsKind_to_lsvalue([lsthing_value])
+        assert len(lskind_to_lsvalue) == 1
+        assert 'bar' in lskind_to_lsvalue
+
+        # No unit_kind in LsThingValue
+        lsthing_value = LsThingValue(
+            ls_type='foo',
+            ls_kind='bar',
+            numeric_value=4.5,
+            unit_kind='baz')
+        lskind_to_lsvalue = get_lsKind_to_lsvalue([lsthing_value])
+        assert len(lskind_to_lsvalue) == 1
+        assert 'bar (baz)' in lskind_to_lsvalue
+
+    def test_007_advanced_search_interactions(self):
+
+        # Create project 1
+        name = str(uuid.uuid4())
+        status_1 = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: status_1,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
+
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_1.save(self.client)
+
+        # Create project 2
+        name_2 = str(uuid.uuid4())
+        status_2 = str(uuid.uuid4())
+        desc_2 = str(uuid.uuid4())
+        meta_dict_2 = {
+            NAME_KEY: name_2,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: status_2,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_2
+        }
+        proj_2 = Project(recorded_by=self.client.username, **meta_dict_2)
+        proj_2.save(self.client)
+
+        # Add interactions between projects
+        proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username)
+        assert len(proj_1.links) == 1
+        proj_1.save(self.client)
+       
+        # Run advanced search by interaction w/value matching on the interaction thing
+        # Forward interaction query w/interaction thing values
+        # Code value search
+        second_itx_listings = [
+            {
+                "lsType": FWD_ITX,
+                "lsKind": "project_project",
+                "thingType": Project.ls_type,
+                "thingKind": Project.ls_kind,
+                "thingValues": [
+                    {
+                    	"value": status_2,
+						"stateType": "metadata",
+						"stateKind": "project metadata",
+						"valueType": "codeValue",
+						"valueKind": "project status",
+						"operator": "~"
+                    }
+                ]
+            }
+        ]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       second_itx_listings=second_itx_listings,
+                                       format="nestedfull",
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 1
+        assert results[0]["codeName"] == proj_1.code_name
+
+        # String value search
+        second_itx_listings = [
+            {
+                "interactionType": FWD_ITX,
+                "thingType": Project.ls_type,
+                "thingKind": Project.ls_kind,
+                "thingCodeName": proj_2.code_name,
+                "thingValues": [
+                    {
+                    	"value": desc_2,
+						"stateType": "metadata",
+						"stateKind": "project metadata",
+						"valueType": "stringValue",
+						"valueKind": "description",
+						"operator": "~"
+                    }
+                ]
+            }
+        ]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       second_itx_listings=second_itx_listings,
+                                       format="nestedfull",
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 1
+        assert results[0]["codeName"] == proj_1.code_name
+
+        # Upper case search using ~ which should still match
+        second_itx_listings = [
+            {
+                "interactionType": FWD_ITX,
+                "thingType": Project.ls_type,
+                "thingKind": Project.ls_kind,
+                "thingCodeName": proj_2.code_name,
+                "thingValues": [
+                    {
+                    	"value": desc_2.upper(),
+						"stateType": "metadata",
+						"stateKind": "project metadata",
+						"valueType": "stringValue",
+						"valueKind": "description",
+						"operator": "~"
+                    }
+                ]
+            }
+        ]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       second_itx_listings=second_itx_listings,
+                                       format="nestedfull",
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 1
+        assert results[0]["codeName"] == proj_1.code_name
+
+        # String value search make sure it doesn't return the wrong project (this should not return any results)
+        second_itx_listings = [
+            {
+                "interactionType": FWD_ITX,
+                "thingType": Project.ls_type,
+                "thingKind": Project.ls_kind,
+                "thingCodeName": proj_2.code_name,
+                "thingValues": [
+                    {
+                    	"value": desc_1,
+						"stateType": "metadata",
+						"stateKind": "project metadata",
+						"valueType": "stringValue",
+						"valueKind": "description",
+						"operator": "~"
+                    }
+                ]
+            }
+        ]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       second_itx_listings=second_itx_listings,
+                                       format="nestedfull",
+                                       max_results=1000,
+                                       combine_terms_with_and=True)
+        assert len(results) == 0
 
 class TestBlobValue(unittest.TestCase):
 

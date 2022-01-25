@@ -13,6 +13,12 @@ import uuid
 # "bob" user name registered
 # "PROJ-00000001" registered
 
+EMPTY_MOL = """
+  Mrv1818 02242010372D          
+
+  0  0  0  0  0  0            999 V2000
+M  END
+"""
 
 def create_project_thing(code, name=None, alias=None):
     if name is None:
@@ -521,6 +527,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
         self.assertIn('Number of entries processed', response['summary'])
+        return response
 
     def test_007_cmpd_search_request(self):
         """Test cmpd search request."""
@@ -1296,3 +1303,31 @@ class TestAcasclient(unittest.TestCase):
         # Assert that the returned blob data is of type bytes and is equal to the blob data sent in
         self.assertEqual(type(blob_data), bytes)
         self.assertEqual(blob_data, bytes_array)
+
+    def test_042_cmpd_structure_search(self):
+        """Test cmpd structure search request."""
+        response = self.test_006_register_sdf()
+
+        # Get a mapping of the registered parents and their structures
+        for file in response['report_files']:
+            if file['name'].endswith('registered.sdf'):
+                registered_sdf_content = file['parsed_content']
+                structures = {}
+                for compound in registered_sdf_content:
+                    meta_lot = self.client.get_meta_lot(compound['properties']['Registered Lot Corp Name'])
+                    structures[meta_lot['lot']['parent']['id']] = compound['ctab']
+                break
+
+        # Search for the structures and verify that the returned parent id matches that of the registered parent id
+        for id in structures:
+            mol_structure = structures[id]
+            search_results = self.client.\
+                cmpd_structure_search(molStructure=mol_structure, searchType = "duplicate_tautomer")
+            self.assertGreater(len(search_results), 0)
+            self.assertEqual(search_results[0], id)
+
+
+        # Search for an empty mol to verify no false positive
+        search_results = self.client.\
+            cmpd_structure_search(molStructure=EMPTY_MOL, searchType = "duplicate_tautomer")
+        self.assertEqual(len(search_results), 0)

@@ -1320,9 +1320,9 @@ class TestAcasclient(unittest.TestCase):
 
         # Search for the structures and verify that the returned parent id matches that of the registered parent id
         for id in structures:
-            mol_struture = structures[id]
+            mol_structure = structures[id]
             search_results = self.client.\
-                cmpd_structure_search(molStructure=mol_struture, searchType = "duplicate_tautomer")
+                cmpd_structure_search(molStructure=mol_structure, searchType = "duplicate_tautomer")
             self.assertGreater(len(search_results), 0)
             self.assertEqual(search_results[0], id)
 

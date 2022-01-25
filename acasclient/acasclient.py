@@ -14,7 +14,7 @@ from io import StringIO
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-VALID_SEARCH_TYPES = {"substructure", "duplicate",
+VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "duplicate_tautomer", "duplicate_no_tautomer",
                         "stereo_ignore", "full_tautomer", "substructure",
                         "similarity", "full"}
@@ -348,9 +348,9 @@ class client():
         search_request = dict(locals())
         del search_request['self']
 
-        if searchType not in VALID_SEARCH_TYPES:
+        if searchType not in VALID_STRUCTURE_SEARCH_TYPES:
             raise ValueError("cmpd_search: searchType must be one of %r."
-                             % VALID_SEARCH_TYPES)
+                             % VALID_STRUCTURE_SEARCH_TYPES)
         return self.cmpd_search_request(search_request)
 
     def cmpd_structure_search(self, searchType="substructure", percentSimilarity=90,
@@ -359,9 +359,9 @@ class client():
         search_request = dict(locals())
         del search_request['self']
 
-        if searchType not in VALID_SEARCH_TYPES:
+        if searchType not in VALID_STRUCTURE_SEARCH_TYPES:
             raise ValueError("cmpd_search: searchType must be one of %r."
-                             % VALID_SEARCH_TYPES)
+                             % VALID_STRUCTURE_SEARCH_TYPES)
         return self.cmpd_structure_search_request(search_request)
 
     def get_all_lots(self):

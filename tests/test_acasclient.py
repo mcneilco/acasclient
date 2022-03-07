@@ -1439,9 +1439,44 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('transactionId', response["experiment_loader_response"])
         self.assertIsNone(response["experiment_loader_response"]['transactionId'])
         self.assertIsNone(response['dose_response_fit_response'])
+    
+        # Read the file as a string so that we can update the data
+        with open(data_file_to_upload, 'r') as f:
+            data_file_as_string = f.read()
+
+        # Substitute Format with "Generic" to test for warning for uploading Generic to 
+        # a Dose Response experiment
+        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
+        request["data_file"] = {
+            "name": f.name,
+            "data": data_file_as_string
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        # Dose response load should warn that a Generic file was uploaded which had a curve id
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertTrue(response["experiment_loader_response"]['hasWarning'])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        # Assert that error messages has a warning message
+        genericFormatUploadedAsDoseResponse = "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly."
+        matchingMessage = None
+        for error_message in response["experiment_loader_response"]['errorMessages']:
+            if error_message['errorLevel'] == 'warning':
+                # Check if warning has the message in it
+                if "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly." in error_message['message']:
+                    matchingMessage = True
+        if matchingMessage is None:
+            self.fail("ACAS did not produce warning that 'Generic' was uploaded as 'Dose")
+        
+        # Use the original data file for further tests
+        request["data_file"] = data_file_to_upload
         request["dry_run"] = False
         response = self.client.\
             dose_response_experiment_loader(**request)
+
         self.assertIn('transactionId', response["experiment_loader_response"])
         self.assertIsNotNone(response["experiment_loader_response"]['transactionId'])
         self.assertIsNotNone(response["experiment_loader_response"]['results'])

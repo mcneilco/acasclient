@@ -661,18 +661,24 @@ class client():
             resp.raise_for_status()
         return resp.json()
 
-    def get_experiment_by_code(self, experiment_code):
+    def get_experiment_by_code(self, experiment_code, full = False):
         """Get an experiment from an experiment code
 
         Get an experiment given an experiment code
 
         Args:
             experiment_code (str): An experiment code code
+            full (bool): If true, return the full experiment object
 
         Returns: Returns an experiment object
         """
+
+        params = {}
+        if full:
+            params = {**params, 'fullObject': True}
         resp = self.session.get("{}/api/experiments/codename/{}".
-                                format(self.url, experiment_code))
+                                format(self.url, experiment_code),
+                                params = params)
         if resp.status_code == 500:
             return None
         else:
@@ -772,8 +778,29 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
+    def dose_response_fit_request(self, data):
+        """ Send a dose response fit request to ACAS
+        
+        """
+        resp = self.session.post("{}/api/doseResponseCurveFit".format(self.url),
+                                 headers={'Content-Type': 'application/json'},
+                                 data=json.dumps(data))
+        resp.raise_for_status()
+        return resp.json()
+
     def experiment_loader(self, data_file, user, dry_run, report_file="",
                           images_file=""):
+        """Load an experiment
+        
+        Load an experiment into ACAS.
+
+        Args:
+            data_file (str): A path to an experiment loader formatted file
+            user (str): A username
+            dry_run (bool): If true, then validate but do not load the data into the database
+            report_file (str): A path to a report file (optional)
+            images_file (str): A path to an images file (optional)
+        """
         data_file = self.upload_files([data_file])['files'][0]["name"]
         if report_file and report_file != "":
             report_file = self.upload_files([report_file])['files'][0]["name"]
@@ -786,6 +813,72 @@ class client():
                    "dryRunMode": dry_run}
         resp = self.experiment_loader_request(request)
         return resp
+
+    def dose_response_experiment_loader(self, model_fit_type, fit_settings, **kwargs):
+        """Dose response experiment loader
+        
+        Args:
+            model_fit_type (str): The type of model fit to perform
+            fit_settings (dict): The settings for the model fit
+            **kwargs: All required arguments to pass to the experiment loader (e.g. data_file, user, dry_run = True/False)
+
+        Returns:
+            dict: The response from the experiment loader and doseresponse fit request
+             
+            Example:
+
+                {
+                    "experiment_loader_response": experiment_loader_response_resp_dict,
+                    "dose_response_fit_response": dose_response_fit_response_resp_dict
+                }
+    
+        Example:
+            request = {
+                "data_file": data_file_to_upload,
+                "user": "bob",
+                "dry_run": True,
+                "model_fit_type": "4 parameter D-R",
+                "fit_settings": {
+                    "smartMode":True,
+                    "inactiveThresholdMode":True,
+                    "inactiveThreshold":20,
+                    "theoreticalMaxMode":False,
+                    "theoreticalMax":None,
+                    "inverseAgonistMode":False,
+                    "max":{
+                        "limitType":"none"
+                    },
+                    "min":
+                        {
+                            "limitType":"none"
+                    },
+                    "slope":{
+                        "limitType":"none"
+                    },
+                    "baseline":{
+                        "value":0
+                    }
+                }
+            }
+            response = client.\
+                dose_response_experiment_loader(**request)
+        """
+        resp = self.experiment_loader(**kwargs)
+        response = {
+            "experiment_loader_response": resp,
+            "dose_response_fit_response": None
+        }
+        if resp['hasError'] == False and resp['commit'] == True:
+            request = {
+                "experimentCode": resp['results']['experimentCode'],
+                "modelFitType": model_fit_type,
+                "testMode": False,
+                "user": kwargs['user'],
+                "inputParameters": json.dumps(fit_settings)
+            }
+            dose_response_resp = self.dose_response_fit_request(request)
+            response["dose_response_fit_response"] = dose_response_resp
+        return response
 
     def delete_experiment(self, idOrCode):
         """Delete an experiment

@@ -778,13 +778,18 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def dose_response_fit_request(self, data):
+    def _dose_response_fit_request(self, dose_response_request_dict):
         """ Send a dose response fit request to ACAS
         
+        This is a private method that is used to send a dose response fit json request to ACAS. It is not intended to be used directly.
+
+        Args:
+            dose_response_request_dict (dict): A dictionary containing the request parameters for the dose response fit request.
         """
+    
         resp = self.session.post("{}/api/doseResponseCurveFit".format(self.url),
                                  headers={'Content-Type': 'application/json'},
-                                 data=json.dumps(data))
+                                 data=json.dumps(dose_response_request_dict))
         resp.raise_for_status()
         return resp.json()
 
@@ -876,7 +881,7 @@ class client():
                 "user": kwargs['user'],
                 "inputParameters": json.dumps(fit_settings)
             }
-            dose_response_resp = self.dose_response_fit_request(request)
+            dose_response_resp = self._dose_response_fit_request(request)
             response["dose_response_fit_response"] = dose_response_resp
         return response
 

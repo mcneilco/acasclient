@@ -75,6 +75,7 @@ class TestLsThing(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+        self.client.close()
         files_to_delete = ['dummy.pdf', 'dummy2.pdf']
         for f in files_to_delete:
             file = Path(f)
@@ -707,6 +708,10 @@ class TestBlobValue(unittest.TestCase):
     def setUp(self) -> None:
         creds = acasclient.get_default_credentials()
         self.client = acasclient.client(creds)
+
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+        self.client.close()
 
     def test_as_dict(self):
         """

@@ -9,10 +9,10 @@ from pathlib import Path
 from pathlib import PurePath
 import re
 import base64
-from io import StringIO
+from io import StringIO, IOBase
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "duplicate_tautomer", "duplicate_no_tautomer",
@@ -233,6 +233,9 @@ class client():
         self.url = creds['url']
         self.session = self.getSession()
 
+    def close(self):
+        self.session.close()
+
     def getSession(self):
         data = {
             'username': self.username,
@@ -319,6 +322,12 @@ class client():
                 filesToUpload[str(file)] = file.open('rb')
         resp = self.session.post("{}/uploads".format(self.url),
                                  files=filesToUpload)
+        # Close the open files
+        for file in filesToUpload:
+            # Check if the file is a file object
+            if isinstance(filesToUpload[file], IOBase):
+                filesToUpload[file].close()
+
         resp.raise_for_status()
         return resp.json()
 

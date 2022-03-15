@@ -218,6 +218,7 @@ class TestAcasclient(unittest.TestCase):
         creds = acasclient.get_default_credentials()
         self.client = acasclient.client(creds)
         self.tempdir = tempfile.mkdtemp()
+        # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
         self.maxDiff = None
 
     def tearDown(self):

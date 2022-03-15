@@ -224,6 +224,7 @@ class TestAcasclient(unittest.TestCase):
     def tearDown(self):
         """Tear down test fixtures, if any."""
         shutil.rmtree(self.tempdir)
+        self.client.close()
 
     def test_000_creds_from_file(self):
         """Test creds from file."""
@@ -253,7 +254,8 @@ class TestAcasclient(unittest.TestCase):
     def test_002_client_initialization(self):
         """Test initializing client."""
         creds = acasclient.get_default_credentials()
-        acasclient.client(creds)
+        client = acasclient.client(creds)
+        client.close()
 
     def test_003_projects(self):
         """Test projects."""
@@ -780,7 +782,6 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('summary', search_results_export)
         search_results_export = self.client.\
             get_file(search_results_export['reportFilePath'])
-        print(search_results_export)
 
     def test_011_get_sdf_file_for_lots(self):
         """Test get sdf file for lots."""

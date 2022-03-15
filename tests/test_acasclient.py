@@ -50,6 +50,15 @@ def remove_common_value(value):
     value["analysisGroupId"] = None
     value["stateId"] = None 
 
+    # Round numeric values to 6 digits for comparison on different systems where calculations like EC50 might be different
+    if value['lsType'] == "numericValue":
+        if value["numericValue"] is not None:
+            value["numericValue"] = round(value["numericValue"], 6)
+    
+    # Round uncertainty values as their calculations may vary from system to system
+    if 'uncertainty' in value and value['uncertainty'] is not None:
+        value["uncertainty"] = round(value["uncertainty"], 6)
+
 def clean_group(group):
     group['key'] =  None
     remove_common_group(group)
@@ -209,6 +218,8 @@ class TestAcasclient(unittest.TestCase):
         creds = acasclient.get_default_credentials()
         self.client = acasclient.client(creds)
         self.tempdir = tempfile.mkdtemp()
+        # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
+        self.maxDiff = None
 
     def tearDown(self):
         """Tear down test fixtures, if any."""

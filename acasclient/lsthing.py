@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from typing import Any, Dict
 
-from acasclient.ddict import DDict
+from acasclient.ddict import ACASDDict, DDict
 from .interactions import INTERACTION_VERBS_DICT, opposite
 
 import copy
@@ -988,23 +988,12 @@ class CodeValue(object):
         """
         if client is None:
             return
-        if self.code_origin.upper() != 'ACAS DDICT':
+        if self.ddict:
+            self.ddict.check_value(self.code, client)
             return
-        else:
-            if self.ddict:
-                self.ddict.check_value(self.code, client)
-                return
-            else:
-                valid_val_dicts = client.get_ddict_values_by_type_and_kind(
-                    self.code_type, self.code_kind)
-                if valid_val_dicts == []:
-                    raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
-                            f"'code_kind':'{self.code_kind}' provided")
-                if any([self.code == val_dict['code'] for val_dict in valid_val_dicts]):
-                    return
-
-                raise ValueError(f"Invalid 'code':'{self.code}' provided for the given "
-                        f"'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'")
+        elif self.code_origin.upper() == 'ACAS DDICT':
+            self.ddict = ACASDDict(code_type=self.code_type, code_kind=self.code_kind)
+            self.validate(client)
 
     def as_dict(self):
         return self.__dict__

@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 
 from acasclient import acasclient
-from acasclient.ddict import ACASDDict
+from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
 # from acasclient.ddict import ACASDDict
@@ -21,6 +21,7 @@ from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
 
 # Constants
 ACAS_DDICT = 'ACAS DDICT'
+ACAS_LSTHING = 'ACAS LsThing'
 PROJECT_METADATA = 'project metadata'
 PROJECT = 'project'
 PROJECT_NAME = 'project name'
@@ -28,6 +29,7 @@ PROJECT_ALIAS = 'project alias'
 STATUS = 'status'
 PROJECT_STATUS = 'project status'
 PROCEDURE_DOCUMENT = 'procedure document'
+PARENT_PROJECT = 'parent project'
 BOOLEAN = 'boolean'
 IS_RESTRICTED = 'is restricted'
 RESTRICTED = 'restricted'
@@ -40,6 +42,7 @@ START_DATE_KEY = 'start_date'
 DESCRIPTION_KEY = 'description'
 PDF_DOCUMENT_KEY = 'pdf_document'
 PROCEDURE_DOCUMENT_KEY = 'procedure_document'
+PARENT_PROJECT_KEY = 'parent_project'
 ACTIVE = 'active'
 INACTIVE = 'inactive'
 
@@ -56,7 +59,7 @@ class Project(SimpleLsThing):
     # RESTRICTED_DDICT = ACASDDict(PROJECT, RESTRICTED)
 
     def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
-                 ls_thing=None):
+                 parent_project=None, ls_thing=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
             PROJECT_METADATA: {
@@ -65,6 +68,7 @@ class Project(SimpleLsThing):
                 PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
                 IS_RESTRICTED: CodeValue(str(is_restricted).lower(), BOOLEAN, BOOLEAN, ACAS_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
+                PARENT_PROJECT: CodeValue(parent_project, PROJECT, PROJECT, ACAS_LSTHING),
                 PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
         }
@@ -760,6 +764,32 @@ class TestLsThing(unittest.TestCase):
         except ValueError as e:
             error = e
         self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        # Now try adding a CodeValue that references an LsThing
+        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        proj_1.save(self.client)
+        # Create a new project 2
+        name_2 = str(uuid.uuid4())
+        desc_2 = str(uuid.uuid4())
+        PARENT_PROJECT_DDICT = ACASLsThingDDict(PROJECT, PROJECT)
+        meta_dict = {
+            NAME_KEY: name_2,
+            PARENT_PROJECT_KEY: CodeValue(proj_1.code_name, ddict=PARENT_PROJECT_DDICT),
+            IS_RESTRICTED_KEY: True,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_2
+        }
+        proj_2 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_2.validate(self.client)
+        assert True
+        # Now try setting parent project to an invalid CodeValue
+        bad_project_code = str(uuid.uuid4())
+        proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(bad_project_code, ddict=PARENT_PROJECT_DDICT)
+        error = None
+        try:
+            proj_2.validate(self.client)
+        except ValueError as e:
+            error = e
+        self.assertEqual(str(error), f"Invalid 'code':'{bad_project_code}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{PROJECT}'")
 
 
 class TestBlobValue(unittest.TestCase):

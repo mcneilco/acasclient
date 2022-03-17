@@ -47,18 +47,16 @@ class Project(SimpleLsThing):
     ls_kind = PROJECT
     preferred_label_kind = PROJECT_NAME
 
-    STATUS_DDICT = DDict(PROJECT, STATUS)
-    RESTRICTED_DDICT = DDict(PROJECT, RESTRICTED)
 
     def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
-                 ls_thing=None):
+                 ls_thing=None, client=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
             PROJECT_METADATA: {
                 START_DATE: start_date,
                 DESCRIPTION_KEY: description,
-                PROJECT_STATUS: CodeValue(status, self.STATUS_DDICT),
-                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), self.RESTRICTED_DDICT),
+                PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT, client=client),
+                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT, client=client),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
                 PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
@@ -706,7 +704,7 @@ class TestLsThing(unittest.TestCase):
                                        combine_terms_with_and=True)
         assert len(results) == 0
     
-    def test_008_validate_ddicts(self):
+    def test_008_validate_codevalue(self):
         # Create project 1
         name = str(uuid.uuid4())
         status_1 = str(uuid.uuid4())
@@ -719,12 +717,10 @@ class TestLsThing(unittest.TestCase):
             DESCRIPTION_KEY: desc_1
         }
 
-        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
-        valid, errors = proj_1.validate_codevalues()
-        assert not valid
-        assert len(errors) == 1
-        # TODO decide if this is the final form
-        assert errors[0]["message"] == f"No code values found for codeType: {PROJECT} and codeKind: {RESTRICTED}"
+        try:
+            proj_1 = Project(recorded_by=self.client.username, client=self.client, **meta_dict)
+        except ValueError as e:
+            assert str(e) == f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'"
 
 class TestBlobValue(unittest.TestCase):
 

@@ -47,6 +47,9 @@ class Project(SimpleLsThing):
     ls_kind = PROJECT
     preferred_label_kind = PROJECT_NAME
 
+    STATUS_DDICT = DDict(PROJECT, STATUS)
+    RESTRICTED_DDICT = DDict(PROJECT, RESTRICTED)
+
     def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
                  ls_thing=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
@@ -54,8 +57,8 @@ class Project(SimpleLsThing):
             PROJECT_METADATA: {
                 START_DATE: start_date,
                 DESCRIPTION_KEY: description,
-                PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
-                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
+                PROJECT_STATUS: CodeValue(status, self.STATUS_DDICT),
+                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), self.RESTRICTED_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
                 PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
@@ -702,6 +705,26 @@ class TestLsThing(unittest.TestCase):
                                        max_results=1000,
                                        combine_terms_with_and=True)
         assert len(results) == 0
+    
+    def test_008_validate_ddicts(self):
+        # Create project 1
+        name = str(uuid.uuid4())
+        status_1 = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: status_1,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
+
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        valid, errors = proj_1.validate_codevalues()
+        assert not valid
+        assert len(errors) == 1
+        # TODO decide if this is the final form
+        assert errors[0]["message"] == f"No code values found for codeType: {PROJECT} and codeKind: {RESTRICTED}"
 
 class TestBlobValue(unittest.TestCase):
 

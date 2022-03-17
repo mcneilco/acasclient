@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 from typing import Any, Dict
+
+from acasclient.ddict import DDict
 from .interactions import INTERACTION_VERBS_DICT, opposite
 
 import copy
@@ -945,7 +947,7 @@ class CodeValue(object):
     _fields = ['code_type', 'code_kind', 'code_origin', 'code']
 
     def __init__(self, code, code_type=None, code_kind=None,
-                 code_origin='ACAS DDict', client=None):
+                 code_origin='ACAS DDict', ddict=None):
         """Instantiate a new CodeValue
 
         :param code: value of this CodeValue, i.e. which DDictValue is being referenced
@@ -958,13 +960,17 @@ class CodeValue(object):
         :type code_origin: str
         """
         self.code = code
-        self.code_type = code_type
-        self.code_kind = code_kind
-        self.code_origin = code_origin
-
-        error_msg = self.validate(client)
-        if error_msg is not None:
-            raise ValueError(error_msg)
+        if ddict:
+            if isinstance(ddict, DDict):
+                self.code_type = ddict.code_type
+                self.code_kind = ddict.code_kind
+                self.code_origin = ddict.code_origin
+            else:
+                raise ValueError('ddict must be an instance of acasclient.ddict.DDict')
+        else:
+            self.code_type = code_type
+            self.code_kind = code_kind
+            self.code_origin = code_origin
 
     def __hash__(self):
         return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'

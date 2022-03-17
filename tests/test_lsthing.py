@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from acasclient import acasclient
+from acasclient.ddict import ACASDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
 # from acasclient.ddict import ACASDDict
@@ -733,25 +734,32 @@ class TestLsThing(unittest.TestCase):
             error = e
         self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
     
-    # def test_009_validate_ddicts(self):
-    #     # Create project 1
-    #     name = str(uuid.uuid4())
-    #     status_1 = str(uuid.uuid4())
-    #     desc_1 = str(uuid.uuid4())
-    #     meta_dict = {
-    #         NAME_KEY: name,
-    #         IS_RESTRICTED_KEY: True,
-    #         STATUS_KEY: status_1,
-    #         START_DATE_KEY: datetime.now(),
-    #         DESCRIPTION_KEY: desc_1
-    #     }
+    def test_009_validate_ddicts(self):
+        # Create project 1
+        name = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
 
-    #     proj_1 = Project(recorded_by=self.client.username, **meta_dict)
-    #     valid, errors = proj_1.validate_ddicts()
-    #     assert not valid
-    #     assert len(errors) == 1
-    #     # TODO decide if this is the final form
-    #     self.assertEqual(errors[0]["message"], f"No code values found for codeType: {PROJECT} and codeKind: {RESTRICTED}")
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        # set status to a CodeValue constructed with a DDict
+        STATUS_DDICT = ACASDDict(PROJECT, STATUS)
+        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        proj_1.validate(self.client)
+        assert True
+        # Now try setting status to an invalid CodeValue
+        status_1 = str(uuid.uuid4())
+        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(status_1, ddict=STATUS_DDICT)
+        error = None
+        try:
+            proj_1.validate(self.client)
+        except ValueError as e:
+            error = e
+        self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
 
 
 class TestBlobValue(unittest.TestCase):

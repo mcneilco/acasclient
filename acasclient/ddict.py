@@ -8,6 +8,10 @@ logging.basicConfig(level=logging.INFO)
 
 
 class DDict(object):
+    """The DDict class is meant as a generic interface for any implementation of a Data Dictionary that
+    can be referenced by an ACAS CodeValue.
+    Any classes implementing this interface must implement the get_values() method.
+    """
 
     def __init__(self, code_type, code_kind, code_origin):
         self.code_type = code_type
@@ -25,6 +29,7 @@ class DDict(object):
 
 
 class ACASDDict(DDict):
+    """DDict implementation for built-in ACAS DDicts """
 
     CODE_ORIGIN = 'ACAS DDict'
 
@@ -45,6 +50,7 @@ class ACASDDict(DDict):
         return super(ACASDDict, self).check_value(value)
 
 class ACASLsThingDDict(DDict):
+    """DDict implementation for referencing ACAS LsThings"""
 
     CODE_ORIGIN = 'ACAS LsThing'
 

@@ -13,16 +13,15 @@ class DDict(object):
         self.code_type = code_type
         self.code_kind = code_kind
         self.code_origin = code_origin
-        self.values = None
+        self.valid_values = None
 
     def get_values(self):
         raise NotImplementedError()
 
     def check_value(self, value):
-        if value in self.valid_values:
-            return True
-        else:
-            return False
+        if value not in self.valid_values:
+            raise ValueError(f"Invalid 'code':'{value}' provided for the given "
+                f"'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'")
 
 
 class ACASDDict(DDict):
@@ -36,6 +35,14 @@ class ACASDDict(DDict):
         valid_codetables = client.get_ddict_values_by_type_and_kind(
             self.code_type, self.code_kind)
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
+        if self.valid_values == []:
+            raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
+                    f"'code_kind':'{self.code_kind}' provided")
+    
+    def check_value(self, value, client):
+        if not self.valid_values:
+            self.get_values(client)
+        return super(ACASDDict, self).check_value(value)
 
 class ACASLsThingDDict(DDict):
 
@@ -48,3 +55,7 @@ class ACASLsThingDDict(DDict):
         valid_codetables = client.get_ls_things_by_type_and_kind(self.code_type, self.code_kind, format='codetable')
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
     
+    def check_value(self, value, client):
+        if not self.valid_values:
+            self.get_values(client)
+        return super(ACASLsThingDDict, self).check_value(value)

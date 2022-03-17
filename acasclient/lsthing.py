@@ -960,6 +960,7 @@ class CodeValue(object):
         :type code_origin: str
         """
         self.code = code
+        self.ddict = ddict
         if ddict:
             if isinstance(ddict, DDict):
                 self.code_type = ddict.code_type
@@ -989,16 +990,21 @@ class CodeValue(object):
             return
         if self.code_origin.upper() != 'ACAS DDICT':
             return
-        valid_val_dicts = client.get_ddict_values_by_type_and_kind(
-            self.code_type, self.code_kind)
-        if valid_val_dicts == []:
-            raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
-                    f"'code_kind':'{self.code_kind}' provided")
-        if any([self.code == val_dict['code'] for val_dict in valid_val_dicts]):
-            return
+        else:
+            if self.ddict:
+                self.ddict.check_value(self.code, client)
+                return
+            else:
+                valid_val_dicts = client.get_ddict_values_by_type_and_kind(
+                    self.code_type, self.code_kind)
+                if valid_val_dicts == []:
+                    raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
+                            f"'code_kind':'{self.code_kind}' provided")
+                if any([self.code == val_dict['code'] for val_dict in valid_val_dicts]):
+                    return
 
-        raise ValueError(f"Invalid 'code':'{self.code}' provided for the given "
-                f"'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'")
+                raise ValueError(f"Invalid 'code':'{self.code}' provided for the given "
+                        f"'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'")
 
     def as_dict(self):
         return self.__dict__

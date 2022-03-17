@@ -945,23 +945,8 @@ class CodeValue(object):
     _fields = ['code_type', 'code_kind', 'code_origin', 'code']
 
     def __init__(self, code, code_type=None, code_kind=None,
-                 code_origin=None, client=None):
-        error_msg = self._validate_params(code, code_type, code_kind,
-                                          code_origin, client)
-        if error_msg is not None:
-            raise ValueError(error_msg)
-
-        self.code = code
-        self.code_type = code_type
-        self.code_kind = code_kind
-        self.code_origin = code_origin
-
-    def __hash__(self):
-        return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'
-                    f'{self.code_origin}')
-
-    def _validate_params(self, code, code_type, code_kind, code_origin, client):
-        """Validate that this CodeValue conforms to the saved list of possible DDictValues
+                 code_origin='ACAS DDict', client=None):
+        """Instantiate a new CodeValue
 
         :param code: value of this CodeValue, i.e. which DDictValue is being referenced
         :type code: str
@@ -971,6 +956,24 @@ class CodeValue(object):
         :type code_kind: str
         :param code_origin: Origin of DDictValue referenced, typically 'ACAS DDict'
         :type code_origin: str
+        """
+        self.code = code
+        self.code_type = code_type
+        self.code_kind = code_kind
+        self.code_origin = code_origin
+
+        error_msg = self.validate(client)
+        if error_msg is not None:
+            raise ValueError(error_msg)
+
+    def __hash__(self):
+        return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'
+                    f'{self.code_origin}')
+
+    def validate(self, client):
+        """Validate that this CodeValue conforms to the saved list of possible DDictValues
+
+
         :param client: Authenticated acasclient.client instance to look up current DDictValues
         :type client: acasclient.client
         :return: Error message, or None if valid
@@ -978,16 +981,18 @@ class CodeValue(object):
         """
         if client is None:
             return
+        if self.code_origin.upper() != 'ACAS DDICT':
+            return
         valid_val_dicts = client.get_ddict_values_by_type_and_kind(
-            code_type, code_kind)
+            self.code_type, self.code_kind)
         if valid_val_dicts == []:
-            return (f"Invalid 'code_type':'{code_type}' or "
-                    f"'code_kind':'{code_kind}' provided")
-        if any([code == val_dict['code'] for val_dict in valid_val_dicts]):
+            raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
+                    f"'code_kind':'{self.code_kind}' provided")
+        if any([self.code == val_dict['code'] for val_dict in valid_val_dicts]):
             return
 
-        return (f"Invalid 'code':'{code}' provided for the given "
-                f"'code_type':'{code_type}' and 'code_kind':'{code_kind}'")
+        raise ValueError(f"Invalid 'code':'{self.code}' provided for the given "
+                f"'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'")
 
     def as_dict(self):
         return self.__dict__
@@ -1942,12 +1947,15 @@ class SimpleLsThing(BaseModel):
     def _cleanup_after_save(self):
         self.populate_from_ls_thing(self._ls_thing)
 
-    def save(self, client):
+    def save(self, client, skip_validation=False):
         """Persist changes to the ACAS server.
 
         :param client: Authenticated instances of acasclient.client
         :type client: acasclient.client
         """
+        # Run validation
+        if not skip_validation:
+            self.validate(client)
         self._prepare_for_save(client)
         # Persist
         self._ls_thing = self._ls_thing.save(client)
@@ -2076,6 +2084,26 @@ class SimpleLsThing(BaseModel):
             return state_dict
         self.metadata = _upload_file_values_from_state_dict(self.metadata)
         self.results = _upload_file_values_from_state_dict(self.results)
+    
+    def validate(self, client):
+        """Validate SimpleLsThing dictionary. Currently only checks that all CodeValues that reference ACAS DDicts
+        have known/valid values.
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        """
+        for _, values_dict in self.metadata.items():
+            for _, value in values_dict.items():
+                if isinstance(value, CodeValue):
+                    if value.code:
+                        value.validate(client)
+        for _, values_dict in self.results.items():
+            for _, value in values_dict.items():
+                if isinstance(value, CodeValue):
+                    if value.value:
+                        value.validate(client)
+        return True
+
 
 
 class SimpleLink(BaseModel):

@@ -740,10 +740,10 @@ class TestLsThing(unittest.TestCase):
         except ValueError as e:
             error = e
         self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
-        # Now test timing of one-by-one validation with 1000 projects versus doing it in bulk
-        # Create 100 valid projects
+        # Now test timing of one-by-one validation with 20 projects versus doing it in bulk
+        # Create 20 valid projects
         meta_dict[STATUS_KEY] = ACTIVE
-        projects = [Project(recorded_by=self.client.username, **meta_dict) for i in range(100)]
+        projects = [Project(recorded_by=self.client.username, **meta_dict) for i in range(20)]
         single_start = datetime.now()
         for proj in projects:
             proj.validate(self.client)

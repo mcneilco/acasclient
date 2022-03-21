@@ -974,28 +974,25 @@ class CodeValue(object):
             self.code_type = code_type
             self.code_kind = code_kind
             self.code_origin = code_origin
+            # Auto-recognize some code origin:
+            if self.code_origin.upper() == ACAS_DDICT:
+                self.ddict = ACASDDict(code_type, code_kind)
+            elif self.code_origin.upper() == ACAS_LSTHING:
+                self.ddict = ACASLsThingDDict(code_type, code_kind)
 
     def __hash__(self):
         return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'
                     f'{self.code_origin}')
 
-    def validate(self, client):
-        """Validate that this CodeValue conforms to the saved list of possible DDictValues
+    def validate(self):
+        """Validate that this CodeValue conforms to the stored list of possible DDictValues in self.ddict
 
-
-        :param client: Authenticated acasclient.client instance to look up current DDictValues
-        :type client: acasclient.client
         :return: Error message, or None if valid
         :rtype: str | None
         """
-        if client is None:
-            return
         if self.ddict:
-            self.ddict.check_value(self.code, client)
+            self.ddict.check_value(self.code)
             return
-        elif self.code_origin.upper() == 'ACAS DDICT':
-            self.ddict = ACASDDict(code_type=self.code_type, code_kind=self.code_kind)
-            self.validate(client)
 
     def as_dict(self):
         return self.__dict__

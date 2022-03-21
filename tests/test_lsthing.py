@@ -13,7 +13,6 @@ from acasclient import acasclient
 from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
-# from acasclient.ddict import ACASDDict
 
 # SETUP
 # "bob" user name registered
@@ -54,9 +53,6 @@ class Project(SimpleLsThing):
     ls_type = PROJECT
     ls_kind = PROJECT
     preferred_label_kind = PROJECT_NAME
-
-    # STATUS_DDICT = ACASDDict(PROJECT, STATUS)
-    # RESTRICTED_DDICT = ACASDDict(PROJECT, RESTRICTED)
 
     def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
                  parent_project=None, ls_thing=None):
@@ -719,6 +715,9 @@ class TestLsThing(unittest.TestCase):
         assert len(results) == 0
     
     def test_008_validate_codevalue(self):
+        """Test creating CodeValues using code + code_type + code_kind + code_origin
+        Confirm that invalid code values are rejected by validate method.
+        """
         # Create project 1
         name = str(uuid.uuid4())
         status_1 = str(uuid.uuid4())
@@ -737,8 +736,11 @@ class TestLsThing(unittest.TestCase):
         except ValueError as e:
             error = e
         self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
-    
+
     def test_009_validate_ddicts(self):
+        """Test creating CodeValues using code + DDict
+        Confirm that invalid code values are rejected by validate method.
+        """
         # Create project 1
         name = str(uuid.uuid4())
         desc_1 = str(uuid.uuid4())
@@ -753,8 +755,14 @@ class TestLsThing(unittest.TestCase):
         # set status to a CodeValue constructed with a DDict
         STATUS_DDICT = ACASDDict(PROJECT, STATUS)
         proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        # Because we are referencing a valid status, this should not raise an error
+        raised = False
+        try:
+            proj_1.validate(self.client)
+        except Exception:
+            raised = True
+        self.assertFalse(raised, f'Exception raised when saving project with valid status {STATUS}')
         proj_1.validate(self.client)
-        assert True
         # Now try setting status to an invalid CodeValue
         status_1 = str(uuid.uuid4())
         proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(status_1, ddict=STATUS_DDICT)
@@ -765,9 +773,10 @@ class TestLsThing(unittest.TestCase):
             error = e
         self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
         # Now try adding a CodeValue that references an LsThing
+        # First we create and save a new LsThing so we can get a code_name
         proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
         proj_1.save(self.client)
-        # Create a new project 2
+        # Then we create a new project 2 and set PARENT_PROJECT_KEY to reference `proj_1`
         name_2 = str(uuid.uuid4())
         desc_2 = str(uuid.uuid4())
         PARENT_PROJECT_DDICT = ACASLsThingDDict(PROJECT, PROJECT)
@@ -779,9 +788,14 @@ class TestLsThing(unittest.TestCase):
             DESCRIPTION_KEY: desc_2
         }
         proj_2 = Project(recorded_by=self.client.username, **meta_dict)
-        proj_2.validate(self.client)
-        assert True
-        # Now try setting parent project to an invalid CodeValue
+        # Because we are referencing a valid LsThing, this should be valid
+        raised = False
+        try:
+            proj_2.validate(self.client)
+        except Exception:
+            raised = True
+        self.assertFalse(raised, f'Exception raised when saving project with valid CodeValue reference to LsThing {proj_1.code_name}')
+        # Now try setting parent project to an invalid CodeValue and confirm validation fails
         bad_project_code = str(uuid.uuid4())
         proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(bad_project_code, ddict=PARENT_PROJECT_DDICT)
         error = None

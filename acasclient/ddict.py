@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-from typing import Any, Dict
 
 import logging
 

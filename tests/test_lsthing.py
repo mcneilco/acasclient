@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime
 import unittest
 import uuid
+import logging
 from pathlib import Path
 
 from acasclient import acasclient
@@ -17,6 +18,9 @@ from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Constants
 ACAS_DDICT = 'ACAS DDICT'
@@ -736,6 +740,21 @@ class TestLsThing(unittest.TestCase):
         except ValueError as e:
             error = e
         self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        # Now test timing of one-by-one validation with 1000 projects versus doing it in bulk
+        # Create 100 valid projects
+        meta_dict[STATUS_KEY] = ACTIVE
+        projects = [Project(recorded_by=self.client.username, **meta_dict) for i in range(100)]
+        single_start = datetime.now()
+        for proj in projects:
+            proj.validate(self.client)
+        single_end = datetime.now()
+        single_duration = single_end - single_start
+        logger.info(f"Single validation took {single_duration}")
+        Project.validate_list(self.client, projects)
+        bulk_end = datetime.now()
+        bulk_duration = bulk_end - single_end
+        logger.info(f"Bulk validation took {bulk_duration}")
+        assert single_duration > bulk_duration
 
     def test_009_validate_ddicts(self):
         """Test creating CodeValues using code + DDict
@@ -782,18 +801,19 @@ class TestLsThing(unittest.TestCase):
         PARENT_PROJECT_DDICT = ACASLsThingDDict(PROJECT, PROJECT)
         meta_dict = {
             NAME_KEY: name_2,
-            PARENT_PROJECT_KEY: CodeValue(proj_1.code_name, ddict=PARENT_PROJECT_DDICT),
             IS_RESTRICTED_KEY: True,
             START_DATE_KEY: datetime.now(),
             DESCRIPTION_KEY: desc_2
         }
         proj_2 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(proj_1.code_name, ddict=PARENT_PROJECT_DDICT)
         # Because we are referencing a valid LsThing, this should be valid
         raised = False
         try:
             proj_2.validate(self.client)
-        except Exception:
+        except Exception as e:
             raised = True
+            raise e
         self.assertFalse(raised, f'Exception raised when saving project with valid CodeValue reference to LsThing {proj_1.code_name}')
         # Now try setting parent project to an invalid CodeValue and confirm validation fails
         bad_project_code = str(uuid.uuid4())

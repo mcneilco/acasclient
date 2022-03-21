@@ -42,11 +42,6 @@ class ACASDDict(DDict):
         if self.valid_values == []:
             raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
                     f"'code_kind':'{self.code_kind}' provided")
-    
-    def check_value(self, value, client):
-        if not self.valid_values:
-            self.get_values(client)
-        return super(ACASDDict, self).check_value(value)
 
 class ACASLsThingDDict(DDict):
     """DDict implementation for referencing ACAS LsThings"""
@@ -59,8 +54,3 @@ class ACASLsThingDDict(DDict):
     def get_values(self, client):
         valid_codetables = client.get_ls_things_by_type_and_kind(self.code_type, self.code_kind, format='codetable')
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
-    
-    def check_value(self, value, client):
-        if not self.valid_values:
-            self.get_values(client)
-        return super(ACASLsThingDDict, self).check_value(value)

@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from typing import Any, Dict
 
-from acasclient.ddict import ACASDDict, DDict
+from acasclient.ddict import ACASDDict, ACASLsThingDDict, DDict
 from .interactions import INTERACTION_VERBS_DICT, opposite
 
 import copy
@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.INFO)
 
 
 ROW_NUM_KEY = 'row number'
+ACAS_DDICT = 'ACAS DDICT'
+ACAS_LSTHING = 'ACAS LSTHING'
 
 # JSON encoding / decoding
 
@@ -947,7 +949,7 @@ class CodeValue(object):
     _fields = ['code_type', 'code_kind', 'code_origin', 'code']
 
     def __init__(self, code, code_type=None, code_kind=None,
-                 code_origin='ACAS DDict', ddict=None):
+                 code_origin=ACAS_DDICT, ddict=None):
         """Instantiate a new CodeValue
 
         :param code: value of this CodeValue, i.e. which DDictValue is being referenced
@@ -1985,9 +1987,32 @@ class SimpleLsThing(BaseModel):
         simple_ls_thing = cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
         simple_ls_thing.set_client(client=client)
         return simple_ls_thing
+    
+    @classmethod
+    def validate_list(cls, client, models):
+        """Validate a list of SimpleLsThing objects
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param models: List of SimpleLsThing objects to validate
+        :type models: list[SimpleLsThing]
+        :return: List of SimpleLsThing objects with validation errors
+        :rtype: list[SimpleLsThing]
+        """
+        ddicts = {}
+        # Collect a list of DDicts
+        for model in models:
+            ddicts.update(model._get_ddicts())
+        # Fetch the valid values from ACAS for each DDict once
+        for ddict in ddicts.values():
+            ddict.get_values(client)
+        # Validate each model
+        for model in models:
+            model._validate_codevalues(ddicts)
+        #TODO switch to returning messages rather than raising exceptions
 
     @classmethod
-    def save_list(cls, client, models):
+    def save_list(cls, client, models, skip_validation=False):
         """Persist a list of new SimpleLsThing objects to the ACAS server
 
         :param client: Authenticated instance of acasclient.client
@@ -1999,7 +2024,9 @@ class SimpleLsThing(BaseModel):
         """
         if len(models) == 0:
             return []
-
+        # Run validation
+        if not skip_validation:
+            cls.validate_list(client, models)
         for model in models:
             model._prepare_for_save(client)
         things_to_save = [model._ls_thing for model in models]
@@ -2086,23 +2113,59 @@ class SimpleLsThing(BaseModel):
         self.metadata = _upload_file_values_from_state_dict(self.metadata)
         self.results = _upload_file_values_from_state_dict(self.results)
     
+    def _get_ddicts(self):
+        """Extract a unique list of DDict objects from the CodeValue attributes of a SimpleThing
+        :return: dictionary of { (code_type, code_kind, code_origin): DDict }
+        """
+        ddicts = {}
+        state_dicts = [self.metadata, self.results]
+        for state_dict in state_dicts:
+            for _, values_dict in state_dict.items():
+                for _, value in values_dict.items():
+                    if isinstance(value, CodeValue):
+                        ddict = None
+                        if value.code_origin.upper() == ACAS_DDICT:
+                            ddict = ACASDDict(value.code_type, value.code_kind)
+                        elif value.code_origin.upper() == ACAS_LSTHING:
+                            ddict = ACASLsThingDDict(value.code_type, value.code_kind)
+                        ddicts[(ddict.code_type, ddict.code_kind, ddict.code_origin.upper())] = ddict
+        return ddicts
+    
+    def _validate_codevalues(self, ddicts):
+        """Confirm all CodeValues have valid values.
+
+        :param ddicts: dict of (code_type, code_kind, code_origin): DDict. Should come from _get_ddicts()
+        :type ddicts: dict
+        """
+        state_dicts = [self.metadata, self.results]
+        for state_dict in state_dicts:
+            for _, values_dict in state_dict.items():
+                for _, value in values_dict.items():
+                    if isinstance(value, CodeValue):
+                        if value.code:
+                            # Get the corresponding DDict
+                            ddict = ddicts.get((value.code_type, value.code_kind, value.code_origin.upper()), None)
+                            if ddict:
+                                # Confirm this CodeValue's code exists in the DDict
+                                ddict.check_value(value.code)
+                            else:
+                                raise ValueError(f"Cannot locate DDict with code_type={value.code_type}, code_kind={value.code_kind}, code_origin={value.code_origin}")
+    
     def validate(self, client):
         """Validate SimpleLsThing dictionary. Currently only checks that all CodeValues that reference ACAS DDicts
-        have known/valid values.
+        have known/valid values. Raises a ValueError if any are not valid.
 
         :param client: Authenticated instance of acasclient.client
         :type client: acasclient.client
+        :raises ValueError if any CodeValues are invalid
         """
-        for _, values_dict in self.metadata.items():
-            for _, value in values_dict.items():
-                if isinstance(value, CodeValue):
-                    if value.code:
-                        value.validate(client)
-        for _, values_dict in self.results.items():
-            for _, value in values_dict.items():
-                if isinstance(value, CodeValue):
-                    if value.value:
-                        value.validate(client)
+        # Extract a unique dictionary of (code_type, code_kind, code_origin) to DDict objects
+        ddicts = self._get_ddicts()
+        # Fetch the valid values from ACAS for each dictionary once
+        for ddict in ddicts.values():
+            ddict.get_values(client)
+        # Validate the CodeValues are valid
+        self._validate_codevalues(ddicts)
         return True
 
 

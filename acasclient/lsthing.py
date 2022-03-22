@@ -22,8 +22,8 @@ logging.basicConfig(level=logging.INFO)
 
 
 ROW_NUM_KEY = 'row number'
-ACAS_DDICT = 'ACAS DDICT'
-ACAS_LSTHING = 'ACAS LSTHING'
+ACAS_DDICT = ACASDDict.CODE_ORIGIN.upper()
+ACAS_LSTHING = ACASLsThingDDict.CODE_ORIGIN.upper()
 
 # JSON encoding / decoding
 
@@ -961,6 +961,8 @@ class CodeValue(object):
         :type code_kind: str
         :param code_origin: Origin of DDictValue referenced, typically 'ACAS DDict'
         :type code_origin: str
+        :param ddict: DDict object being referenced. Can be used instead of code_type + code_kind + code_origin
+        :type ddict: DDict
         """
         self.code = code
         self.ddict = ddict
@@ -2007,7 +2009,7 @@ class SimpleLsThing(BaseModel):
             ddicts.update(model._get_ddicts())
         # Fetch the valid values from ACAS for each DDict once
         for ddict in ddicts.values():
-            ddict.get_values(client)
+            ddict.update_valid_values(client)
         # Validate each model
         for model in models:
             result += model._validate_codevalues(ddicts)
@@ -2122,14 +2124,16 @@ class SimpleLsThing(BaseModel):
         ddicts = {}
         state_dicts = [self.metadata, self.results]
         for state_dict in state_dicts:
-            for _, values_dict in state_dict.items():
-                for _, value in values_dict.items():
+            for values_dict in state_dict.values():
+                for value in values_dict.values():
                     if isinstance(value, CodeValue):
                         ddict = None
                         if value.code_origin.upper() == ACAS_DDICT:
                             ddict = ACASDDict(value.code_type, value.code_kind)
                         elif value.code_origin.upper() == ACAS_LSTHING:
                             ddict = ACASLsThingDDict(value.code_type, value.code_kind)
+                        else:
+                            raise ValueError(f'Unsupported code_origin: {value.code_origin}')
                         ddicts[(ddict.code_type, ddict.code_kind, ddict.code_origin.upper())] = ddict
         return ddicts
     
@@ -2143,8 +2147,8 @@ class SimpleLsThing(BaseModel):
         result = ValidationResult(True, [])
         state_dicts = [self.metadata, self.results]
         for state_dict in state_dicts:
-            for _, values_dict in state_dict.items():
-                for _, value in values_dict.items():
+            for values_dict in state_dict.values():
+                for value in values_dict.values():
                     if isinstance(value, CodeValue):
                         if value.code:
                             # Get the corresponding DDict
@@ -2173,7 +2177,7 @@ class SimpleLsThing(BaseModel):
         ddicts = self._get_ddicts()
         # Fetch the valid values from ACAS for each dictionary once
         for ddict in ddicts.values():
-            ddict.get_values(client)
+            ddict.update_valid_values(client)
         # Validate the CodeValues are valid
         result += self._validate_codevalues(ddicts)
         return result

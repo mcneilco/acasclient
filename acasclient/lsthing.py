@@ -991,8 +991,8 @@ class CodeValue(object):
     def validate(self):
         """Validate that this CodeValue conforms to the stored list of possible DDictValues in self.ddict
 
-        :return: Error message, or None if valid
-        :rtype: str | None
+        :return: ValidationResult indicating True / valid if code is valid, False / invalid otherwise
+        :rtype: ValidationResult
         """
         if self.ddict:
             return self.ddict.check_value(self.code)

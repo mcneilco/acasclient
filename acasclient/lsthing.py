@@ -3,6 +3,7 @@ from typing import Any, Dict
 
 from acasclient.ddict import ACASDDict, ACASLsThingDDict, DDict
 from .interactions import INTERACTION_VERBS_DICT, opposite
+from .validation import validation_result, ValidationResult
 
 import copy
 import hashlib
@@ -984,6 +985,7 @@ class CodeValue(object):
         return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'
                     f'{self.code_origin}')
 
+    @validation_result
     def validate(self):
         """Validate that this CodeValue conforms to the stored list of possible DDictValues in self.ddict
 
@@ -991,8 +993,9 @@ class CodeValue(object):
         :rtype: str | None
         """
         if self.ddict:
-            self.ddict.check_value(self.code)
-            return
+            return self.ddict.check_value(self.code)
+        else:
+            return True
 
     def as_dict(self):
         return self.__dict__
@@ -1986,6 +1989,7 @@ class SimpleLsThing(BaseModel):
         return simple_ls_thing
     
     @classmethod
+    @validation_result
     def validate_list(cls, client, models):
         """Validate a list of SimpleLsThing objects
 
@@ -1996,6 +2000,7 @@ class SimpleLsThing(BaseModel):
         :return: List of SimpleLsThing objects with validation errors
         :rtype: list[SimpleLsThing]
         """
+        result = ValidationResult(True, [])
         ddicts = {}
         # Collect a list of DDicts
         for model in models:
@@ -2005,8 +2010,8 @@ class SimpleLsThing(BaseModel):
             ddict.get_values(client)
         # Validate each model
         for model in models:
-            model._validate_codevalues(ddicts)
-        #TODO switch to returning messages rather than raising exceptions
+            result += model._validate_codevalues(ddicts)
+        return result
 
     @classmethod
     def save_list(cls, client, models, skip_validation=False):
@@ -2128,12 +2133,14 @@ class SimpleLsThing(BaseModel):
                         ddicts[(ddict.code_type, ddict.code_kind, ddict.code_origin.upper())] = ddict
         return ddicts
     
+    @validation_result
     def _validate_codevalues(self, ddicts):
         """Confirm all CodeValues have valid values.
 
         :param ddicts: dict of (code_type, code_kind, code_origin): DDict. Should come from _get_ddicts()
         :type ddicts: dict
         """
+        result = ValidationResult(True, [])
         state_dicts = [self.metadata, self.results]
         for state_dict in state_dicts:
             for _, values_dict in state_dict.items():
@@ -2144,26 +2151,32 @@ class SimpleLsThing(BaseModel):
                             ddict = ddicts.get((value.code_type, value.code_kind, value.code_origin.upper()), None)
                             if ddict:
                                 # Confirm this CodeValue's code exists in the DDict
-                                ddict.check_value(value.code)
+                                result += ddict.check_value(value.code)
                             else:
-                                raise ValueError(f"Cannot locate DDict with code_type={value.code_type}, code_kind={value.code_kind}, code_origin={value.code_origin}")
+                                result += ValidationResult(True, f"Cannot locate DDict with code_type={value.code_type}, code_kind={value.code_kind}, code_origin={value.code_origin}")
+        return result
     
+    @validation_result
     def validate(self, client):
         """Validate SimpleLsThing dictionary. Currently only checks that all CodeValues that reference ACAS DDicts
-        have known/valid values. Raises a ValueError if any are not valid.
+        have known/valid values
 
         :param client: Authenticated instance of acasclient.client
         :type client: acasclient.client
-        :raises ValueError if any CodeValues are invalid
+        :return: ValidationResult
         """
+        result = ValidationResult(True, [])
+        # Check if recorded_by is populated
+        if not self.recorded_by:
+            result += ValidationResult(False, "recorded_by is required")
         # Extract a unique dictionary of (code_type, code_kind, code_origin) to DDict objects
         ddicts = self._get_ddicts()
         # Fetch the valid values from ACAS for each dictionary once
         for ddict in ddicts.values():
             ddict.get_values(client)
         # Validate the CodeValues are valid
-        self._validate_codevalues(ddicts)
-        return True
+        result += self._validate_codevalues(ddicts)
+        return result
 
 
 

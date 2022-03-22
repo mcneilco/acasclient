@@ -733,24 +733,25 @@ class TestLsThing(unittest.TestCase):
             START_DATE_KEY: datetime.now(),
             DESCRIPTION_KEY: desc_1
         }
-        error = None
-        try:
-            proj_1 = Project(recorded_by=self.client.username, **meta_dict)
-            proj_1.validate(self.client)
-        except ValueError as e:
-            error = e
-        self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        valid = proj_1.validate(self.client)
+        assert not valid
+        messages = valid.get_messages()
+        assert len(messages) == 1
+        self.assertEqual(messages[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
         # Now test timing of one-by-one validation with 20 projects versus doing it in bulk
         # Create 20 valid projects
         meta_dict[STATUS_KEY] = ACTIVE
         projects = [Project(recorded_by=self.client.username, **meta_dict) for i in range(20)]
         single_start = datetime.now()
         for proj in projects:
-            proj.validate(self.client)
+            valid = proj.validate(self.client)
+            assert valid
         single_end = datetime.now()
         single_duration = single_end - single_start
         logger.info(f"Single validation took {single_duration}")
-        Project.validate_list(self.client, projects)
+        valid = Project.validate_list(self.client, projects)
+        assert valid
         bulk_end = datetime.now()
         bulk_duration = bulk_end - single_end
         logger.info(f"Bulk validation took {bulk_duration}")
@@ -775,22 +776,16 @@ class TestLsThing(unittest.TestCase):
         STATUS_DDICT = ACASDDict(PROJECT, STATUS)
         proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
         # Because we are referencing a valid status, this should not raise an error
-        raised = False
-        try:
-            proj_1.validate(self.client)
-        except Exception:
-            raised = True
-        self.assertFalse(raised, f'Exception raised when saving project with valid status {STATUS}')
-        proj_1.validate(self.client)
+        valid = proj_1.validate(self.client)
+        assert valid
+        assert len(valid.get_messages()) == 0
         # Now try setting status to an invalid CodeValue
         status_1 = str(uuid.uuid4())
         proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(status_1, ddict=STATUS_DDICT)
-        error = None
-        try:
-            proj_1.validate(self.client)
-        except ValueError as e:
-            error = e
-        self.assertEqual(str(error), f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        valid = proj_1.validate(self.client)
+        assert not valid
+        assert len(valid.get_messages()) == 1
+        self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
         # Now try adding a CodeValue that references an LsThing
         # First we create and save a new LsThing so we can get a code_name
         proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
@@ -808,22 +803,14 @@ class TestLsThing(unittest.TestCase):
         proj_2 = Project(recorded_by=self.client.username, **meta_dict)
         proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(proj_1.code_name, ddict=PARENT_PROJECT_DDICT)
         # Because we are referencing a valid LsThing, this should be valid
-        raised = False
-        try:
-            proj_2.validate(self.client)
-        except Exception as e:
-            raised = True
-            raise e
-        self.assertFalse(raised, f'Exception raised when saving project with valid CodeValue reference to LsThing {proj_1.code_name}')
+        valid = proj_2.validate(self.client)
+        assert valid
         # Now try setting parent project to an invalid CodeValue and confirm validation fails
         bad_project_code = str(uuid.uuid4())
         proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(bad_project_code, ddict=PARENT_PROJECT_DDICT)
-        error = None
-        try:
-            proj_2.validate(self.client)
-        except ValueError as e:
-            error = e
-        self.assertEqual(str(error), f"Invalid 'code':'{bad_project_code}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{PROJECT}'")
+        valid = proj_2.validate(self.client)
+        assert not valid
+        self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{bad_project_code}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{PROJECT}'")
 
 
 class TestBlobValue(unittest.TestCase):

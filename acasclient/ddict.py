@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+from .validation import validation_result
 
 import logging
 
@@ -21,10 +22,11 @@ class DDict(object):
     def get_values(self):
         raise NotImplementedError()
 
+    @validation_result
     def check_value(self, value):
+        """Check if the value is within `self.valid_values` for the DDict."""
         if value not in self.valid_values:
-            raise ValueError(f"Invalid 'code':'{value}' provided for the given "
-                f"'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'")
+            return False, f"Invalid 'code':'{value}' provided for the given 'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'"
 
 
 class ACASDDict(DDict):
@@ -36,6 +38,7 @@ class ACASDDict(DDict):
         super(ACASDDict, self).__init__(code_type, code_kind, self.CODE_ORIGIN)
 
     def get_values(self, client):
+        """Get the valid values for the DDict."""
         valid_codetables = client.get_ddict_values_by_type_and_kind(
             self.code_type, self.code_kind)
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
@@ -52,5 +55,6 @@ class ACASLsThingDDict(DDict):
         super(ACASLsThingDDict, self).__init__(thing_type, thing_kind, self.CODE_ORIGIN)
     
     def get_values(self, client):
+        """Get the valid values for the DDict."""
         valid_codetables = client.get_ls_things_by_type_and_kind(self.code_type, self.code_kind, format='codetable')
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]

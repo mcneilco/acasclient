@@ -7,9 +7,11 @@ import tempfile
 from datetime import datetime
 import unittest
 import uuid
+import logging
 from pathlib import Path
 
 from acasclient import acasclient
+from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
 
@@ -17,8 +19,12 @@ from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
 # "bob" user name registered
 # "PROJ-00000001" registered
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 # Constants
 ACAS_DDICT = 'ACAS DDICT'
+ACAS_LSTHING = 'ACAS LsThing'
 PROJECT_METADATA = 'project metadata'
 PROJECT = 'project'
 PROJECT_NAME = 'project name'
@@ -26,6 +32,8 @@ PROJECT_ALIAS = 'project alias'
 STATUS = 'status'
 PROJECT_STATUS = 'project status'
 PROCEDURE_DOCUMENT = 'procedure document'
+PARENT_PROJECT = 'parent project'
+BOOLEAN = 'boolean'
 IS_RESTRICTED = 'is restricted'
 RESTRICTED = 'restricted'
 PDF_DOCUMENT = 'pdf document'
@@ -37,6 +45,9 @@ START_DATE_KEY = 'start_date'
 DESCRIPTION_KEY = 'description'
 PDF_DOCUMENT_KEY = 'pdf_document'
 PROCEDURE_DOCUMENT_KEY = 'procedure_document'
+PARENT_PROJECT_KEY = 'parent_project'
+ACTIVE = 'active'
+INACTIVE = 'inactive'
 
 FWD_ITX = 'relates to'
 BACK_ITX = 'is related to'
@@ -48,15 +59,16 @@ class Project(SimpleLsThing):
     preferred_label_kind = PROJECT_NAME
 
     def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
-                 ls_thing=None):
+                 parent_project=None, ls_thing=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
             PROJECT_METADATA: {
                 START_DATE: start_date,
                 DESCRIPTION_KEY: description,
                 PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
-                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
+                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), BOOLEAN, BOOLEAN, ACAS_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
+                PARENT_PROJECT: CodeValue(parent_project, PROJECT, PROJECT, ACAS_LSTHING),
                 PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
         }
@@ -113,7 +125,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now()
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -139,7 +151,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: blob_test_path
         }
@@ -151,7 +163,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: str(blob_test_path)
         }
@@ -198,7 +210,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: "SOMEGARBAGEPATH"
         }
@@ -213,7 +225,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: self.tempdir
         }
@@ -237,7 +249,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: file_path
         }
@@ -268,7 +280,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PDF_DOCUMENT_KEY: file_test_path
         }
@@ -283,7 +295,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PDF_DOCUMENT_KEY: str(file_test_path)
         }
@@ -298,7 +310,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -315,7 +327,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -380,14 +392,14 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now()
         }
         name_2 = str(uuid.uuid4())
         meta_dict_2 = {
             NAME_KEY: name_2,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now()
         }
         proj_1 = Project(recorded_by=self.client.username, **meta_dict)
@@ -569,7 +581,8 @@ class TestLsThing(unittest.TestCase):
         }
 
         proj_1 = Project(recorded_by=self.client.username, **meta_dict)
-        proj_1.save(self.client)
+        # skip CodeValue validation since this is not a valid status
+        proj_1.save(self.client, skip_validation=True)
 
         # Create project 2
         name_2 = str(uuid.uuid4())
@@ -583,12 +596,14 @@ class TestLsThing(unittest.TestCase):
             DESCRIPTION_KEY: desc_2
         }
         proj_2 = Project(recorded_by=self.client.username, **meta_dict_2)
-        proj_2.save(self.client)
+        # skip CodeValue validation since this is not a valid status
+        proj_2.save(self.client, skip_validation=True)
 
         # Add interactions between projects
         proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username)
         assert len(proj_1.links) == 1
-        proj_1.save(self.client)
+        # skip CodeValue validation since this is not a valid status
+        proj_1.save(self.client, skip_validation=True)
        
         # Run advanced search by interaction w/value matching on the interaction thing
         # Forward interaction query w/interaction thing values
@@ -702,6 +717,101 @@ class TestLsThing(unittest.TestCase):
                                        max_results=1000,
                                        combine_terms_with_and=True)
         assert len(results) == 0
+    
+    def test_008_validate_codevalue(self):
+        """Test creating CodeValues using code + code_type + code_kind + code_origin
+        Confirm that invalid code values are rejected by validate method.
+        """
+        # Create project 1
+        name = str(uuid.uuid4())
+        status_1 = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: status_1,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        valid = proj_1.validate(self.client)
+        assert not valid
+        messages = valid.get_messages()
+        assert len(messages) == 1
+        self.assertEqual(messages[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        # Now test timing of one-by-one validation with 20 projects versus doing it in bulk
+        # Create 20 valid projects
+        meta_dict[STATUS_KEY] = ACTIVE
+        projects = [Project(recorded_by=self.client.username, **meta_dict) for i in range(20)]
+        single_start = datetime.now()
+        for proj in projects:
+            valid = proj.validate(self.client)
+            assert valid
+        single_end = datetime.now()
+        single_duration = single_end - single_start
+        logger.info(f"Single validation took {single_duration}")
+        valid = Project.validate_list(self.client, projects)
+        assert valid
+        bulk_end = datetime.now()
+        bulk_duration = bulk_end - single_end
+        logger.info(f"Bulk validation took {bulk_duration}")
+        assert single_duration > bulk_duration
+
+    def test_009_validate_ddicts(self):
+        """Test creating CodeValues using code + DDict
+        Confirm that invalid code values are rejected by validate method.
+        """
+        # Create project 1
+        name = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
+
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        # set status to a CodeValue constructed with a DDict
+        STATUS_DDICT = ACASDDict(PROJECT, STATUS)
+        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        # Because we are referencing a valid status, this should not raise an error
+        valid = proj_1.validate(self.client)
+        assert valid
+        assert len(valid.get_messages()) == 0
+        # Now try setting status to an invalid CodeValue
+        status_1 = str(uuid.uuid4())
+        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(status_1, ddict=STATUS_DDICT)
+        valid = proj_1.validate(self.client)
+        assert not valid
+        assert len(valid.get_messages()) == 1
+        self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        # Now try adding a CodeValue that references an LsThing
+        # First we create and save a new LsThing so we can get a code_name
+        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        proj_1.save(self.client)
+        # Then we create a new project 2 and set PARENT_PROJECT_KEY to reference `proj_1`
+        name_2 = str(uuid.uuid4())
+        desc_2 = str(uuid.uuid4())
+        PARENT_PROJECT_DDICT = ACASLsThingDDict(PROJECT, PROJECT)
+        meta_dict = {
+            NAME_KEY: name_2,
+            IS_RESTRICTED_KEY: True,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_2
+        }
+        proj_2 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(proj_1.code_name, ddict=PARENT_PROJECT_DDICT)
+        # Because we are referencing a valid LsThing, this should be valid
+        valid = proj_2.validate(self.client)
+        assert valid
+        # Now try setting parent project to an invalid CodeValue and confirm validation fails
+        bad_project_code = str(uuid.uuid4())
+        proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(bad_project_code, ddict=PARENT_PROJECT_DDICT)
+        valid = proj_2.validate(self.client)
+        assert not valid
+        self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{bad_project_code}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{PROJECT}'")
+
 
 class TestBlobValue(unittest.TestCase):
 

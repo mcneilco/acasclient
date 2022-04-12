@@ -350,7 +350,8 @@ class TestLsThing(unittest.TestCase):
 
         # Test updating other values on a saved Thing
         saved_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
-        saved_project.metadata[PROJECT_METADATA][STATUS_KEY] = 'inactive'
+        STATUS_DDICT = ACASDDict(PROJECT, STATUS)
+        saved_project.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(INACTIVE, ddict=STATUS_DDICT)
         saved_project.save(self.client)
 
         # Test updating FileValue on a saved Thing
@@ -774,21 +775,21 @@ class TestLsThing(unittest.TestCase):
         proj_1 = Project(recorded_by=self.client.username, **meta_dict)
         # set status to a CodeValue constructed with a DDict
         STATUS_DDICT = ACASDDict(PROJECT, STATUS)
-        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
         # Because we are referencing a valid status, this should not raise an error
         valid = proj_1.validate(self.client)
         assert valid
         assert len(valid.get_messages()) == 0
         # Now try setting status to an invalid CodeValue
         status_1 = str(uuid.uuid4())
-        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(status_1, ddict=STATUS_DDICT)
+        proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(status_1, ddict=STATUS_DDICT)
         valid = proj_1.validate(self.client)
         assert not valid
         assert len(valid.get_messages()) == 1
         self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
         # Now try adding a CodeValue that references an LsThing
         # First we create and save a new LsThing so we can get a code_name
-        proj_1.metadata[PROJECT_METADATA][STATUS_KEY] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
         proj_1.save(self.client)
         # Then we create a new project 2 and set PARENT_PROJECT_KEY to reference `proj_1`
         name_2 = str(uuid.uuid4())

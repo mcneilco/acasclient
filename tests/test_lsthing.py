@@ -117,6 +117,12 @@ class TestLsThing(unittest.TestCase):
         new_bytes = self._get_bytes(file_path)
         orig_bytes = self._get_bytes(orig_file_path)
         self.assertEqual(new_bytes, orig_bytes)
+    
+    def _test_codevalue_missing_error(self, message, value, code_type, code_kind, code_origin):
+        base_msg = "'{code}' is not yet in the database as a valid '{code_kind}'. Please double-check the spelling and correct your data if you expect this to match an existing term. If this is a novel valid term, please contact your administrator to add it to the following dictionary: Code Type: {code_type}, Code Kind: {code_kind}, Code Origin: {code_origin}"
+        expected_msg = base_msg.format(code=value, code_type=code_type, code_kind=code_kind, code_origin=code_origin)
+        self.assertEqual(message, expected_msg)
+
 
     # Tests
     def test_000_simple_ls_thing_save(self):
@@ -739,7 +745,7 @@ class TestLsThing(unittest.TestCase):
         assert not valid
         messages = valid.get_messages()
         assert len(messages) == 1
-        self.assertEqual(messages[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        self._test_codevalue_missing_error(messages[0], status_1, PROJECT, STATUS, 'ACAS DDict')
         # Now test timing of one-by-one validation with 20 projects versus doing it in bulk
         # Create 20 valid projects
         meta_dict[STATUS_KEY] = ACTIVE
@@ -786,7 +792,7 @@ class TestLsThing(unittest.TestCase):
         valid = proj_1.validate(self.client)
         assert not valid
         assert len(valid.get_messages()) == 1
-        self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{status_1}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{STATUS}'")
+        self._test_codevalue_missing_error(valid.get_messages()[0], status_1, PROJECT, STATUS, 'ACAS DDict')
         # Now try adding a CodeValue that references an LsThing
         # First we create and save a new LsThing so we can get a code_name
         proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
@@ -811,7 +817,7 @@ class TestLsThing(unittest.TestCase):
         proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(bad_project_code, ddict=PARENT_PROJECT_DDICT)
         valid = proj_2.validate(self.client)
         assert not valid
-        self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{bad_project_code}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{PROJECT}'")
+        self._test_codevalue_missing_error(valid.get_messages()[0], bad_project_code, PROJECT, PROJECT, 'ACAS LsThing')
 
 
 class TestBlobValue(unittest.TestCase):

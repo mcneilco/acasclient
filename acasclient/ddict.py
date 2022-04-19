@@ -14,6 +14,9 @@ class DDict(object):
     The `update_valid_values` method must also be called before calling `check_value`
     """
 
+    EMPTY_DICTIONARY_MESSAGE = "The Data Dictionary you've tried to reference is currently empty. No valid values found for Code Type: {code_type}, Code Kind: {code_kind}, Code Origin: {code_origin}"
+    MISSING_VALUE_MESSAGE = "'{code}' is not yet in the database as a valid '{code_kind}'. Please double-check the spelling and correct your data if you expect this to match an existing term. If this is a novel valid term, please contact your administrator to add it to the following dictionary: Code Type: {code_type}, Code Kind: {code_kind}, Code Origin: {code_origin}"
+
     def __init__(self, code_type, code_kind, code_origin):
         self.code_type = code_type
         self.code_kind = code_kind
@@ -22,14 +25,19 @@ class DDict(object):
 
     def update_valid_values(self, client):
         raise NotImplementedError()
+    
+    def raise_empty_dict_error(self):
+        msg = self.EMPTY_DICTIONARY_MESSAGE.format(code_type=self.code_type, code_kind=self.code_kind, code_origin=self.code_origin)
+        raise ValueError(msg)
 
     @validation_result
     def check_value(self, value):
         """Check if the value is within `self.valid_values` for the DDict."""
         if not self.valid_values:
-            raise ValueError('Valid values has not been populated. Call `update_valid_values` first.')
+            self.raise_empty_dict_error()
         if value not in self.valid_values:
-            return False, f"Invalid 'code':'{value}' provided for the given 'code_type':'{self.code_type}' and 'code_kind':'{self.code_kind}'"
+            msg = self.MISSING_VALUE_MESSAGE.format(code=value, code_kind=self.code_kind, code_origin=self.code_origin, code_type=self.code_type)
+            return False, msg
 
 
 class ACASDDict(DDict):
@@ -46,8 +54,8 @@ class ACASDDict(DDict):
             self.code_type, self.code_kind)
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
         if not self.valid_values:
-            raise ValueError(f"Invalid 'code_type':'{self.code_type}' or "
-                    f"'code_kind':'{self.code_kind}' provided")
+            self.raise_empty_dict_error()
+
 
 class ACASLsThingDDict(DDict):
     """DDict implementation for referencing ACAS LsThings"""
@@ -56,8 +64,10 @@ class ACASLsThingDDict(DDict):
 
     def __init__(self, thing_type, thing_kind):
         super(ACASLsThingDDict, self).__init__(thing_type, thing_kind, self.CODE_ORIGIN)
-    
+
     def update_valid_values(self, client):
         """Get the valid values for the DDict."""
         valid_codetables = client.get_ls_things_by_type_and_kind(self.code_type, self.code_kind, format='codetable')
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
+        if not self.valid_values:
+            self.raise_empty_dict_error()

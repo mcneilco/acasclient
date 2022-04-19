@@ -1,4 +1,5 @@
 import decorator
+from collections import defaultdict
 from typing import List
 
 # Author: Anand Kumar
@@ -87,3 +88,65 @@ def validation_result(func, *args, **kwargs):
         return result
 
     raise TypeError(f"Expected bool or tuple return values, got '{result}'")
+
+def get_validation_response(validation_result, ls_thing=None, commit=False, transaction_id=-1):
+    """
+    :param validation_result: validation result object
+    :type validation_result: validations.ValidationResult
+
+    :param ls_thing: ls_thing of an entity
+    :type ls_thing: dict
+
+    :param commit: if the data was committed to the database
+    :type commit: bool
+
+    :param transaction_id: id of the transaction
+    :type transaction_id: int
+
+    :return: validation response for the given result
+    :rtype: dict
+    """
+    # TODO: For now lets just categorise all messages with the same errorLevel.
+    has_errors = not bool(validation_result)
+    has_warnings = not has_errors and len(validation_result.get_messages()) > 0
+    if has_errors:
+        error_level = 'error'
+    elif has_warnings:
+        error_level = 'warning'
+    else:
+        error_level = ''
+    
+    # Deduplicate error messages and count occurrences
+    messages = defaultdict(int)
+    for msg in validation_result.get_messages():
+        messages[msg] += 1
+    
+    deduped_errors = []
+    for msg, count in messages.items():
+        if count > 1:
+            deduped_errors.append(f'{count} occurrences of: {msg}')
+        else:
+            deduped_errors.append(msg)
+
+    error_messages = [{
+        'errorLevel': error_level,
+        'message': msg
+    } for msg in deduped_errors]
+    response_html_header = 'Validation ' + (
+        'Successful' if bool(validation_result) else 'Unsuccessful')
+    html_summary = f'<h3>{response_html_header}</h3>'
+    for err_msg in error_messages:
+        html_summary += f'<p>{err_msg["message"]}</p>'
+    resp_dict = {
+        'commit': commit,
+        'transaction_id': transaction_id,
+        'results': {
+            'htmlSummary': html_summary,
+        },
+        'hasError': has_errors,
+        'hasWarning': has_warnings,
+        'errorMessages': error_messages,
+    }
+    if ls_thing:
+        resp_dict['results']['thing'] = ls_thing
+    return resp_dict

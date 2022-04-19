@@ -14,6 +14,7 @@ from acasclient import acasclient
 from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
+from acasclient.validation import get_validation_response
 
 # SETUP
 # "bob" user name registered
@@ -812,6 +813,21 @@ class TestLsThing(unittest.TestCase):
         valid = proj_2.validate(self.client)
         assert not valid
         self.assertEqual(valid.get_messages()[0], f"Invalid 'code':'{bad_project_code}' provided for the given 'code_type':'{PROJECT}' and 'code_kind':'{PROJECT}'")
+        # Generate validation response and check it
+        validation_response = get_validation_response(valid, ls_thing=proj_2)
+        # Confirm the structure of the response body
+        assert validation_response.get("commit") is False
+        self.assertEqual(validation_response.get("transaction_id"), -1)
+        assert validation_response.get("hasError") is True
+        assert validation_response.get("hasWarning") is False
+        assert validation_response.get("results") is not None
+        assert validation_response.get("results").get("thing") is not None
+        # Check we have one message and it is an error
+        self.assertEqual(len(validation_response.get("errorMessages")), 1)
+        msg = validation_response.get("errorMessages")[0]
+        self.assertEqual(msg.get("errorLevel"), "error")
+        # Do a loose check of the html summary and confirm it contains mention of our bad code
+        assert bad_project_code in validation_response['results']['htmlSummary']
 
 
 class TestBlobValue(unittest.TestCase):

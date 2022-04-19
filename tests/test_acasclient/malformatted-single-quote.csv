@@ -1,0 +1,16 @@
+Experiment Meta Data,,,
+Format,Generic,,
+Protocol Name,BLAH,,
+Experiment Name,BLAH,,
+Scientist,bob,,
+Notebook,BLAH,,
+Page,,,
+Assay Date,2022-03-30,,
+Project,Global,,
+,,,
+,,,
+Calculated Results,,,
+Datatype,Number,Number,Number
+Corporate Batch ID,t1/2 (min),In vitro Clint (uL/min/mg protein),Clint (mL/min/kg)
+"CMPD-0000001-001",4.36,159.04,"answer in a string,388.06"
+CMPD-0000001-001",3.31,2"09.43",511.02

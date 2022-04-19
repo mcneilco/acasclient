@@ -14,7 +14,7 @@ from acasclient import acasclient
 from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
-from acasclient.validation import get_validation_response
+from acasclient.validation import ValidationResult, get_validation_response
 
 # SETUP
 # "bob" user name registered
@@ -853,3 +853,73 @@ class TestBlobValue(unittest.TestCase):
         assert blob_value_dict['value'] == value
         assert blob_value_dict['comments'] == comments
         assert blob_value_dict['id'] == id
+
+class TestValidationResponse(unittest.TestCase):
+
+    def setUp(self) -> None:
+        creds = acasclient.get_default_credentials()
+        self.client = acasclient.client(creds)
+
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+        self.client.close()
+
+    def test_001_response_with_errors_and_warnings(self):
+        """
+        Test creating a ValidationResponse with errors and warnings.
+        """
+        ERR_MSG = 'error 1'
+        WARN_MSG = 'warning 1'
+        # Create a warning
+        warn = ValidationResult(True, [WARN_MSG])
+        assert warn
+        assert len(warn.get_messages()) == 1
+        assert len(warn.get_warnings()) == 1
+        assert warn.get_warnings()[0] == WARN_MSG
+        assert len(warn.get_errors()) == 0
+
+        # Create an error
+        err = ValidationResult(False, [ERR_MSG])
+        assert not err
+        assert len(err.get_messages()) == 1
+        assert len(err.get_warnings()) == 0
+        assert len(err.get_errors()) == 1
+        assert err.get_errors()[0] == ERR_MSG
+
+        # Add them
+        valid = warn + err
+        assert not valid
+        assert len(valid.get_messages()) == 2
+        assert valid.get_messages()[0] == ERR_MSG
+        assert valid.get_messages()[1] == WARN_MSG
+        assert len(valid.get_errors()) == 1
+        assert valid.get_errors()[0] == ERR_MSG
+        assert len(valid.get_warnings()) == 1
+        assert valid.get_warnings()[0] == WARN_MSG
+
+        # Generate and check a response
+        response = get_validation_response(valid)
+        # Confirm the structure of the response body
+        assert response.get("commit") is False
+        self.assertEqual(response.get("transaction_id"), -1)
+        assert response.get("hasError") is True
+        assert response.get("hasWarning") is True
+        assert response.get("results") is not None
+        # Check we have two messages: one error, one warning
+        self.assertEqual(len(response.get("errorMessages")), 2)
+        self.assertEqual(response.get("errorMessages")[0].get("errorLevel"), "error")
+        self.assertEqual(response.get("errorMessages")[1].get("errorLevel"), "warning")
+        # Confirm HTML summary contains both messages
+        assert ERR_MSG in response['results']['htmlSummary']
+        assert WARN_MSG in response['results']['htmlSummary']
+
+        # Create a ValidationResult with error and warning at once
+        valid = ValidationResult(False, errors=[ERR_MSG], warnings=[WARN_MSG])
+        assert len(valid.get_messages()) == 2
+
+        # Create an invalid ValidationResult by giving an error message but saying it is valid
+        try:
+            invalid = ValidationResult(True, errors=[ERR_MSG], warnings=[WARN_MSG])
+            assert False
+        except ValueError as e:
+            assert str(e) == "ValidationResult cannot be valid and contain error messages"

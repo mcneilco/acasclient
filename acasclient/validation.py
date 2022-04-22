@@ -197,6 +197,7 @@ def _get_html_summary(errors, warnings, summaries, commit=False) -> str:
     <ul>{message_list}</ul>
     """
     WARNINGS_TEMPLATE = """<h4>Warnings: {count} </h4>
+    <p>Warnings provide information on issues found in the upload file. You can proceed with warnings; however, it is recommended that, if possible, you make the changes suggested by the warnings and upload a new version of the file by using the 'Back' button at the bottom of this screen.<p>
     <ul>{message_list}</ul>"""
     SUMMARY_TEMPLATE = """<h4>Summary</h4>
     <p>Information:</p>

@@ -876,6 +876,7 @@ class TestValidationResponse(unittest.TestCase):
         """
         ERR_MSG = 'error 1'
         WARN_MSG = 'warning 1'
+        SUMM_MSG = 'summary 1'
         # Create a warning
         warn = ValidationResult(True, [WARN_MSG])
         assert warn
@@ -892,6 +893,9 @@ class TestValidationResponse(unittest.TestCase):
         assert len(err.get_errors()) == 1
         assert err.get_errors()[0] == ERR_MSG
 
+        # Create a summary
+        summary = ValidationResult(True, summaries=[SUMM_MSG])
+
         # Add them
         valid = warn + err
         assert not valid
@@ -902,6 +906,14 @@ class TestValidationResponse(unittest.TestCase):
         assert valid.get_errors()[0] == ERR_MSG
         assert len(valid.get_warnings()) == 1
         assert valid.get_warnings()[0] == WARN_MSG
+
+        # Add in the summary
+        valid = valid + summary
+        assert not valid
+        assert len(valid.get_messages()) == 3
+        assert valid.get_messages()[2] == SUMM_MSG
+        assert len(valid.get_summaries()) == 1
+        assert valid.get_summaries()[0] == SUMM_MSG
 
         # Generate and check a response
         response = get_validation_response(valid)
@@ -977,5 +989,12 @@ class TestValidationResponse(unittest.TestCase):
         self.assertIn(ERR_INSTRUCT, html)
         self.assertIn('<h4 style="color:red">Errors: 2 </h4>', html)
         self.assertNotIn('<h4>Warnings:', html)
-        
-        # TODO add summary
+        # Errors, warnings, and summaries
+        res = ValidationResult(False, errors=[ERR_1, ERR_2], warnings=[WARN_1, WARN_2], summaries=[SUMM_1, SUMM_2])
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertIn(ERR_INSTRUCT, html)
+        self.assertIn('<h4 style="color:red">Errors: 2 </h4>', html)
+        self.assertIn('<h4>Warnings: 2 </h4>', html)
+        self.assertIn('<h4>Summary</h4>', html)
+        self.assertIn(f"<li>{SUMM_1}</li>", html)
+        self.assertIn(f"<li>{SUMM_2}</li>", html)

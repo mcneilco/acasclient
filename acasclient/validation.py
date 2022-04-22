@@ -23,10 +23,11 @@ class ValidationResult(object):
 
     """
 
-    def __init__(self, is_valid: bool, messages: List[str] = None, errors: List[str] = None, warnings: List[str] = None):
+    def __init__(self, is_valid: bool, messages: List[str] = None, errors: List[str] = None, warnings: List[str] = None, summaries: List[str] = None):
         self._is_valid = is_valid
         self._errors = errors or []
         self._warnings = warnings or []
+        self._summaries = summaries or []
         # For simple messages, classify them as errors or warnings based on the validity of the result
         if messages:
             if is_valid:
@@ -46,6 +47,8 @@ class ValidationResult(object):
             res += '\nERRORS:\n' + '\n'.join(self._errors)
         if self._warnings:
             res += '\nWARNINGS:\n' + '\n'.join(self._warnings)
+        if self._summaries:
+            res += '\nSUMMARIES:\n' + '\n'.join(self._summaries)
         return res
 
     def __repr__(self) -> str:
@@ -55,16 +58,20 @@ class ValidationResult(object):
         is_valid = self._is_valid and other._is_valid
         errors = self._errors + other._errors
         warnings = self._warnings + other._warnings
-        return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
+        summaries = self._summaries + other._summaries
+        return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings, summaries=summaries)
 
     def get_messages(self) -> List[str]:
-        return self._errors + self._warnings
+        return self._errors + self._warnings + self._summaries
     
     def get_errors(self) -> List[str]:
         return self._errors
     
     def get_warnings(self) -> List[str]:
         return self._warnings
+    
+    def get_summaries(self) -> List[str]:
+        return self._summaries
 
 
 @decorator.decorator
@@ -144,6 +151,7 @@ def get_validation_response(validation_result, ls_thing=None, commit=False, tran
     """
     errors = validation_result.get_errors()
     warnings = validation_result.get_warnings()
+    summaries = validation_result.get_summaries()
     
     has_errors = len(errors) > 0
     has_warnings = len(warnings) > 0
@@ -159,7 +167,7 @@ def get_validation_response(validation_result, ls_thing=None, commit=False, tran
     for msg in warnings:
         error_messages.append({'message': msg, 'errorLevel': 'warning'})
     # Format HTML
-    html_summary = _get_html_summary(errors, warnings)
+    html_summary = _get_html_summary(errors, warnings, summaries)
     resp_dict = {
         'commit': commit,
         'transaction_id': transaction_id,
@@ -175,7 +183,7 @@ def get_validation_response(validation_result, ls_thing=None, commit=False, tran
     return resp_dict
 
 
-def _get_html_summary(errors, warnings, commit=False) -> str:
+def _get_html_summary(errors, warnings, summaries, commit=False) -> str:
     """
     Format HTML summary for the validation result.
     """
@@ -194,9 +202,6 @@ def _get_html_summary(errors, warnings, commit=False) -> str:
     <p>Information:</p>
     <ul>{message_list}</ul>"""
     MESSAGE_TEMPLATE = """<li>{message}</li>"""
-
-    # TODO implement commit and summaries
-    summaries = []
 
     # Set up variables
     instructions = ''

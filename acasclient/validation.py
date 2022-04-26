@@ -167,7 +167,7 @@ def get_validation_response(validation_result, ls_thing=None, commit=False, tran
     for msg in warnings:
         error_messages.append({'message': msg, 'errorLevel': 'warning'})
     # Format HTML
-    html_summary = _get_html_summary(errors, warnings, summaries)
+    html_summary = _get_html_summary(errors, warnings, summaries, commit)
     resp_dict = {
         'commit': commit,
         'transaction_id': transaction_id,
@@ -183,7 +183,7 @@ def get_validation_response(validation_result, ls_thing=None, commit=False, tran
     return resp_dict
 
 
-def _get_html_summary(errors, warnings, summaries, commit=False) -> str:
+def _get_html_summary(errors, warnings, summaries, commit) -> str:
     """
     Format HTML summary for the validation result.
     """

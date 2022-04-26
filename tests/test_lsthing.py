@@ -949,6 +949,7 @@ class TestValidationResponse(unittest.TestCase):
         ERR_INSTRUCT = "<p>Please fix the following errors and use the 'Back' button at the bottom of this screen to upload a new version of the data.</p>"
         WARN_INSTRUCT = "<p>Please review the warnings and summary before uploading.</p>"
         SUCCESS_INSTRUCT = "<p>Please review the summary before uploading.</p>"
+        COMMIT_INSTRUCT = "<p>Upload completed.</p>"
         ERR_1 = 'error 1'
         ERR_2 = 'error 2'
         WARN_1 = 'warning 1'
@@ -998,3 +999,12 @@ class TestValidationResponse(unittest.TestCase):
         self.assertIn('<h4>Summary</h4>', html)
         self.assertIn(f"<li>{SUMM_1}</li>", html)
         self.assertIn(f"<li>{SUMM_2}</li>", html)
+        # Commit should hide warnings and show a different message
+        res = ValidationResult(True, warnings=[WARN_1], summaries=[SUMM_1])
+        html = get_validation_response(res, commit=True).get('results').get('htmlSummary')
+        self.assertIn(COMMIT_INSTRUCT, html)
+        self.assertNotIn(ERR_INSTRUCT, html)
+        self.assertNotIn('<h4 style="color:red">Errors:', html)
+        self.assertNotIn('<h4>Warnings:', html)
+        self.assertIn('<h4>Summary</h4>', html)
+        self.assertIn(f"<li>{SUMM_1}</li>", html)

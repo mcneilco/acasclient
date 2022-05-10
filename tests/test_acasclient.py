@@ -11,6 +11,9 @@ import uuid
 import json
 import operator
 import signal
+import requests
+import hashlib
+import base64
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
@@ -222,13 +225,72 @@ def create_thing_with_blob_value(code):
     return ls_thing, file_name, bytes_array
 
 
+def acas_password_hash(password):
+    """ Returns a hash of the password in the form used by ACAS built-in authentication """
+    m = hashlib.sha1()
+    m.update(password.encode('UTF-8'))
+    enc = base64.b64encode(m.digest())
+    return enc.decode('UTF-8')
+
+
+def create_backdoor_user(username, password, is_admin=False):
+    """ Creates a backdoor user for testing purposes """
+    user = {
+        "firstName": username,
+        "lastName": username,
+        "emailAddress": username + "@example.com",
+        "userName": username,
+        "password": acas_password_hash(password),
+        "enabled": True,
+        "locked": False,
+        "recordedBy": "bob",
+        "lsType": "default",
+        "lsKind": "default",
+    }
+    # POST the user to ACAS Roo directly. This only works if you are local to the ACAS server.
+    acas_roo_url = "http://localhost:8080/acas/api/v1/"
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    author_api_endpoint = acas_roo_url + "authors/jsonArray"
+    r = requests.post(author_api_endpoint, json=[user], headers=headers)
+    r.raise_for_status()
+    # Grant User or User + Admin roles to this user
+    user_role = {
+        "roleType": 'System',
+        "roleKind": 'ACAS',
+        "roleName": 'ROLE_ACAS-USERS',
+        "userName": username,
+    }
+    admin_role = {
+        "roleType": 'System',
+        "roleKind": 'ACAS',
+        "roleName": 'ROLE_ACAS-ADMINS',
+        "userName": username,
+    }
+    roles = [user_role]
+    if is_admin:
+        roles.append(admin_role)
+    # Sync roles
+    roles_api_endpoint = acas_roo_url + "authorroles/saveRoles"
+    r = requests.post(roles_api_endpoint, json=roles, headers=headers)
+    r.raise_for_status()
+
 class TestAcasclient(unittest.TestCase):
     """Tests for `acasclient` package."""
 
     def setUp(self):
         """Set up test fixtures, if any."""
         creds = acasclient.get_default_credentials()
-        self.client = acasclient.client(creds)
+        try:
+            self.client = acasclient.client(creds)
+        except RuntimeError:
+            # Create the test user if it doesn't exist
+            if creds.get('username'):
+                create_backdoor_user(creds.get('username'), creds.get('password'), is_admin=True)
+            # Login again
+            self.client = acasclient.client(creds)
         self.tempdir = tempfile.mkdtemp()
         # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
         self.maxDiff = None

@@ -244,9 +244,10 @@ class client():
         session = requests.Session()
         resp = session.post("{}/login".format(self.url),
                             headers={'Content-Type': 'application/json'},
-                            data=json.dumps(data))
+                            data=json.dumps(data),
+                            allow_redirects=False)
         resp.raise_for_status()
-        if 'location' in resp.headers and resp.headers.location == "/login":
+        if resp.status_code == 302 or ('location' in resp.headers and resp.headers.location == "/login"):
             raise RuntimeError("Failed to login. Please check credentials.")
         return session
 

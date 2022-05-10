@@ -247,7 +247,7 @@ class client():
                             data=json.dumps(data),
                             allow_redirects=False)
         resp.raise_for_status()
-        if resp.status_code == 302 or ('location' in resp.headers and resp.headers.location == "/login"):
+        if resp.status_code == 302 and 'location' in resp.headers and resp.headers.get('location') == "/login":
             raise RuntimeError("Failed to login. Please check credentials.")
         return session
 

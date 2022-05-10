@@ -7,18 +7,25 @@ import tempfile
 from datetime import datetime
 import unittest
 import uuid
+import logging
 from pathlib import Path
 
 from acasclient import acasclient
+from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
+from acasclient.validation import ValidationResult, get_validation_response
 
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 # Constants
 ACAS_DDICT = 'ACAS DDICT'
+ACAS_LSTHING = 'ACAS LsThing'
 PROJECT_METADATA = 'project metadata'
 PROJECT = 'project'
 PROJECT_NAME = 'project name'
@@ -26,6 +33,8 @@ PROJECT_ALIAS = 'project alias'
 STATUS = 'status'
 PROJECT_STATUS = 'project status'
 PROCEDURE_DOCUMENT = 'procedure document'
+PARENT_PROJECT = 'parent project'
+BOOLEAN = 'boolean'
 IS_RESTRICTED = 'is restricted'
 RESTRICTED = 'restricted'
 PDF_DOCUMENT = 'pdf document'
@@ -37,6 +46,9 @@ START_DATE_KEY = 'start_date'
 DESCRIPTION_KEY = 'description'
 PDF_DOCUMENT_KEY = 'pdf_document'
 PROCEDURE_DOCUMENT_KEY = 'procedure_document'
+PARENT_PROJECT_KEY = 'parent_project'
+ACTIVE = 'active'
+INACTIVE = 'inactive'
 
 FWD_ITX = 'relates to'
 BACK_ITX = 'is related to'
@@ -48,15 +60,16 @@ class Project(SimpleLsThing):
     preferred_label_kind = PROJECT_NAME
 
     def __init__(self, name=None, alias=None, start_date=None, description=None, status=None, is_restricted=True, procedure_document=None, pdf_document=None, recorded_by=None,
-                 ls_thing=None):
+                 parent_project=None, ls_thing=None):
         names = {PROJECT_NAME: name, PROJECT_ALIAS: alias}
         metadata = {
             PROJECT_METADATA: {
                 START_DATE: start_date,
                 DESCRIPTION_KEY: description,
                 PROJECT_STATUS: CodeValue(status, PROJECT, STATUS, ACAS_DDICT),
-                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), PROJECT, RESTRICTED, ACAS_DDICT),
+                IS_RESTRICTED: CodeValue(str(is_restricted).lower(), BOOLEAN, BOOLEAN, ACAS_DDICT),
                 PROCEDURE_DOCUMENT: BlobValue(file_path=procedure_document),
+                PARENT_PROJECT: CodeValue(parent_project, PROJECT, PROJECT, ACAS_LSTHING),
                 PDF_DOCUMENT: FileValue(file_path=pdf_document)
             }
         }
@@ -75,6 +88,7 @@ class TestLsThing(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+        self.client.close()
         files_to_delete = ['dummy.pdf', 'dummy2.pdf']
         for f in files_to_delete:
             file = Path(f)
@@ -105,6 +119,12 @@ class TestLsThing(unittest.TestCase):
         orig_bytes = self._get_bytes(orig_file_path)
         self.assertEqual(new_bytes, orig_bytes)
 
+    def _test_codevalue_missing_error(self, message, value, code_type, code_kind, code_origin):
+        base_msg = "'{code}' is not yet in the database as a valid '{code_kind}'. Please double-check the spelling and correct your data if you expect this to match an existing term. If this is a novel valid term, please contact your administrator to add it to the following dictionary: Code Type: {code_type}, Code Kind: {code_kind}, Code Origin: {code_origin}"
+        expected_msg = base_msg.format(code=value, code_type=code_type, code_kind=code_kind, code_origin=code_origin)
+        self.assertEqual(message, expected_msg)
+
+
     # Tests
     def test_000_simple_ls_thing_save(self):
         """Test saving simple ls thing."""
@@ -112,7 +132,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now()
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -138,7 +158,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: blob_test_path
         }
@@ -150,7 +170,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: str(blob_test_path)
         }
@@ -197,7 +217,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: "SOMEGARBAGEPATH"
         }
@@ -212,7 +232,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: self.tempdir
         }
@@ -236,7 +256,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PROCEDURE_DOCUMENT_KEY: file_path
         }
@@ -267,7 +287,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PDF_DOCUMENT_KEY: file_test_path
         }
@@ -282,7 +302,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
             PDF_DOCUMENT_KEY: str(file_test_path)
         }
@@ -297,7 +317,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -314,7 +334,7 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now(),
         }
         newProject = Project(recorded_by=self.client.username, **meta_dict)
@@ -337,7 +357,8 @@ class TestLsThing(unittest.TestCase):
 
         # Test updating other values on a saved Thing
         saved_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
-        saved_project.metadata[PROJECT_METADATA][STATUS_KEY] = 'inactive'
+        STATUS_DDICT = ACASDDict(PROJECT, STATUS)
+        saved_project.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(INACTIVE, ddict=STATUS_DDICT)
         saved_project.save(self.client)
 
         # Test updating FileValue on a saved Thing
@@ -379,14 +400,14 @@ class TestLsThing(unittest.TestCase):
         meta_dict = {
             NAME_KEY: name,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now()
         }
         name_2 = str(uuid.uuid4())
         meta_dict_2 = {
             NAME_KEY: name_2,
             IS_RESTRICTED_KEY: True,
-            STATUS_KEY: "active",
+            STATUS_KEY: ACTIVE,
             START_DATE_KEY: datetime.now()
         }
         proj_1 = Project(recorded_by=self.client.username, **meta_dict)
@@ -568,7 +589,8 @@ class TestLsThing(unittest.TestCase):
         }
 
         proj_1 = Project(recorded_by=self.client.username, **meta_dict)
-        proj_1.save(self.client)
+        # skip CodeValue validation since this is not a valid status
+        proj_1.save(self.client, skip_validation=True)
 
         # Create project 2
         name_2 = str(uuid.uuid4())
@@ -582,12 +604,14 @@ class TestLsThing(unittest.TestCase):
             DESCRIPTION_KEY: desc_2
         }
         proj_2 = Project(recorded_by=self.client.username, **meta_dict_2)
-        proj_2.save(self.client)
+        # skip CodeValue validation since this is not a valid status
+        proj_2.save(self.client, skip_validation=True)
 
         # Add interactions between projects
         proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username)
         assert len(proj_1.links) == 1
-        proj_1.save(self.client)
+        # skip CodeValue validation since this is not a valid status
+        proj_1.save(self.client, skip_validation=True)
 
         # Run advanced search by interaction w/value matching on the interaction thing
         # Forward interaction query w/interaction thing values
@@ -702,6 +726,116 @@ class TestLsThing(unittest.TestCase):
                                        combine_terms_with_and=True)
         assert len(results) == 0
 
+    def test_008_validate_codevalue(self):
+        """Test creating CodeValues using code + code_type + code_kind + code_origin
+        Confirm that invalid code values are rejected by validate method.
+        """
+        # Create project 1
+        name = str(uuid.uuid4())
+        status_1 = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: status_1,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        valid = proj_1.validate(self.client)
+        assert not valid
+        messages = valid.get_messages()
+        assert len(messages) == 1
+        self._test_codevalue_missing_error(messages[0], status_1, PROJECT, STATUS, 'ACAS DDict')
+        # Now test timing of one-by-one validation with 20 projects versus doing it in bulk
+        # Create 20 valid projects
+        meta_dict[STATUS_KEY] = ACTIVE
+        projects = [Project(recorded_by=self.client.username, **meta_dict) for i in range(20)]
+        single_start = datetime.now()
+        for proj in projects:
+            valid = proj.validate(self.client)
+            assert valid
+        single_end = datetime.now()
+        single_duration = single_end - single_start
+        logger.info(f"Single validation took {single_duration}")
+        valid = Project.validate_list(self.client, projects)
+        assert valid
+        bulk_end = datetime.now()
+        bulk_duration = bulk_end - single_end
+        logger.info(f"Bulk validation took {bulk_duration}")
+        assert single_duration > bulk_duration
+
+    def test_009_validate_ddicts(self):
+        """Test creating CodeValues using code + DDict
+        Confirm that invalid code values are rejected by validate method.
+        """
+        # Create project 1
+        name = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_1
+        }
+
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        # set status to a CodeValue constructed with a DDict
+        STATUS_DDICT = ACASDDict(PROJECT, STATUS)
+        proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        # Because we are referencing a valid status, this should not raise an error
+        valid = proj_1.validate(self.client)
+        assert valid
+        assert len(valid.get_messages()) == 0
+        # Now try setting status to an invalid CodeValue
+        status_1 = str(uuid.uuid4())
+        proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(status_1, ddict=STATUS_DDICT)
+        valid = proj_1.validate(self.client)
+        assert not valid
+        assert len(valid.get_messages()) == 1
+        self._test_codevalue_missing_error(valid.get_messages()[0], status_1, PROJECT, STATUS, 'ACAS DDict')
+        # Now try adding a CodeValue that references an LsThing
+        # First we create and save a new LsThing so we can get a code_name
+        proj_1.metadata[PROJECT_METADATA][PROJECT_STATUS] = CodeValue(ACTIVE, ddict=STATUS_DDICT)
+        proj_1.save(self.client)
+        # Then we create a new project 2 and set PARENT_PROJECT_KEY to reference `proj_1`
+        name_2 = str(uuid.uuid4())
+        desc_2 = str(uuid.uuid4())
+        PARENT_PROJECT_DDICT = ACASLsThingDDict(PROJECT, PROJECT)
+        meta_dict = {
+            NAME_KEY: name_2,
+            IS_RESTRICTED_KEY: True,
+            START_DATE_KEY: datetime.now(),
+            DESCRIPTION_KEY: desc_2
+        }
+        proj_2 = Project(recorded_by=self.client.username, **meta_dict)
+        proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(proj_1.code_name, ddict=PARENT_PROJECT_DDICT)
+        # Because we are referencing a valid LsThing, this should be valid
+        valid = proj_2.validate(self.client)
+        assert valid
+        # Now try setting parent project to an invalid CodeValue and confirm validation fails
+        bad_project_code = str(uuid.uuid4())
+        proj_2.metadata[PROJECT_METADATA][PARENT_PROJECT_KEY] = CodeValue(bad_project_code, ddict=PARENT_PROJECT_DDICT)
+        valid = proj_2.validate(self.client)
+        assert not valid
+        self._test_codevalue_missing_error(valid.get_messages()[0], bad_project_code, PROJECT, PROJECT, 'ACAS LsThing')
+        # Generate validation response and check it
+        validation_response = get_validation_response(valid, ls_thing=proj_2)
+        # Confirm the structure of the response body
+        assert validation_response.get("commit") is False
+        self.assertEqual(validation_response.get("transaction_id"), -1)
+        assert validation_response.get("hasError") is True
+        assert validation_response.get("hasWarning") is False
+        assert validation_response.get("results") is not None
+        assert validation_response.get("results").get("thing") is not None
+        # Check we have one message and it is an error
+        self.assertEqual(len(validation_response.get("errorMessages")), 1)
+        msg = validation_response.get("errorMessages")[0]
+        self.assertEqual(msg.get("errorLevel"), "error")
+        # Do a loose check of the html summary and confirm it contains mention of our bad code
+        assert bad_project_code in validation_response['results']['htmlSummary']
+
+
     def test_008_get_by_code(self):
         """
         If no lsthing entry is found for the given `code_name`, `ls_type` and
@@ -719,6 +853,10 @@ class TestBlobValue(unittest.TestCase):
         creds = acasclient.get_default_credentials()
         self.client = acasclient.client(creds)
 
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+        self.client.close()
+
     def test_as_dict(self):
         """
         Verify `as_dict` returns the instance attributes mapped to their value.
@@ -732,3 +870,152 @@ class TestBlobValue(unittest.TestCase):
         assert blob_value_dict['value'] == value
         assert blob_value_dict['comments'] == comments
         assert blob_value_dict['id'] == id
+
+class TestValidationResponse(unittest.TestCase):
+
+    def setUp(self) -> None:
+        creds = acasclient.get_default_credentials()
+        self.client = acasclient.client(creds)
+
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+        self.client.close()
+
+    def test_001_response_with_errors_and_warnings(self):
+        """
+        Test creating a ValidationResponse with errors and warnings.
+        """
+        ERR_MSG = 'error 1'
+        WARN_MSG = 'warning 1'
+        SUMM_MSG = 'summary 1'
+        # Create a warning
+        warn = ValidationResult(True, [WARN_MSG])
+        assert warn
+        assert len(warn.get_messages()) == 1
+        assert len(warn.get_warnings()) == 1
+        assert warn.get_warnings()[0] == WARN_MSG
+        assert len(warn.get_errors()) == 0
+
+        # Create an error
+        err = ValidationResult(False, [ERR_MSG])
+        assert not err
+        assert len(err.get_messages()) == 1
+        assert len(err.get_warnings()) == 0
+        assert len(err.get_errors()) == 1
+        assert err.get_errors()[0] == ERR_MSG
+
+        # Create a summary
+        summary = ValidationResult(True, summaries=[SUMM_MSG])
+
+        # Add them
+        valid = warn + err
+        assert not valid
+        assert len(valid.get_messages()) == 2
+        assert valid.get_messages()[0] == ERR_MSG
+        assert valid.get_messages()[1] == WARN_MSG
+        assert len(valid.get_errors()) == 1
+        assert valid.get_errors()[0] == ERR_MSG
+        assert len(valid.get_warnings()) == 1
+        assert valid.get_warnings()[0] == WARN_MSG
+
+        # Add in the summary
+        valid = valid + summary
+        assert not valid
+        assert len(valid.get_messages()) == 3
+        assert valid.get_messages()[2] == SUMM_MSG
+        assert len(valid.get_summaries()) == 1
+        assert valid.get_summaries()[0] == SUMM_MSG
+
+        # Generate and check a response
+        response = get_validation_response(valid)
+        # Confirm the structure of the response body
+        assert response.get("commit") is False
+        self.assertEqual(response.get("transaction_id"), -1)
+        assert response.get("hasError") is True
+        assert response.get("hasWarning") is True
+        assert response.get("results") is not None
+        # Check we have two messages: one error, one warning
+        self.assertEqual(len(response.get("errorMessages")), 2)
+        self.assertEqual(response.get("errorMessages")[0].get("errorLevel"), "error")
+        self.assertEqual(response.get("errorMessages")[1].get("errorLevel"), "warning")
+        # Confirm HTML summary contains both messages
+        assert ERR_MSG in response['results']['htmlSummary']
+        assert WARN_MSG in response['results']['htmlSummary']
+
+        # Create a ValidationResult with error and warning at once
+        valid = ValidationResult(False, errors=[ERR_MSG], warnings=[WARN_MSG])
+        assert len(valid.get_messages()) == 2
+
+        # Create an invalid ValidationResult by giving an error message but saying it is valid
+        try:
+            invalid = ValidationResult(True, errors=[ERR_MSG], warnings=[WARN_MSG])
+            assert False
+        except ValueError as e:
+            assert str(e) == "ValidationResult cannot be valid and contain error messages"
+
+    def test_002_html_summary(self):
+        """
+        Test the HTML Summary generated by ValidationResult
+        """
+        ERR_INSTRUCT = "<p>Please fix the following errors and use the 'Back' button at the bottom of this screen to upload a new version of the data.</p>"
+        WARN_INSTRUCT = "<p>Please review the warnings and summary before uploading.</p>"
+        SUCCESS_INSTRUCT = "<p>Please review the summary before uploading.</p>"
+        COMMIT_INSTRUCT = "<p>Upload completed.</p>"
+        ERR_1 = 'error 1'
+        ERR_2 = 'error 2'
+        WARN_1 = 'warning 1'
+        WARN_2 = 'warning 2'
+        SUMM_1 = 'summary 1'
+        SUMM_2 = 'summary 2'
+        # No errors or warnings
+        res = ValidationResult(True)
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertEqual(html.strip(), SUCCESS_INSTRUCT)
+        # 1 errors 1 warning
+        res = ValidationResult(False, errors=[ERR_1], warnings=[WARN_1])
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertIn(ERR_INSTRUCT, html)
+        self.assertIn('<h4 style="color:red">Errors: 1 </h4>', html)
+        self.assertIn('<h4>Warnings: 1 </h4>', html)
+        self.assertIn(f"<li>{ERR_1}</li>", html)
+        self.assertIn(f"<li>{WARN_1}</li>", html)
+        # Multiple errors & warnings, including dupes
+        res = ValidationResult(False, errors=[ERR_1, ERR_2, ERR_1], warnings=[WARN_1, WARN_1, WARN_2])
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertIn('<h4 style="color:red">Errors: 2 </h4>', html)
+        self.assertIn('<h4>Warnings: 2 </h4>', html)
+        self.assertIn(f'<li>2 occurrences of: {ERR_1}</li>', html)
+        self.assertNotIn(f"<li>{ERR_1}</li>", html)
+        self.assertIn(f"<li>{ERR_2}</li>", html)
+        self.assertIn(f'<li>2 occurrences of: {WARN_1}</li>', html)
+        self.assertIn(f"<li>{WARN_2}</li>", html)
+        # Warnings, no errors
+        res = ValidationResult(True, warnings=[WARN_1, WARN_2])
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertIn(WARN_INSTRUCT, html)
+        self.assertIn('<h4>Warnings: 2 </h4>', html)
+        self.assertNotIn('<h4 style="color:red">Errors:', html)
+        # Errors, no warnings
+        res = ValidationResult(False, errors=[ERR_1, ERR_2])
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertIn(ERR_INSTRUCT, html)
+        self.assertIn('<h4 style="color:red">Errors: 2 </h4>', html)
+        self.assertNotIn('<h4>Warnings:', html)
+        # Errors, warnings, and summaries
+        res = ValidationResult(False, errors=[ERR_1, ERR_2], warnings=[WARN_1, WARN_2], summaries=[SUMM_1, SUMM_2])
+        html = get_validation_response(res).get('results').get('htmlSummary')
+        self.assertIn(ERR_INSTRUCT, html)
+        self.assertIn('<h4 style="color:red">Errors: 2 </h4>', html)
+        self.assertIn('<h4>Warnings: 2 </h4>', html)
+        self.assertIn('<h4>Summary</h4>', html)
+        self.assertIn(f"<li>{SUMM_1}</li>", html)
+        self.assertIn(f"<li>{SUMM_2}</li>", html)
+        # Commit should hide warnings and show a different message
+        res = ValidationResult(True, warnings=[WARN_1], summaries=[SUMM_1])
+        html = get_validation_response(res, commit=True).get('results').get('htmlSummary')
+        self.assertIn(COMMIT_INSTRUCT, html)
+        self.assertNotIn(ERR_INSTRUCT, html)
+        self.assertNotIn('<h4 style="color:red">Errors:', html)
+        self.assertNotIn('<h4>Warnings:', html)
+        self.assertIn('<h4>Summary</h4>', html)
+        self.assertIn(f"<li>{SUMM_1}</li>", html)

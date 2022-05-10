@@ -2,13 +2,15 @@
 
 """Tests for `acasclient` package."""
 
-
 import unittest
 from acasclient import acasclient
 from pathlib import Path
 import tempfile
 import shutil
 import uuid
+import json
+import operator
+import signal
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
@@ -19,6 +21,91 @@ EMPTY_MOL = """
   0  0  0  0  0  0            999 V2000
 M  END
 """
+
+class Timeout:
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
+
+# Code to anonymize experiments for testing
+def remove_common(object):
+    # Remove fields which are subject to change and are commmon for groups, states, values classes
+    object["id"] = None
+    object["recordedDate"] = None
+    object["modifiedDate"] = None
+    object["lsTransaction"] = None
+    object["version"] = None
+    return object
+
+def remove_common_group(group):
+    # Remove fields which are subject to change and are in common for group classes
+    remove_common(group)
+    group["codeName"] = None
+    return group
+
+def remove_common_state(state):
+    # Remove fields which are subject to change and are in common for all state classes
+    remove_common(state)
+    return state
+
+def remove_common_value(value):
+    # Remove fields which are subject to change and are in common for all value classes
+    remove_common(value)
+    value["analysisGroupCode"] = None
+    value["analysisGroupId"] = None
+    value["stateId"] = None 
+
+    # Round numeric values to 6 digits for comparison on different systems where calculations like EC50 might be different
+    if value['lsType'] == "numericValue":
+        if value["numericValue"] is not None:
+            value["numericValue"] = round(value["numericValue"], 6)
+    
+    # Round uncertainty values as their calculations may vary from system to system
+    if 'uncertainty' in value and value['uncertainty'] is not None:
+        value["uncertainty"] = round(value["uncertainty"], 6)
+
+def clean_group(group):
+    group['key'] =  None
+    remove_common_group(group)
+    for state in group["lsStates"]:
+        remove_common_state(state)
+        for value in state["lsValues"]:
+            remove_common_value(value)
+            # If key is curve id it is subject to change so just set it to a standard name for testing
+            if value['lsKind'] == "curve id":
+                value["stringValue"] = "FakeCurveIDJustForTesting"
+            # If there is a "Key" lsKind in the lsValues then we set it on the groups so that we can sort the groups
+            # later by the key (this is for diffing puroses as part of the test)
+            elif value['lsKind'] == "Key":
+                group['key'] = value['numericValue']
+        state["lsValues"] = sorted(state["lsValues"], key=operator.itemgetter('lsKind','ignored'))
+
+    group["lsStates"] = sorted(group["lsStates"], key=operator.itemgetter('lsType','lsKind','ignored'))
+    return group
+    
+def anonymize_experiment_dict(experiment):
+    # Anonymizes an experiment by removing keys which are subject to change each time the experiment is loaded
+    # It also sorts the analysis groups by an analysis group value lsKind "Key" if present in the upload file
+    # This key was added to the Dose Response upload file for these testing purposes
+    for analysis_group in experiment["analysisGroups"]:
+        clean_group(analysis_group)
+        # TODO: Treatment and Subject groups are not included in the diff because it was difficult to get them sorted
+        # correctly. One way to do this is might be to sort the keys by dose and response values.
+        analysis_group["treatmentGroups"] = None
+        # Leaving this code as reference for future when we want to sort the groups by some key
+        # for tg in analysis_group["treatmentGroups"]:
+        #     clean_group(tg)
+        #     for sg in tg["subjects"]:
+        #         clean_group(sg)
+    experiment["analysisGroups"] = sorted(experiment["analysisGroups"], key=operator.itemgetter('key'))
+    return experiment
 
 def create_project_thing(code, name=None, alias=None):
     if name is None:
@@ -143,10 +230,13 @@ class TestAcasclient(unittest.TestCase):
         creds = acasclient.get_default_credentials()
         self.client = acasclient.client(creds)
         self.tempdir = tempfile.mkdtemp()
+        # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
+        self.maxDiff = None
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
         shutil.rmtree(self.tempdir)
+        self.client.close()
 
     def test_000_creds_from_file(self):
         """Test creds from file."""
@@ -176,7 +266,8 @@ class TestAcasclient(unittest.TestCase):
     def test_002_client_initialization(self):
         """Test initializing client."""
         creds = acasclient.get_default_credentials()
-        acasclient.client(creds)
+        client = acasclient.client(creds)
+        client.close()
 
     def test_003_projects(self):
         """Test projects."""
@@ -703,7 +794,6 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('summary', search_results_export)
         search_results_export = self.client.\
             get_file(search_results_export['reportFilePath'])
-        print(search_results_export)
 
     def test_011_get_sdf_file_for_lots(self):
         """Test get sdf file for lots."""
@@ -759,20 +849,91 @@ class TestAcasclient(unittest.TestCase):
 
     def test_014_experiment_loader(self):
         """Test experiment loader."""
+
+        def experiment_load_test(data_file_to_upload, dry_run_mode, self):
+            response = self.client.\
+                experiment_loader(data_file_to_upload, "bob", dry_run_mode)
+            self.assertIn('results', response)
+            self.assertIn('errorMessages', response)
+            self.assertIn('hasError', response)
+            self.assertIn('hasWarning', response)
+            self.assertIn('transactionId', response)
+            if dry_run_mode:
+                self.assertIsNone(response['transactionId'])
+            else:
+                self.assertIsNotNone(response['transactionId'])
+            return response
+
+        def csv_to_txt(data_file_to_upload, self):
+            # Get the file name but change it to .txt
+            file_name = data_file_to_upload.name
+            file_name = file_name.replace(".csv", ".txt")
+            temp_file_path = Path(self.tempdir, file_name)
+            # Change the delim to the new delim
+            with open(data_file_to_upload, 'r') as f:
+                with open(temp_file_path, 'w') as f2:
+                    for line in f:
+                        f2.write(line.replace(',', "\t"))
+            return temp_file_path
+
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
-        response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", True)
-        self.assertIn('results', response)
-        self.assertIn('errorMessages', response)
-        self.assertIn('hasError', response)
-        self.assertIn('hasWarning', response)
-        self.assertIn('transactionId', response)
-        self.assertIsNone(response['transactionId'])
-        response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", False)
-        self.assertIn('transactionId', response)
-        self.assertIsNotNone(response['transactionId'])
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+
+        
+        # Test for csv format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        experiment_load_test(txt_file, True, self)
+        experiment_load_test(txt_file, False, self)
+
+        # Test for non-uniform comma format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        experiment_load_test(txt_file, True, self)
+        experiment_load_test(txt_file, False, self)
+
+        # Test for malformed single quote format file
+        def assert_malformed_single_quote_file(response, self):
+            self.assertTrue(response['hasError'])
+            self.assertIn('errorMessages', response)
+            hasEOFError = False 
+            for message in response['errorMessages'] :
+                if(message['message'].endswith('EOF within quoted string')):
+                    hasEOFError = True
+            self.assertTrue(hasEOFError)
+
+            
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
+        response = experiment_load_test(data_file_to_upload, True, self)
+        assert_malformed_single_quote_file(response, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        response = experiment_load_test(txt_file, True, self)
+        assert_malformed_single_quote_file(response, self)
+
+        # Speed test dry run
+        try:
+            # Dry run on 50 K row file with 3 columns of data should take
+            # less than 25 seconds to complete. On my machine it takes
+            # about 9 seconds. This is a sanity check to make sure the
+            # dry run hasn't slowed significantly.
+            with Timeout(seconds=25):
+                data_file_to_upload = Path(__file__).resolve()\
+                    .parent.joinpath('test_acasclient', '50k-lines.csv')
+                experiment_load_test(data_file_to_upload, True, self)
+        except TimeoutError:
+            self.fail("Timeout error")
+        else:
+            pass
+
 
     def test_015_get_protocols_by_label(self):
         """Test get protocols by label"""
@@ -1331,3 +1492,118 @@ class TestAcasclient(unittest.TestCase):
         search_results = self.client.\
             cmpd_structure_search(molStructure=EMPTY_MOL, searchType = "duplicate_tautomer")
         self.assertEqual(len(search_results), 0)
+
+    def test_043_dose_response_experiment_loader(self):
+        """Test dose response experiment loader."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R.csv')
+        request = {
+            "data_file": data_file_to_upload,
+            "user": "bob",
+            "dry_run": True,
+            "model_fit_type": "4 parameter D-R",
+            "fit_settings": {
+                "smartMode":True,
+                "inactiveThresholdMode":True,
+                "inactiveThreshold":20,
+                "theoreticalMaxMode":False,
+                "theoreticalMax":None,
+                "inverseAgonistMode":False,
+                "max":{
+                    "limitType":"none"
+                },
+                "min":
+                    {
+                        "limitType":"none"
+                },
+                "slope":{
+                    "limitType":"none"
+                },
+                "baseline":{
+                    "value":0
+                }
+            }
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        self.assertIn('hasError', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertIn('transactionId', response["experiment_loader_response"])
+        self.assertIsNone(response["experiment_loader_response"]['transactionId'])
+        self.assertIsNone(response['dose_response_fit_response'])
+    
+        # Read the file as a string so that we can update the data
+        with open(data_file_to_upload, 'r') as f:
+            data_file_as_string = f.read()
+
+        # Substitute Format with "Generic" to test for warning for uploading Generic to 
+        # a Dose Response experiment
+        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
+        request["data_file"] = {
+            "name": f.name,
+            "data": data_file_as_string
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        # Dose response load should warn that a Generic file was uploaded which had a curve id
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertTrue(response["experiment_loader_response"]['hasWarning'])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        # Assert that error messages has a warning message
+        genericFormatUploadedAsDoseResponse = "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly."
+        matchingMessage = None
+        for error_message in response["experiment_loader_response"]['errorMessages']:
+            if error_message['errorLevel'] == 'warning':
+                # Check if warning has the message in it
+                if "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly." in error_message['message']:
+                    matchingMessage = True
+        if matchingMessage is None:
+            self.fail("ACAS did not produce warning that 'Generic' was uploaded as 'Dose")
+        
+        # Use the original data file for further tests
+        request["data_file"] = data_file_to_upload
+        request["dry_run"] = False
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        self.assertIn('transactionId', response["experiment_loader_response"])
+        self.assertIsNotNone(response["experiment_loader_response"]['transactionId'])
+        self.assertIsNotNone(response["experiment_loader_response"]['results'])
+        self.assertIsNotNone(response["experiment_loader_response"]['results']['experimentCode'])
+
+        self.assertIn('dose_response_fit_response', response)
+        self.assertIn('results', response["dose_response_fit_response"])
+        self.assertIn('htmlSummary', response["dose_response_fit_response"]['results'])
+        self.assertIn('status', response["dose_response_fit_response"]['results'])
+        self.assertEqual(response["dose_response_fit_response"]['results']['status'], 'complete')
+
+        # Get Experiment results
+        experiment = self.client.\
+            get_experiment_by_code(response["experiment_loader_response"]['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+
+        accepted_results_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', "test_dose_response_experiment_loader_accepted_results.json")
+
+        # Leaving this here to show how to update the accepted results file
+        # with open(accepted_results_file_path, 'w') as f:
+        #     json.dump(experiment, f, indent=2)
+
+        experiment = anonymize_experiment_dict(experiment)
+        
+        accepted_results_experiment  = json.loads(accepted_results_file_path.read_text())
+        accepted_results_analysis_groups = anonymize_experiment_dict(accepted_results_experiment)["analysisGroups"]
+        new_results_analysis_groups = experiment["analysisGroups"]
+
+        # Verify that the analysis groups are the same as the accepted results analysis groups
+        # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
+        for i in range(len(accepted_results_analysis_groups)):
+            self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
+

@@ -1967,12 +1967,16 @@ class SimpleLsThing(BaseModel):
         :type ls_kind: str, optional
         :return: SimpleLsThing object with latest data fetched frm the ACAS server
         :rtype: SimpleLsThing
+        :raises KeyError: If no lsthing is found for the given options.
         """
         if not ls_type:
             ls_type = cls.ls_type
         if not ls_kind:
             ls_kind = cls.ls_kind
         camel_case_dict = client.get_ls_thing(ls_type, ls_kind, code_name)
+        if camel_case_dict is None:
+            msg = f'No lsthing found for {ls_type=}, {ls_kind=}, {code_name=}'
+            raise KeyError(msg)
         simple_ls_thing = cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
         simple_ls_thing.set_client(client=client)
         return simple_ls_thing

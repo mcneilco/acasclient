@@ -588,7 +588,7 @@ class TestLsThing(unittest.TestCase):
         proj_1.add_link(FWD_ITX, proj_2, recorded_by=self.client.username)
         assert len(proj_1.links) == 1
         proj_1.save(self.client)
-       
+
         # Run advanced search by interaction w/value matching on the interaction thing
         # Forward interaction query w/interaction thing values
         # Code value search
@@ -701,6 +701,17 @@ class TestLsThing(unittest.TestCase):
                                        max_results=1000,
                                        combine_terms_with_and=True)
         assert len(results) == 0
+
+    def test_008_get_by_code(self):
+        """
+        If no lsthing entry is found for the given `code_name`, `ls_type` and
+        `ls_kind` then `get_by_code` should raise KeyError.
+        """
+
+        with self.assertRaises(KeyError):
+            _ = SimpleLsThing.get_by_code(code_name='baz', client=self.client,
+            ls_type='foo', ls_kind='bar')
+
 
 class TestBlobValue(unittest.TestCase):
 

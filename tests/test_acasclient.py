@@ -252,9 +252,8 @@ def get_or_create_global_project():
     output = r.json()
     return output["messages"]
 
-class TestAcasclient(unittest.TestCase):
-    """Tests for `acasclient` package."""
-
+class BaseAcasClientTest(unittest.TestCase):
+    """ Base class for ACAS Client tests """
     def setUp(self):
         """Set up test fixtures, if any."""
         creds = acasclient.get_default_credentials()
@@ -282,6 +281,17 @@ class TestAcasclient(unittest.TestCase):
             for username in self.test_usernames:
                 delete_backdoor_user(username)
         self.client.close()
+
+class TestAcasclient(unittest.TestCase):
+    """Tests for `acasclient` package."""
+
+    def setUp(self):
+        """Set up test fixtures, if any."""
+        super().setUp()
+
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+        super().tearDown()
 
     def test_000_creds_from_file(self):
         """Test creds from file."""
@@ -1651,4 +1661,33 @@ class TestAcasclient(unittest.TestCase):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
-
+    
+    def test_044_author_and_role_apis(self):
+        # Test that as an admin you can fetch authors
+        all_authors = self.client.get_authors()
+        self.assertGreater(len(all_authors), 0)
+        # Create a non-admin account to test we can create authors
+        user_creds = {
+                      'username': 'test_user',
+                      'password': 'test_password',
+                      'url': self.client.url,
+                      }
+        new_user = self.client.create_user(user_creds['username'],
+                                           user_creds['password'],
+                                           acas_user=True,
+                                           acas_admin=False,
+                                           cmpdreg_user=False,
+                                           cmpdreg_admin=False,
+                                           project = ['Global'])
+        self.assertIsNotNone(new_user)
+        # Test we can login with the new user
+        user_client = acasclient.client(user_creds)
+        # Confirm the user can access projects
+        projects = user_client.get_projects()
+        self.assertGreater(len(projects), 0)
+        # TODO Test as an admin you can POST updateProjectRoles
+        # TODO Test as a non-admin you CANNOT fetch authors, POST authors array, or POST updateProjectRoles
+        try:
+            self.client.get_authors()
+        except Exception as e:
+            assert "401" in str(e)

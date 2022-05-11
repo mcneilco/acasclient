@@ -15,10 +15,8 @@ from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
                                 SimpleLsThing, get_lsKind_to_lsvalue)
 from acasclient.validation import ValidationResult, get_validation_response
+from tests.test_acasclient import BaseAcasClientTest
 
-# SETUP
-# "bob" user name registered
-# "PROJ-00000001" registered
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -77,23 +75,21 @@ class Project(SimpleLsThing):
                                       preferred_label_kind=self.preferred_label_kind, metadata=metadata, ls_thing=ls_thing)
 
 
-class TestLsThing(unittest.TestCase):
+class TestLsThing(BaseAcasClientTest):
     """Tests for `acasclient lsthing` package model."""
 
     def setUp(self):
         """Set up test fixtures, if any."""
-        creds = acasclient.get_default_credentials()
-        self.client = acasclient.client(creds)
-        self.tempdir = tempfile.mkdtemp()
+        super().setUp()
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-        self.client.close()
         files_to_delete = ['dummy.pdf', 'dummy2.pdf']
         for f in files_to_delete:
             file = Path(f)
             if file.exists():
                 os.remove(file)
+        super().tearDown()
 
     # Helpers
     def _get_path(self, file_name):

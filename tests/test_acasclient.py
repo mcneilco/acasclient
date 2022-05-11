@@ -1673,10 +1673,9 @@ class TestAcasclient(BaseAcasClientTest):
             "userName": "jdoe",
             "emailAddress": "john@example.com",
             "password": str(uuid.uuid4()),
-            "enabled": True,
         }
         new_author = self.client.create_author(author)
-        # self.test_usernames.append(author['userName])
+        self.test_usernames.append(author['userName'])
         self.assertEqual(new_author["firstName"], author["firstName"])
         self.assertEqual(new_author["lastName"], author["lastName"])
         self.assertEqual(new_author["userName"], author["userName"])
@@ -1715,20 +1714,50 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(len(updated_author['authorRoles']), 1)
         role = updated_author['authorRoles'][0]['roleEntry']
         self.assertEqual(role['roleName'], 'ROLE_ACAS-USERS')
-        # Test we can login with the new user
+        # Try login with the new user, which will fail due to account not being activated
+        # Database authentication requires email address to be confirmed
         user_creds = {
             'username': author['userName'],
             'password': author['password'],
             'url': self.client.url
         }
+        with self.assertRaises(RuntimeError):
+            acasclient.client(user_creds)
+        # Now use the "backdoor" route to create a non-admin account which will be activated
+        test_username = 'test_user'
+        test_password = str(uuid.uuid4())
+        new_user = create_backdoor_user(test_username, test_password)
+        self.test_usernames.append(test_username)
+        user_creds = {
+            'username': test_username,
+            'password': test_password,
+            'url': self.client.url
+        }
         user_client = acasclient.client(user_creds)
         # Confirm the user can access projects
-        projects = user_client.get_projects()
+        projects = user_client.projects()
         self.assertGreater(len(projects), 0)
-        # TODO Test as an admin you can POST updateProjectRoles
-        # TODO Test as a non-admin you CANNOT fetch authors, POST authors array, or POST updateProjectRoles
-        try:
-            # TODO switch so authors CAN be fetched just not created by non-admin
-            self.client.get_authors()
-        except Exception as e:
-            assert "401" in str(e)
+        # Check that a non-admin cannot create more authors
+        with self.assertRaises(requests.HTTPError) as context:
+            author = {
+                "firstName": "Jane",
+                "lastName": "Doe",
+                "userName": "jadoe",
+                "emailAddress": "jane@example.com",
+                "password": str(uuid.uuid4()),
+            }
+            user_client.create_author(author)
+        self.assertIn('500 Server Error', str(context.exception))
+        # Check a non-admin can access the list of authors
+        authors = user_client.get_authors()
+        self.assertGreater(len(authors), 0)
+        # Confirm a non-admin cannot escalate user roles
+        with self.assertRaises(requests.HTTPError) as context:
+            cmpdreg_user_author_role['userName'] = test_username
+            user_client.update_author_roles([cmpdreg_user_author_role])
+        self.assertIn('500 Server Error', str(context.exception))
+        # Confirm a non-admin cannot revoke user roles
+        with self.assertRaises(requests.HTTPError) as context:
+            acas_user_author_role['userName'] = test_username
+            user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
+        self.assertIn('500 Server Error', str(context.exception))

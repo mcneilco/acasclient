@@ -12,11 +12,7 @@ import json
 import operator
 import signal
 import requests
-import hashlib
-import base64
-# SETUP
-# "bob" user name registered
-# "PROJ-00000001" registered
+
 
 EMPTY_MOL = """
   Mrv1818 02242010372D          
@@ -248,12 +244,23 @@ def create_backdoor_user(username, password, acas_user=True, acas_admin=False, c
     r.raise_for_status()
     return r.json()
 
+
+def get_or_create_global_project():
+    """ Creates a global project for testing purposes """
+    r = requests.get(ACAS_NODEAPI_BASE_URL + "/api/systemTest/getOrCreateGlobalProject")
+    r.raise_for_status()
+    output = r.json()
+    return output["messages"]
+
 class TestAcasclient(unittest.TestCase):
     """Tests for `acasclient` package."""
 
     def setUp(self):
         """Set up test fixtures, if any."""
         creds = acasclient.get_default_credentials()
+        # Ensure Global project is there
+        global_project = get_or_create_global_project()
+        self.global_project_code = global_project["code"]
         self.test_usernames = []
         try:
             self.client = acasclient.client(creds)
@@ -440,7 +447,7 @@ class TestAcasclient(unittest.TestCase):
                 },
                 {
                     "dbProperty": "Project",
-                    "defaultVal": "PROJ-00000001",
+                    "defaultVal": self.global_project_code,
                     "required": True,
                     "sdfProperty": "Project Code Name"
                 },
@@ -603,7 +610,7 @@ class TestAcasclient(unittest.TestCase):
             },
             {
                 "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
+                "defaultVal": self.global_project_code,
                 "required": True,
                 "sdfProperty": "Project Code Name"
             },
@@ -1129,9 +1136,9 @@ class TestAcasclient(unittest.TestCase):
     def test_027_get_ls_thing(self):
         ls_thing = self.client.get_ls_thing("project",
                                             "project",
-                                            "PROJ-00000001")
+                                            self.global_project_code)
         self.assertIn('codeName', ls_thing)
-        self.assertEqual("PROJ-00000001", ls_thing["codeName"])
+        self.assertEqual(self.global_project_code, ls_thing["codeName"])
         ls_thing = self.client.get_ls_thing("project",
                                             "project",
                                             "FAKE")

@@ -1666,21 +1666,61 @@ class TestAcasclient(BaseAcasClientTest):
         # Test that as an admin you can fetch authors
         all_authors = self.client.get_authors()
         self.assertGreater(len(all_authors), 0)
-        # Create a non-admin account to test we can create authors
-        user_creds = {
-                      'username': 'test_user',
-                      'password': 'test_password',
-                      'url': self.client.url,
-                      }
-        new_user = self.client.create_user(user_creds['username'],
-                                           user_creds['password'],
-                                           acas_user=True,
-                                           acas_admin=False,
-                                           cmpdreg_user=False,
-                                           cmpdreg_admin=False,
-                                           project = ['Global'])
-        self.assertIsNotNone(new_user)
+        # Test that as an admin you can create an author
+        author = {
+            "firstName": "John",
+            "lastName": "Doe",
+            "userName": "jdoe",
+            "emailAddress": "john@example.com",
+            "password": str(uuid.uuid4()),
+            "enabled": True,
+        }
+        new_author = self.client.create_author(author)
+        # self.test_usernames.append(author['userName])
+        self.assertEqual(new_author["firstName"], author["firstName"])
+        self.assertEqual(new_author["lastName"], author["lastName"])
+        self.assertEqual(new_author["userName"], author["userName"])
+        self.assertEqual(new_author["emailAddress"], author["emailAddress"])
+        self.assertEqual(new_author.get('password'), None)
+        self.assertIsNotNone(new_author.get('codeName'))
+        # Test as an admin you can grant the user roles
+        acas_user_author_role = {
+            'userName': new_author['userName'],
+            'roleType': 'System',
+            'roleKind': 'ACAS',
+            'roleName': 'ROLE_ACAS-USERS',
+        }
+        cmpdreg_user_author_role = {
+            'userName': new_author['userName'],
+            'roleType': 'System',
+            'roleKind': 'CmpdReg',
+            'roleName': 'ROLE_CMPDREG-USERS',
+        }
+        roles_to_add = [acas_user_author_role, cmpdreg_user_author_role]
+        self.client.update_author_roles(roles_to_add)
+        # Fetch the updated author so we can check its attributes
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        # Confirm the roles were granted
+        self.assertEqual(len(updated_author['authorRoles']), 2)
+        for author_role in updated_author['authorRoles']:
+            role = author_role['roleEntry']
+            self.assertEqual(role['lsType'], 'System')
+            self.assertIn(role['lsKind'], ['ACAS', 'CmpdReg'])
+            self.assertIn(role['roleName'], ['ROLE_ACAS-USERS', 'ROLE_CMPDREG-USERS'])
+        # Revoke the CmpdReg role
+        roles_to_remove = [cmpdreg_user_author_role]
+        self.client.update_author_roles(author_roles_to_delete=roles_to_remove)
+        # Confirm a role was revoked
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        self.assertEqual(len(updated_author['authorRoles']), 1)
+        role = updated_author['authorRoles'][0]['roleEntry']
+        self.assertEqual(role['roleName'], 'ROLE_ACAS-USERS')
         # Test we can login with the new user
+        user_creds = {
+            'username': author['userName'],
+            'password': author['password'],
+            'url': self.client.url
+        }
         user_client = acasclient.client(user_creds)
         # Confirm the user can access projects
         projects = user_client.get_projects()
@@ -1688,6 +1728,7 @@ class TestAcasclient(BaseAcasClientTest):
         # TODO Test as an admin you can POST updateProjectRoles
         # TODO Test as a non-admin you CANNOT fetch authors, POST authors array, or POST updateProjectRoles
         try:
+            # TODO switch so authors CAN be fetched just not created by non-admin
             self.client.get_authors()
         except Exception as e:
             assert "401" in str(e)

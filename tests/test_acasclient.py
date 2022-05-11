@@ -282,7 +282,7 @@ class BaseAcasClientTest(unittest.TestCase):
                 delete_backdoor_user(username)
         self.client.close()
 
-class TestAcasclient(unittest.TestCase):
+class TestAcasclient(BaseAcasClientTest):
     """Tests for `acasclient` package."""
 
     def setUp(self):

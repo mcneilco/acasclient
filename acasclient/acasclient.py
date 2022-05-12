@@ -1463,6 +1463,19 @@ class client():
             'newAuthorRoles': new_author_roles or [],
             'authorRolesToDelete': author_roles_to_delete or [],
         }
+        resp = self.session.post("{}/api/updateAuthorRoles".format(self.url),
+                                    json=body)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def update_project_roles(self, new_author_roles=None, author_roles_to_delete=None):
+        """
+        Same as update author roles but with a different endpoint name.
+        """
+        body = {
+            'newAuthorRoles': new_author_roles or [],
+            'authorRolesToDelete': author_roles_to_delete or [],
+        }
         resp = self.session.post("{}/api/projects/updateProjectRoles".format(self.url),
                                     json=body)
         resp.raise_for_status()

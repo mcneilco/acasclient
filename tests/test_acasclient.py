@@ -276,22 +276,15 @@ class BaseAcasClientTest(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-        shutil.rmtree(self.tempdir)
-        if self.test_usernames:
+        try:
+            shutil.rmtree(self.tempdir)
             for username in self.test_usernames:
                 delete_backdoor_user(username)
-        self.client.close()
+        finally:
+            self.client.close()
 
 class TestAcasclient(BaseAcasClientTest):
     """Tests for `acasclient` package."""
-
-    def setUp(self):
-        """Set up test fixtures, if any."""
-        super().setUp()
-
-    def tearDown(self):
-        """Tear down test fixtures, if any."""
-        super().tearDown()
 
     def test_000_creds_from_file(self):
         """Test creds from file."""

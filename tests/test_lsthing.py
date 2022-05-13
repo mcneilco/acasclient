@@ -78,9 +78,7 @@ class Project(SimpleLsThing):
 class TestLsThing(BaseAcasClientTest):
     """Tests for `acasclient lsthing` package model."""
 
-    def setUp(self):
-        """Set up test fixtures, if any."""
-        super().setUp()
+    # See test_acasclient.BaseAcasClientTest for setUp
 
     def tearDown(self):
         """Tear down test fixtures, if any."""

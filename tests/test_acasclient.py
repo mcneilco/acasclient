@@ -272,9 +272,6 @@ class BaseAcasClientTest(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures, if any."""
         creds = acasclient.get_default_credentials()
-        # Ensure Global project is there
-        global_project = get_or_create_global_project()
-        self.global_project_code = global_project["code"]
         self.test_usernames = []
         try:
             self.client = acasclient.client(creds)
@@ -285,6 +282,15 @@ class BaseAcasClientTest(unittest.TestCase):
                 create_backdoor_user(creds.get('username'), creds.get('password'), acas_user=True, acas_admin=True, creg_user=True, creg_admin=True)
             # Login again
             self.client = acasclient.client(creds)
+        # Ensure Global project is there
+        projects = self.client.projects()
+        global_project = [p for p in projects if p.get('name') == 'Global']
+        if not global_project:
+            # Create the global project
+            global_project = get_or_create_global_project()
+        else:
+            global_project = global_project[0]
+        self.global_project_code = global_project["code"]
         self.tempdir = tempfile.mkdtemp()
         # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
         self.maxDiff = None
@@ -1670,6 +1676,7 @@ class TestAcasclient(BaseAcasClientTest):
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
     
+    @requires_node_api
     def test_044_author_and_role_apis(self):
         # Test that as an admin you can fetch authors
         all_authors = self.client.get_authors()

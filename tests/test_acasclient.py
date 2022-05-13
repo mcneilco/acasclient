@@ -1714,6 +1714,21 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(len(updated_author['authorRoles']), 1)
         role = updated_author['authorRoles'][0]['roleEntry']
         self.assertEqual(role['roleName'], 'ROLE_ACAS-USERS')
+        # Try adding a role by updating the author
+        # Unfortunately we need to hardcode the id of the role, or fetch it from the server
+        nested_cmpdreg_role = {
+            'roleEntry': {
+                'id': 3,
+                'lsType': 'System',
+                'lsKind': 'CmpdReg',
+                'roleName': 'ROLE_CMPDREG-USERS',
+            }
+        }
+        updated_author['authorRoles'].append(nested_cmpdreg_role)
+        self.client.update_author(updated_author)
+        # Confirm the role was added
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        self.assertEqual(len(updated_author['authorRoles']), 2)
         # Confirm the legacy 'updateProjectRoles' endpoint is still functional
         self.client.update_project_roles([cmpdreg_user_author_role])
         updated_author = self.client.get_author_by_username(new_author['userName'])

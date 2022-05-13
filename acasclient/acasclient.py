@@ -1433,6 +1433,22 @@ class client():
         resp.raise_for_status()
         return resp.json()
     
+    def update_author(self, author):
+        """Update an author
+
+        Args:
+            author (dict): A dict object representing the author to update
+
+        Returns:
+            a dict object representing the updated author
+        """
+        if 'id' not in author:
+            raise ValueError("id attribute of author dict is required")
+        resp = self.session.put("{}/api/author/{}".format(self.url, author.get('id')),
+                                    json=author)
+        resp.raise_for_status()
+        return resp.json()
+    
     def create_authors(self, authors):
         """
         Create authors

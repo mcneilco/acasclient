@@ -2,6 +2,7 @@
 
 """Tests for `acasclient` package."""
 
+from functools import wraps
 import unittest
 from acasclient import acasclient
 from pathlib import Path
@@ -222,13 +223,27 @@ def create_thing_with_blob_value(code):
     # Return thing file and bytes array for testing
     return ls_thing, file_name, bytes_array
 
+def requires_node_api(func):
+    """
+    Decorator to skip tests if the node API is not available
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            requests.get(ACAS_NODEAPI_BASE_URL)
+        except requests.exceptions.ConnectionError:
+            print('WARNING: ACAS Node API is not available. Skipping tests which require it.')
+            raise unittest.SkipTest("Node API is not available")
+        return func(*args, **kwargs)
+    return wrapper
 
+@requires_node_api
 def delete_backdoor_user(username):
     """ Deletes a backdoor user created for testing purposes """
     r = requests.delete(ACAS_NODEAPI_BASE_URL + "/api/systemTest/deleteTestUser/" + username)
     r.raise_for_status()
 
-
+@requires_node_api
 def create_backdoor_user(username, password, acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names=None):
     """ Creates a backdoor user for testing purposes """
     body = {
@@ -244,7 +259,7 @@ def create_backdoor_user(username, password, acas_user=True, acas_admin=False, c
     r.raise_for_status()
     return r.json()
 
-
+@requires_node_api
 def get_or_create_global_project():
     """ Creates a global project for testing purposes """
     r = requests.get(ACAS_NODEAPI_BASE_URL + "/api/systemTest/getOrCreateGlobalProject")

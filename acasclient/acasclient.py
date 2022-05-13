@@ -1459,10 +1459,7 @@ class client():
         Returns:
             a list of dict objects representing the saved authors
         """
-        saved_authors = []
-        for author in authors:
-            saved_authors.append(self.create_author(author))
-        return saved_authors
+        return [self.create_author(author) for author in authors]
     
     def update_author_roles(self, new_author_roles=None, author_roles_to_delete=None):
         """

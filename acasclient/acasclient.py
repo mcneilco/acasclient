@@ -9,6 +9,7 @@ from pathlib import Path
 from pathlib import PurePath
 import re
 import base64
+import hashlib
 from io import StringIO, IOBase
 
 logger = logging.getLogger(__name__)
@@ -244,9 +245,10 @@ class client():
         session = requests.Session()
         resp = session.post("{}/login".format(self.url),
                             headers={'Content-Type': 'application/json'},
-                            data=json.dumps(data))
+                            data=json.dumps(data),
+                            allow_redirects=False)
         resp.raise_for_status()
-        if 'location' in resp.headers and resp.headers.location == "/login":
+        if resp.status_code == 302 and 'location' in resp.headers and resp.headers.get('location') == "/login":
             raise RuntimeError("Failed to login. Please check credentials.")
         return session
 
@@ -1383,3 +1385,111 @@ class client():
                                 .format(self.url, valueId))
         resp.raise_for_status()
         return resp.content
+    
+    def get_authors(self):
+        """
+        Get all authors
+
+        Returns:
+            a list of dict objects representing the authors
+        """
+        resp = self.session.get("{}/api/authors".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_author_by_username(self, username):
+        """
+        Get author by username
+            
+        Args:
+            username (str): The username of the author to fetch
+
+        Returns:
+            a dict object representing the author
+        """
+        resp = self.session.get("{}/api/authorByUsername/{}".format(self.url, username))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_author(self, author):
+        """
+        Create an author
+
+        Args:
+            author (dict): A dict object representing the author to create
+
+        Returns:
+            a dict object representing the new author
+        """
+        def hash_password(password):
+            """ Calculate the base64-encoded sha1 hash of the password for ACAS built-in authentication """
+            hasher = hashlib.sha1()
+            hasher.update(password.encode('utf-8'))
+            return base64.b64encode(hasher.digest()).decode('utf-8')
+        if 'password' in author:
+            author['password'] = hash_password(author['password'])
+        resp = self.session.post("{}/api/author".format(self.url),
+                                    json=author)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def update_author(self, author):
+        """Update an author
+
+        Args:
+            author (dict): A dict object representing the author to update
+
+        Returns:
+            a dict object representing the updated author
+        """
+        if 'id' not in author:
+            raise ValueError("id attribute of author dict is required")
+        resp = self.session.put("{}/api/author/{}".format(self.url, author.get('id')),
+                                    json=author)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_authors(self, authors):
+        """
+        Create authors
+
+        Args:
+            authors (list): A list of dicts representing the authors to create
+            
+        Returns:
+            a list of dict objects representing the saved authors
+        """
+        return [self.create_author(author) for author in authors]
+    
+    def update_author_roles(self, new_author_roles=None, author_roles_to_delete=None):
+        """
+        Update author roles
+        
+        Args:
+            new_author_roles (list): A list of dicts representing the new author roles to create
+            author_roles_to_delete (list): A list of dicts representing the author roles to delete
+            
+        Returns:
+            a list of dict objects representing the saved author roles
+        """
+        body = {
+            'newAuthorRoles': new_author_roles or [],
+            'authorRolesToDelete': author_roles_to_delete or [],
+        }
+        resp = self.session.post("{}/api/updateAuthorRoles".format(self.url),
+                                    json=body)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def update_project_roles(self, new_author_roles=None, author_roles_to_delete=None):
+        """
+        Same as update author roles but with a different endpoint name.
+        """
+        body = {
+            'newAuthorRoles': new_author_roles or [],
+            'authorRolesToDelete': author_roles_to_delete or [],
+        }
+        resp = self.session.post("{}/api/projects/updateProjectRoles".format(self.url),
+                                    json=body)
+        resp.raise_for_status()
+        return resp.json()

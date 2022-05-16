@@ -2,6 +2,7 @@
 
 """Tests for `acasclient` package."""
 
+from functools import wraps
 import unittest
 from acasclient import acasclient
 from pathlib import Path
@@ -11,9 +12,8 @@ import uuid
 import json
 import operator
 import signal
-# SETUP
-# "bob" user name registered
-# "PROJ-00000001" registered
+import requests
+
 
 EMPTY_MOL = """
   Mrv1818 02242010372D          
@@ -21,6 +21,8 @@ EMPTY_MOL = """
   0  0  0  0  0  0            999 V2000
 M  END
 """
+
+ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
@@ -221,22 +223,89 @@ def create_thing_with_blob_value(code):
     # Return thing file and bytes array for testing
     return ls_thing, file_name, bytes_array
 
+def requires_node_api(func):
+    """
+    Decorator to skip tests if the node API is not available
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            requests.get(ACAS_NODEAPI_BASE_URL)
+        except requests.exceptions.ConnectionError:
+            print('WARNING: ACAS Node API is not available. Skipping tests which require it.')
+            raise unittest.SkipTest("Node API is not available")
+        return func(*args, **kwargs)
+    return wrapper
 
-class TestAcasclient(unittest.TestCase):
-    """Tests for `acasclient` package."""
+@requires_node_api
+def delete_backdoor_user(username):
+    """ Deletes a backdoor user created for testing purposes """
+    r = requests.delete(ACAS_NODEAPI_BASE_URL + "/api/systemTest/deleteTestUser/" + username)
+    r.raise_for_status()
 
+@requires_node_api
+def create_backdoor_user(username, password, acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names=None):
+    """ Creates a backdoor user for testing purposes """
+    body = {
+        "username": username,
+        "password": password,
+        "acasUser": acas_user,
+        "acasAdmin": acas_admin,
+        "cmpdregUser": creg_user,
+        "cmpdregAdmin": creg_admin,
+        "projectNames": project_names or []
+    }
+    r = requests.post(ACAS_NODEAPI_BASE_URL + "/api/systemTest/getOrCreateTestUser", json=body)
+    r.raise_for_status()
+    return r.json()
+
+@requires_node_api
+def get_or_create_global_project():
+    """ Creates a global project for testing purposes """
+    r = requests.get(ACAS_NODEAPI_BASE_URL + "/api/systemTest/getOrCreateGlobalProject")
+    r.raise_for_status()
+    output = r.json()
+    return output["messages"]
+
+class BaseAcasClientTest(unittest.TestCase):
+    """ Base class for ACAS Client tests """
     def setUp(self):
         """Set up test fixtures, if any."""
         creds = acasclient.get_default_credentials()
-        self.client = acasclient.client(creds)
+        self.test_usernames = []
+        try:
+            self.client = acasclient.client(creds)
+        except RuntimeError:
+            # Create the default user if it doesn't exist
+            if creds.get('username'):
+                self.test_usernames.append(creds.get('username'))
+                create_backdoor_user(creds.get('username'), creds.get('password'), acas_user=True, acas_admin=True, creg_user=True, creg_admin=True)
+            # Login again
+            self.client = acasclient.client(creds)
+        # Ensure Global project is there
+        projects = self.client.projects()
+        global_project = [p for p in projects if p.get('name') == 'Global']
+        if not global_project:
+            # Create the global project
+            global_project = get_or_create_global_project()
+        else:
+            global_project = global_project[0]
+        self.global_project_code = global_project["code"]
         self.tempdir = tempfile.mkdtemp()
         # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
         self.maxDiff = None
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-        shutil.rmtree(self.tempdir)
-        self.client.close()
+        try:
+            shutil.rmtree(self.tempdir)
+            for username in self.test_usernames:
+                delete_backdoor_user(username)
+        finally:
+            self.client.close()
+
+class TestAcasclient(BaseAcasClientTest):
+    """Tests for `acasclient` package."""
 
     def test_000_creds_from_file(self):
         """Test creds from file."""
@@ -402,7 +471,7 @@ class TestAcasclient(unittest.TestCase):
                 },
                 {
                     "dbProperty": "Project",
-                    "defaultVal": "PROJ-00000001",
+                    "defaultVal": self.global_project_code,
                     "required": True,
                     "sdfProperty": "Project Code Name"
                 },
@@ -414,7 +483,7 @@ class TestAcasclient(unittest.TestCase):
                 },
                 {
                     "dbProperty": "Parent Stereo Category",
-                    "defaultVal": "unknown",
+                    "defaultVal": "Unknown",
                     "required": True,
                     "sdfProperty": None
                 },
@@ -565,7 +634,7 @@ class TestAcasclient(unittest.TestCase):
             },
             {
                 "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
+                "defaultVal": self.global_project_code,
                 "required": True,
                 "sdfProperty": "Project Code Name"
             },
@@ -577,7 +646,7 @@ class TestAcasclient(unittest.TestCase):
             },
             {
                 "dbProperty": "Parent Stereo Category",
-                "defaultVal": "unknown",
+                "defaultVal": "Unknown",
                 "required": True,
                 "sdfProperty": None
             },
@@ -803,8 +872,8 @@ class TestAcasclient(unittest.TestCase):
         content = str(search_results_export['content'])
         self.assertIn('<Parent Corp Name>\\nCMPD-0000001', content)
         self.assertIn('<Lot Corp Name>\\nCMPD-0000001-001', content)
-        self.assertIn('<Project>\\nPROJ-00000001', content)
-        self.assertIn('<Parent Stereo Category>\\nunknown', content)
+        self.assertIn(f'<Project>\\n{self.global_project_code}', content)
+        self.assertIn('<Parent Stereo Category>\\nUnknown', content)
         self.assertIn('content-type', search_results_export)
         self.assertIn('name', search_results_export)
         self.assertIn('content-length', search_results_export)
@@ -1035,7 +1104,7 @@ class TestAcasclient(unittest.TestCase):
             .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
         mappings = [{
             "dbProperty": "Parent Stereo Category",
-            "defaultVal": "unknown",
+            "defaultVal": "Unknown",
             "required": True,
             "sdfProperty": None
         }]
@@ -1091,9 +1160,9 @@ class TestAcasclient(unittest.TestCase):
     def test_027_get_ls_thing(self):
         ls_thing = self.client.get_ls_thing("project",
                                             "project",
-                                            "PROJ-00000001")
+                                            self.global_project_code)
         self.assertIn('codeName', ls_thing)
-        self.assertEqual("PROJ-00000001", ls_thing["codeName"])
+        self.assertEqual(self.global_project_code, ls_thing["codeName"])
         ls_thing = self.client.get_ls_thing("project",
                                             "project",
                                             "FAKE")
@@ -1606,4 +1675,126 @@ class TestAcasclient(unittest.TestCase):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
-
+    
+    @requires_node_api
+    def test_044_author_and_role_apis(self):
+        # Test that as an admin you can fetch authors
+        all_authors = self.client.get_authors()
+        self.assertGreater(len(all_authors), 0)
+        # Test that as an admin you can create an author
+        author = {
+            "firstName": "John",
+            "lastName": "Doe",
+            "userName": "jdoe",
+            "emailAddress": "john@example.com",
+            "password": str(uuid.uuid4()),
+        }
+        self.test_usernames.append(author['userName'])
+        new_author = self.client.create_author(author)
+        self.assertEqual(new_author["firstName"], author["firstName"])
+        self.assertEqual(new_author["lastName"], author["lastName"])
+        self.assertEqual(new_author["userName"], author["userName"])
+        self.assertEqual(new_author["emailAddress"], author["emailAddress"])
+        self.assertEqual(new_author.get('password'), None)
+        self.assertIsNotNone(new_author.get('codeName'))
+        # Test as an admin you can grant the user roles
+        acas_user_author_role = {
+            'userName': new_author['userName'],
+            'roleType': 'System',
+            'roleKind': 'ACAS',
+            'roleName': 'ROLE_ACAS-USERS',
+        }
+        cmpdreg_user_author_role = {
+            'userName': new_author['userName'],
+            'roleType': 'System',
+            'roleKind': 'CmpdReg',
+            'roleName': 'ROLE_CMPDREG-USERS',
+        }
+        roles_to_add = [acas_user_author_role, cmpdreg_user_author_role]
+        self.client.update_author_roles(roles_to_add)
+        # Fetch the updated author so we can check its attributes
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        # Confirm the roles were granted
+        self.assertEqual(len(updated_author['authorRoles']), 2)
+        for author_role in updated_author['authorRoles']:
+            role = author_role['roleEntry']
+            self.assertEqual(role['lsType'], 'System')
+            self.assertIn(role['lsKind'], ['ACAS', 'CmpdReg'])
+            self.assertIn(role['roleName'], ['ROLE_ACAS-USERS', 'ROLE_CMPDREG-USERS'])
+        # Revoke the CmpdReg role
+        roles_to_remove = [cmpdreg_user_author_role]
+        self.client.update_author_roles(author_roles_to_delete=roles_to_remove)
+        # Confirm a role was revoked
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        self.assertEqual(len(updated_author['authorRoles']), 1)
+        role = updated_author['authorRoles'][0]['roleEntry']
+        self.assertEqual(role['roleName'], 'ROLE_ACAS-USERS')
+        # Try adding a role by updating the author
+        # Unfortunately we need to hardcode the id of the role, or fetch it from the server
+        nested_cmpdreg_role = {
+            'roleEntry': {
+                'id': 3,
+                'lsType': 'System',
+                'lsKind': 'CmpdReg',
+                'roleName': 'ROLE_CMPDREG-USERS',
+            }
+        }
+        updated_author['authorRoles'].append(nested_cmpdreg_role)
+        self.client.update_author(updated_author)
+        # Confirm the role was added
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        self.assertEqual(len(updated_author['authorRoles']), 2)
+        # Confirm the legacy 'updateProjectRoles' endpoint is still functional
+        self.client.update_project_roles([cmpdreg_user_author_role])
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        self.assertEqual(len(updated_author['authorRoles']), 2)
+        self.client.update_project_roles(author_roles_to_delete=[cmpdreg_user_author_role])
+        updated_author = self.client.get_author_by_username(new_author['userName'])
+        self.assertEqual(len(updated_author['authorRoles']), 1)
+        # Try login with the new user, which will fail due to account not being activated
+        # Database authentication requires email address to be confirmed
+        user_creds = {
+            'username': author['userName'],
+            'password': author['password'],
+            'url': self.client.url
+        }
+        with self.assertRaises(RuntimeError):
+            acasclient.client(user_creds)
+        # Now use the "backdoor" route to create a non-admin account which will be activated
+        test_username = 'test_user'
+        test_password = str(uuid.uuid4())
+        self.test_usernames.append(test_username)
+        new_user = create_backdoor_user(test_username, test_password)
+        user_creds = {
+            'username': test_username,
+            'password': test_password,
+            'url': self.client.url
+        }
+        user_client = acasclient.client(user_creds)
+        # Confirm the user can access projects
+        projects = user_client.projects()
+        self.assertGreater(len(projects), 0)
+        # Check that a non-admin cannot create more authors
+        with self.assertRaises(requests.HTTPError) as context:
+            author = {
+                "firstName": "Jane",
+                "lastName": "Doe",
+                "userName": "jadoe",
+                "emailAddress": "jane@example.com",
+                "password": str(uuid.uuid4()),
+            }
+            user_client.create_author(author)
+        self.assertIn('500 Server Error', str(context.exception))
+        # Check a non-admin can access the list of authors
+        authors = user_client.get_authors()
+        self.assertGreater(len(authors), 0)
+        # Confirm a non-admin cannot escalate user roles
+        with self.assertRaises(requests.HTTPError) as context:
+            cmpdreg_user_author_role['userName'] = test_username
+            user_client.update_author_roles([cmpdreg_user_author_role])
+        self.assertIn('500 Server Error', str(context.exception))
+        # Confirm a non-admin cannot revoke user roles
+        with self.assertRaises(requests.HTTPError) as context:
+            acas_user_author_role['userName'] = test_username
+            user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
+        self.assertIn('500 Server Error', str(context.exception))

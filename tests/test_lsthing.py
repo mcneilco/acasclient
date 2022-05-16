@@ -830,15 +830,7 @@ class TestLsThing(BaseAcasClientTest):
         assert bad_project_code in validation_response['results']['htmlSummary']
 
 
-class TestBlobValue(unittest.TestCase):
-
-    def setUp(self) -> None:
-        creds = acasclient.get_default_credentials()
-        self.client = acasclient.client(creds)
-
-    def tearDown(self):
-        """Tear down test fixtures, if any."""
-        self.client.close()
+class TestBlobValue(BaseAcasClientTest):
 
     def test_as_dict(self):
         """
@@ -854,15 +846,7 @@ class TestBlobValue(unittest.TestCase):
         assert blob_value_dict['comments'] == comments
         assert blob_value_dict['id'] == id
 
-class TestValidationResponse(unittest.TestCase):
-
-    def setUp(self) -> None:
-        creds = acasclient.get_default_credentials()
-        self.client = acasclient.client(creds)
-
-    def tearDown(self):
-        """Tear down test fixtures, if any."""
-        self.client.close()
+class TestValidationResponse(BaseAcasClientTest):
 
     def test_001_response_with_errors_and_warnings(self):
         """

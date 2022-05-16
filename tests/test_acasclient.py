@@ -483,7 +483,7 @@ class TestAcasclient(BaseAcasClientTest):
                 },
                 {
                     "dbProperty": "Parent Stereo Category",
-                    "defaultVal": "unknown",
+                    "defaultVal": "Unknown",
                     "required": True,
                     "sdfProperty": None
                 },
@@ -646,7 +646,7 @@ class TestAcasclient(BaseAcasClientTest):
             },
             {
                 "dbProperty": "Parent Stereo Category",
-                "defaultVal": "unknown",
+                "defaultVal": "Unknown",
                 "required": True,
                 "sdfProperty": None
             },
@@ -872,8 +872,8 @@ class TestAcasclient(BaseAcasClientTest):
         content = str(search_results_export['content'])
         self.assertIn('<Parent Corp Name>\\nCMPD-0000001', content)
         self.assertIn('<Lot Corp Name>\\nCMPD-0000001-001', content)
-        self.assertIn('<Project>\\nPROJ-00000001', content)
-        self.assertIn('<Parent Stereo Category>\\nunknown', content)
+        self.assertIn(f'<Project>\\n{self.global_project_code}', content)
+        self.assertIn('<Parent Stereo Category>\\nUnknown', content)
         self.assertIn('content-type', search_results_export)
         self.assertIn('name', search_results_export)
         self.assertIn('content-length', search_results_export)
@@ -1104,7 +1104,7 @@ class TestAcasclient(BaseAcasClientTest):
             .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
         mappings = [{
             "dbProperty": "Parent Stereo Category",
-            "defaultVal": "unknown",
+            "defaultVal": "Unknown",
             "required": True,
             "sdfProperty": None
         }]

@@ -758,8 +758,16 @@ class client():
                                  data=json.dumps(data))
         resp.raise_for_status()
         return resp.json()
+    
+    def _validate_sdf_request(self, data):
+        resp = self.session.post("{}/api/cmpdRegBulkLoader/validateCmpds"
+                                 .format(self.url),
+                                 headers={'Content-Type': 'application/json'},
+                                 data=json.dumps(data))
+        resp.raise_for_status()
+        return resp.json()
 
-    def register_sdf(self, file, userName, mappings, prefix=None):
+    def register_sdf(self, file, userName, mappings, prefix=None, dry_run=False):
         files = self.upload_files([file])
         request = {
             "fileName": files['files'][0]["name"],
@@ -773,13 +781,17 @@ class client():
                 "labelTypeAndKind": "id_corpName",
                 "thingTypeAndKind": "parent_compound"
             }
-        response = self.register_sdf_request(request)
+        if dry_run:
+            response = self._validate_sdf_request(request)
+        else:
+            response = self.register_sdf_request(request)
         report_files = []
         for file in response[0]['reportFiles']:
             filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
                 PurePath(Path(file)).name)
             report_files.append(self.get_file(filePath))
         return {"summary": response[0]['summary'],
+                "results": response[0]['results'],
                 "report_files": report_files}
 
     def experiment_loader_request(self, data):
@@ -1491,5 +1503,85 @@ class client():
         }
         resp = self.session.post("{}/api/projects/updateProjectRoles".format(self.url),
                                     json=body)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_cmpdreg_scientists(self):
+        """
+        Fetch the list of possible lot chemists for CmpdReg
+        """
+        resp = self.session.get("{}/cmpdreg/scientists".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_cmpdreg_scientist(self, code, name):
+        """
+        Create a new scientist for CmpdReg
+        """
+        resp = self.session.post("{}/api/codeTablesAdmin/compound/scientist".format(self.url), json={'code': code, 'name': name})
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_stereo_categories(self):
+        """
+        Get all stereo categories
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/stereoCategories".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_stereo_category(self, code, name):
+        """
+        Create a new stereo category
+        """
+        resp = self.session.post("{}/api/cmpdRegAdmin/stereoCategory".format(self.url), json={'code': code, 'name': name})
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_salts(self):
+        """
+        Get all salts
+        """
+        resp = self.session.get("{}/cmpdreg/salts".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_salt(self, abbrev, name, mol_structure):
+        """
+        Create a new salt
+        """
+        resp = self.session.post("{}/cmpdreg/salts".format(self.url), json={'abbrev': abbrev, 'name': name, 'molStructure': mol_structure})
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_physical_states(self):
+        """
+        Get all physical states
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/physicalStates".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_physical_state(self, code, name):
+        """
+        Create a new physical state
+        """
+        resp = self.session.post("{}/api/cmpdRegAdmin/physicalStates".format(self.url), json={'code': code, 'name': name})
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_cmpdreg_vendors(self):
+        """
+        Get all vendors for CmpdReg
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/vendors".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_cmpdreg_vendor(self, code, name):
+        """
+        Create a new vendor for CmpdReg
+        """
+        resp = self.session.post("{}/api/cmpdRegAdmin/vendors".format(self.url), json={'code': code, 'name': name})
         resp.raise_for_status()
         return resp.json()

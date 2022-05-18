@@ -1798,3 +1798,109 @@ class TestAcasclient(BaseAcasClientTest):
             acas_user_author_role['userName'] = test_username
             user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
         self.assertIn('500 Server Error', str(context.exception))
+    
+    def test045_register_sdf_case_insensitive(self):
+        """Test register sdf with case insensitive lookups"""
+        # test values
+        CHEMIST = 'bob'
+        CHEMIST_NAME = 'Bob Roberts'
+        CHEMIST_ALT = 'Bob'
+        STEREO_CATEGORY = 'Unknown'
+        STEREO_CATEGORY_ALT = 'unknown'
+        SALT_ABBREV = 'HCl'
+        SALT_ABBREV_ALT = 'hcl'
+        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
+        PHYSICAL_STATE = 'Solid'
+        PHYSICAL_STATE_ALT = 'SOLID'
+        VENDOR = 'ThermoFisher'
+        VENDOR_ALT = 'thermofisher'
+        # TODO Lot Chemist, Stereo Category, Salt Abbrev, Physical State, Vendor
+        # Get Lot Chemists
+        lot_chemists = self.client.get_cmpdreg_scientists()
+        # Create Lot Chemist
+        if CHEMIST not in [c['code'] for c in lot_chemists]:
+            lot_chemist = self.client.create_cmpdreg_scientist(code=CHEMIST, name=CHEMIST_NAME)
+            self.assertIsNotNone(lot_chemist.get('id'))
+        # Get Stereo Category
+        stereo_categories = self.client.get_stereo_categories()
+        # Create Stereo Category
+        if STEREO_CATEGORY not in [c['code'] for c in stereo_categories]:
+            stereo_category = self.client.create_stereo_category(code=STEREO_CATEGORY, name=STEREO_CATEGORY)
+            self.assertIsNotNone(stereo_category.get('id'))
+        # Get Salt Abbrevs
+        salts = self.client.get_salts()
+        # Create Salt Abbrev
+        if SALT_ABBREV not in [s['abbrev'] for s in salts]:
+            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            self.assertIsNotNone(salt.get('id'))
+        # Get Physical States
+        physical_states = self.client.get_physical_states()
+        # Create Physical State
+        if PHYSICAL_STATE not in [p['code'] for p in physical_states]:
+            physical_state = self.client.create_physical_state(code=PHYSICAL_STATE, name=PHYSICAL_STATE)
+            self.assertIsNotNone(physical_state.get('id'))
+        # Get Vendors
+        vendors = self.client.get_cmpdreg_vendors()
+        # Create Vendor
+        if VENDOR not in [v['code'] for v in vendors]:
+            vendor = self.client.create_cmpdreg_vendor(code=VENDOR, name=VENDOR)
+            self.assertIsNotNone(vendor.get('id'))
+        upload_file_file = Path(__file__).resolve().parent.\
+            joinpath('test_acasclient', 'test_045_register_sdf_case_insensitive.sdf')
+        mappings = [
+            {
+                "dbProperty": "Lot Vendor",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Vendor"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "Bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": self.global_project_code,
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": "unknown",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Physical State",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Physical State"
+            },
+            {
+                "dbProperty": "Lot Salt Abbrev",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Salt Name"
+            },
+            {
+                "dbProperty": "Lot Salt Equivalents",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Salt Equivalents"
+            }
+        ]
+        
+        # Validate and confirm no errors
+        response = self.client.register_sdf(upload_file_file, "bob",
+                                            mappings, dry_run=True)
+        self.assertIn('results', response)
+        errors = response['results']
+        self.assertEqual(len(errors), 0)
+        # Register and confirm no errors
+        response = self.client.register_sdf(upload_file_file, "bob",
+                                            mappings)
+        self.assertIn('results', response)
+        errors = response['results']
+        self.assertEqual(len(errors), 0)

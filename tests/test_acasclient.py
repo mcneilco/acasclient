@@ -1804,16 +1804,11 @@ class TestAcasclient(BaseAcasClientTest):
         # test values
         CHEMIST = 'bob'
         CHEMIST_NAME = 'Bob Roberts'
-        CHEMIST_ALT = 'Bob'
         STEREO_CATEGORY = 'Unknown'
-        STEREO_CATEGORY_ALT = 'unknown'
         SALT_ABBREV = 'HCl'
-        SALT_ABBREV_ALT = 'hcl'
         SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
-        PHYSICAL_STATE = 'Solid'
-        PHYSICAL_STATE_ALT = 'SOLID'
+        PHYSICAL_STATE = 'plasma'
         VENDOR = 'ThermoFisher'
-        VENDOR_ALT = 'thermofisher'
         # TODO Lot Chemist, Stereo Category, Salt Abbrev, Physical State, Vendor
         # Get Lot Chemists
         lot_chemists = self.client.get_cmpdreg_scientists()
@@ -1904,3 +1899,5 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('results', response)
         errors = response['results']
         self.assertEqual(len(errors), 0)
+        summary = response['summary']
+        self.assertIn('New lots of existing compounds: 2', summary)

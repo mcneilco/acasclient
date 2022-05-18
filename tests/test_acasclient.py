@@ -916,94 +916,6 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('transactionId', response)
         self.assertIsNotNone(response['transactionId'])
 
-    def test_014_experiment_loader(self):
-        """Test experiment loader."""
-
-        def experiment_load_test(data_file_to_upload, dry_run_mode, self):
-            response = self.client.\
-                experiment_loader(data_file_to_upload, "bob", dry_run_mode)
-            self.assertIn('results', response)
-            self.assertIn('errorMessages', response)
-            self.assertIn('hasError', response)
-            self.assertIn('hasWarning', response)
-            self.assertIn('transactionId', response)
-            if dry_run_mode:
-                self.assertIsNone(response['transactionId'])
-            else:
-                self.assertIsNotNone(response['transactionId'])
-            return response
-
-        def csv_to_txt(data_file_to_upload, self):
-            # Get the file name but change it to .txt
-            file_name = data_file_to_upload.name
-            file_name = file_name.replace(".csv", ".txt")
-            temp_file_path = Path(self.tempdir, file_name)
-            # Change the delim to the new delim
-            with open(data_file_to_upload, 'r') as f:
-                with open(temp_file_path, 'w') as f2:
-                    for line in f:
-                        f2.write(line.replace(',', "\t"))
-            return temp_file_path
-
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
-        experiment_load_test(data_file_to_upload, True, self)
-        experiment_load_test(data_file_to_upload, False, self)
-
-        
-        # Test for csv format file
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
-        experiment_load_test(data_file_to_upload, True, self)
-        experiment_load_test(data_file_to_upload, False, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
-        experiment_load_test(txt_file, True, self)
-        experiment_load_test(txt_file, False, self)
-
-        # Test for non-uniform comma format file
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
-        experiment_load_test(data_file_to_upload, True, self)
-        experiment_load_test(data_file_to_upload, False, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
-        experiment_load_test(txt_file, True, self)
-        experiment_load_test(txt_file, False, self)
-
-        # Test for malformed single quote format file
-        def assert_malformed_single_quote_file(response, self):
-            self.assertTrue(response['hasError'])
-            self.assertIn('errorMessages', response)
-            hasEOFError = False 
-            for message in response['errorMessages'] :
-                if(message['message'].endswith('EOF within quoted string')):
-                    hasEOFError = True
-            self.assertTrue(hasEOFError)
-
-            
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
-        response = experiment_load_test(data_file_to_upload, True, self)
-        assert_malformed_single_quote_file(response, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
-        response = experiment_load_test(txt_file, True, self)
-        assert_malformed_single_quote_file(response, self)
-
-        # Speed test dry run
-        try:
-            # Dry run on 50 K row file with 3 columns of data should take
-            # less than 25 seconds to complete. On my machine it takes
-            # about 9 seconds. This is a sanity check to make sure the
-            # dry run hasn't slowed significantly.
-            with Timeout(seconds=25):
-                data_file_to_upload = Path(__file__).resolve()\
-                    .parent.joinpath('test_acasclient', '50k-lines.csv')
-                experiment_load_test(data_file_to_upload, True, self)
-        except TimeoutError:
-            self.fail("Timeout error")
-        else:
-            pass
-
-
     def test_015_get_protocols_by_label(self):
         """Test get protocols by label"""
         protocols = self.client.get_protocols_by_label("Test Protocol")
@@ -1562,120 +1474,6 @@ class TestAcasclient(BaseAcasClientTest):
             cmpd_structure_search(molStructure=EMPTY_MOL, searchType = "duplicate_tautomer")
         self.assertEqual(len(search_results), 0)
 
-    def test_043_dose_response_experiment_loader(self):
-        """Test dose response experiment loader."""
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', '4 parameter D-R.csv')
-        request = {
-            "data_file": data_file_to_upload,
-            "user": "bob",
-            "dry_run": True,
-            "model_fit_type": "4 parameter D-R",
-            "fit_settings": {
-                "smartMode":True,
-                "inactiveThresholdMode":True,
-                "inactiveThreshold":20,
-                "theoreticalMaxMode":False,
-                "theoreticalMax":None,
-                "inverseAgonistMode":False,
-                "max":{
-                    "limitType":"none"
-                },
-                "min":
-                    {
-                        "limitType":"none"
-                },
-                "slope":{
-                    "limitType":"none"
-                },
-                "baseline":{
-                    "value":0
-                }
-            }
-        }
-        response = self.client.\
-            dose_response_experiment_loader(**request)
-        self.assertIn("experiment_loader_response", response)
-        self.assertIn('results', response["experiment_loader_response"])
-        self.assertIn('errorMessages', response["experiment_loader_response"])
-        self.assertIn('hasError', response["experiment_loader_response"])
-        self.assertIn('hasWarning', response["experiment_loader_response"])
-        self.assertIn('transactionId', response["experiment_loader_response"])
-        self.assertIsNone(response["experiment_loader_response"]['transactionId'])
-        self.assertIsNone(response['dose_response_fit_response'])
-    
-        # Read the file as a string so that we can update the data
-        with open(data_file_to_upload, 'r') as f:
-            data_file_as_string = f.read()
-
-        # Substitute Format with "Generic" to test for warning for uploading Generic to 
-        # a Dose Response experiment
-        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
-        request["data_file"] = {
-            "name": f.name,
-            "data": data_file_as_string
-        }
-        response = self.client.\
-            dose_response_experiment_loader(**request)
-
-        # Dose response load should warn that a Generic file was uploaded which had a curve id
-        self.assertIn("experiment_loader_response", response)
-        self.assertIn('results', response["experiment_loader_response"])
-        self.assertIn('hasWarning', response["experiment_loader_response"])
-        self.assertTrue(response["experiment_loader_response"]['hasWarning'])
-        self.assertIn('errorMessages', response["experiment_loader_response"])
-        # Assert that error messages has a warning message
-        genericFormatUploadedAsDoseResponse = "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly."
-        matchingMessage = None
-        for error_message in response["experiment_loader_response"]['errorMessages']:
-            if error_message['errorLevel'] == 'warning':
-                # Check if warning has the message in it
-                if "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly." in error_message['message']:
-                    matchingMessage = True
-        if matchingMessage is None:
-            self.fail("ACAS did not produce warning that 'Generic' was uploaded as 'Dose")
-        
-        # Use the original data file for further tests
-        request["data_file"] = data_file_to_upload
-        request["dry_run"] = False
-        response = self.client.\
-            dose_response_experiment_loader(**request)
-
-        self.assertIn('transactionId', response["experiment_loader_response"])
-        self.assertIsNotNone(response["experiment_loader_response"]['transactionId'])
-        self.assertIsNotNone(response["experiment_loader_response"]['results'])
-        self.assertIsNotNone(response["experiment_loader_response"]['results']['experimentCode'])
-
-        self.assertIn('dose_response_fit_response', response)
-        self.assertIn('results', response["dose_response_fit_response"])
-        self.assertIn('htmlSummary', response["dose_response_fit_response"]['results'])
-        self.assertIn('status', response["dose_response_fit_response"]['results'])
-        self.assertEqual(response["dose_response_fit_response"]['results']['status'], 'complete')
-
-        # Get Experiment results
-        experiment = self.client.\
-            get_experiment_by_code(response["experiment_loader_response"]['results']['experimentCode'], full = True)
-        self.assertIsNotNone(experiment)
-        self.assertIn("analysisGroups", experiment)
-
-        accepted_results_file_path = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', "test_dose_response_experiment_loader_accepted_results.json")
-
-        # Leaving this here to show how to update the accepted results file
-        # with open(accepted_results_file_path, 'w') as f:
-        #     json.dump(experiment, f, indent=2)
-
-        experiment = anonymize_experiment_dict(experiment)
-        
-        accepted_results_experiment  = json.loads(accepted_results_file_path.read_text())
-        accepted_results_analysis_groups = anonymize_experiment_dict(accepted_results_experiment)["analysisGroups"]
-        new_results_analysis_groups = experiment["analysisGroups"]
-
-        # Verify that the analysis groups are the same as the accepted results analysis groups
-        # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
-        for i in range(len(accepted_results_analysis_groups)):
-            self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
-    
     @requires_node_api
     def test_044_author_and_role_apis(self):
         # Test that as an admin you can fetch authors
@@ -1798,3 +1596,298 @@ class TestAcasclient(BaseAcasClientTest):
             acas_user_author_role['userName'] = test_username
             user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
         self.assertIn('500 Server Error', str(context.exception))
+
+
+
+def experiment_load_test(data_file_to_upload, dry_run_mode, self):
+    response = self.client.\
+        experiment_loader(data_file_to_upload, "bob", dry_run_mode)
+    self.assertIn('results', response)
+    self.assertIn('htmlSummary', response['results'])
+    self.assertIn('errorMessages', response)
+    self.assertIn('hasError', response)
+    self.assertIn('hasWarning', response)
+    self.assertIn('transactionId', response)
+    if dry_run_mode:
+        self.assertIsNone(response['transactionId'])
+    else:
+        self.assertIsNotNone(response['transactionId'])
+    return response
+
+def csv_to_txt(data_file_to_upload, self):
+    # Get the file name but change it to .txt
+    file_name = data_file_to_upload.name
+    file_name = file_name.replace(".csv", ".txt")
+    temp_file_path = Path(self.tempdir, file_name)
+    # Change the delim to the new delim
+    with open(data_file_to_upload, 'r') as f:
+        with open(temp_file_path, 'w') as f2:
+            for line in f:
+                f2.write(line.replace(',', "\t"))
+    return temp_file_path
+
+class TestExperimentLoader(BaseAcasClientTest):
+    """Tests for `Experiment Loading`."""
+
+    def test_basic_excel(self):
+        """Test experiment loader."""
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+
+    def test_basic_csv(self):
+        # Test for csv format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        experiment_load_test(txt_file, True, self)
+        experiment_load_test(txt_file, False, self)
+
+    def test_non_unitform_comma_csv(self):
+        # Test for non-uniform comma format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        experiment_load_test(txt_file, True, self)
+        experiment_load_test(txt_file, False, self)
+
+    def test_malformed_single_quote(self):
+        # Test for malformed single quote format file
+        def assert_malformed_single_quote_file(response, self):
+            self.assertTrue(response['hasError'])
+            self.assertIn('errorMessages', response)
+            hasEOFError = False 
+            for message in response['errorMessages'] :
+                if(message['message'].endswith('EOF within quoted string')):
+                    hasEOFError = True
+            self.assertTrue(hasEOFError)
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
+        response = experiment_load_test(data_file_to_upload, True, self)
+        assert_malformed_single_quote_file(response, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        response = experiment_load_test(txt_file, True, self)
+        assert_malformed_single_quote_file(response, self)
+
+    def test_speed(self):
+        # Speed test dry run
+        try:
+            # Dry run on 50 K row file with 3 columns of data should take
+            # less than 25 seconds to complete. On my machine it takes
+            # about 9 seconds. This is a sanity check to make sure the
+            # dry run hasn't slowed significantly.
+            with Timeout(seconds=25):
+                data_file_to_upload = Path(__file__).resolve()\
+                    .parent.joinpath('test_acasclient', '50k-lines.csv')
+                experiment_load_test(data_file_to_upload, True, self)
+        except TimeoutError:
+            self.fail("Timeout error")
+        else:
+            pass
+
+    def test_experiment_loader_curve_validation(self):
+        # Test dose response curve validation
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R-validation.csv')
+
+        # Read the file as a string so that we can update the data
+        with open(data_file_to_upload, 'r') as f:
+            data_file_as_string = f.read()
+
+        # Substitute Format with "Generic" to test for warning for uploading Generic to 
+        # a Dose Response experiment
+        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
+        response = experiment_load_test(data_file_to_upload, True, self)
+
+        # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
+        self.assertTrue(response['results']['htmlSummary'].find("bv_doseResponseSummaryTable") != -1)
+
+        # print(json.dumps(response['errorMessages'], sort_keys=True, indent=4))
+        expected_messages = [
+            {
+                "errorLevel": "error",
+                "message": "No 'Rendering Hint' was found for curve id '9629'. If a curve id is specified, it must be associated with a Rendering Hint."
+            },
+            {
+                "errorLevel": "error",
+                "message": "The following parameters were not found for curve id '9629'.  Please provide values for these parameters so that curves are drawn properly: EC50"
+            },
+            {
+                "errorLevel": "error",
+                "message": "The following parameters were not found for curve id '8836'.  Please provide values for these parameters so that curves are drawn properly: Min"
+            },
+            {
+                "errorLevel": "error",
+                "message": "The following parameters were not found for curve id '8806'.  Please provide values for these parameters so that curves are drawn properly: Max"
+            },
+            {
+                "errorLevel": "error",
+                "message": "The following parameters were not found for curve id '8788'.  Please provide values for these parameters so that curves are drawn properly: Slope"
+            },
+            {
+                "errorLevel": "error",
+                "message": "The following parameters were not found for curve id '126933'.  Please provide values for these parameters so that curves are drawn properly: Slope, Max"
+            },
+            {
+                "errorLevel": "error",
+                "message": "The following parameters were not found for curve id '126915'.  Please provide values for these parameters so that curves are drawn properly: Slope, Min, Max, EC50"
+            },
+            {
+                "errorLevel": "error",
+                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'f'"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "A date is not in the proper format. Found: \"5/8/15\" This was interpreted as \"2015-08-05\". Please enter dates as YYYY-MM-DD."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following column headers have never been loaded in an Experiment before: 'Comment'. If you have loaded a similar Experiment before, please use the same headers that were used previously. If this is a new Protocol, you can proceed without worry."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The R&#178; for curve id 'a' is 0.215 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The R&#178; for curve id 'b' is 0.858 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "Experiment '4 parameter D-R - 2018-05-08' already exists, so the loader will delete its current data and replace it with your new upload. If you do not intend to delete and reload data, enter a new Experiment Name."
+            }
+        ]
+        self.assertCountEqual(response['errorMessages'], expected_messages)
+        for message in response['errorMessages']:
+            # This matches the response error message and level to the expected message and level
+            expectedResult = [m for m in expected_messages if m['errorLevel'] == message['errorLevel'] and m['message'] == message['message']]
+            # Should return 1 and only 1 match
+            self.assertEqual(len(expectedResult), 1)
+
+    def test_dose_response_experiment_loader(self):
+        """Test dose response experiment loader."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R.csv')
+        request = {
+            "data_file": data_file_to_upload,
+            "user": "bob",
+            "dry_run": True,
+            "model_fit_type": "4 parameter D-R",
+            "fit_settings": {
+                "smartMode":True,
+                "inactiveThresholdMode":True,
+                "inactiveThreshold":20,
+                "theoreticalMaxMode":False,
+                "theoreticalMax":None,
+                "inverseAgonistMode":False,
+                "max":{
+                    "limitType":"none"
+                },
+                "min":{
+                    "limitType":"none"
+                },
+                "slope":{
+                    "limitType":"none"
+                },
+                "baseline":{
+                    "value":0
+                }
+            }
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        self.assertIn('hasError', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertIn('transactionId', response["experiment_loader_response"])
+        self.assertIsNone(response["experiment_loader_response"]['transactionId'])
+        self.assertIsNone(response['dose_response_fit_response'])
+
+        # When loading dose response data and doing a curve fit we shold NOT get a dose response summary table because acas isn't evaluating the uploaded
+        # curve fit parameters (it replaces it with it's own curve fits)
+        self.assertTrue(response["experiment_loader_response"]['results']['htmlSummary'].find("bv_doseResponseSummaryTable") == -1)
+
+        # Read the file as a string so that we can update the data
+        with open(data_file_to_upload, 'r') as f:
+            data_file_as_string = f.read()
+
+        # Substitute Format with "Generic" to test for warning for uploading Generic to 
+        # a Dose Response experiment
+        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
+        request["data_file"] = {
+            "name": f.name,
+            "data": data_file_as_string
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        # Dose response load should warn that a Generic file was uploaded which had a curve id
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertTrue(response["experiment_loader_response"]['hasWarning'])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        # Assert that error messages has a warning message
+        genericFormatUploadedAsDoseResponse = "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly."
+        matchingMessage = None
+        for error_message in response["experiment_loader_response"]['errorMessages']:
+            if error_message['errorLevel'] == 'warning':
+                # Check if warning has the message in it
+                if genericFormatUploadedAsDoseResponse in error_message['message']:
+                    matchingMessage = True
+        if matchingMessage is None:
+            self.fail("ACAS did not produce warning that 'Generic' was uploaded as 'Dose")
+        
+        # Use the original data file for further tests
+        request["data_file"] = data_file_to_upload
+        request["dry_run"] = False
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        self.assertIn('transactionId', response["experiment_loader_response"])
+        self.assertIsNotNone(response["experiment_loader_response"]['transactionId'])
+        self.assertIsNotNone(response["experiment_loader_response"]['results'])
+        self.assertIsNotNone(response["experiment_loader_response"]['results']['experimentCode'])
+
+        self.assertIn('dose_response_fit_response', response)
+        self.assertIn('results', response["dose_response_fit_response"])
+        self.assertIn('htmlSummary', response["dose_response_fit_response"]['results'])
+        self.assertIn('status', response["dose_response_fit_response"]['results'])
+        self.assertEqual(response["dose_response_fit_response"]['results']['status'], 'complete')
+
+        # Get Experiment results
+        experiment = self.client.\
+            get_experiment_by_code(response["experiment_loader_response"]['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+
+        accepted_results_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', "test_dose_response_experiment_loader_accepted_results.json")
+
+        # Leaving this here to show how to update the accepted results file
+        # with open(accepted_results_file_path, 'w') as f:
+        #     json.dump(experiment, f, indent=2)
+
+        experiment = anonymize_experiment_dict(experiment)
+        
+        accepted_results_experiment  = json.loads(accepted_results_file_path.read_text())
+        accepted_results_analysis_groups = anonymize_experiment_dict(accepted_results_experiment)["analysisGroups"]
+        new_results_analysis_groups = experiment["analysisGroups"]
+
+        # Verify that the analysis groups are the same as the accepted results analysis groups
+        # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
+        for i in range(len(accepted_results_analysis_groups)):
+            self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])

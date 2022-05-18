@@ -805,7 +805,7 @@ class client():
         return resp.json()
 
     def experiment_loader(self, data_file, user, dry_run, report_file="",
-                          images_file=""):
+                          images_file="", validate_dose_response_curves=True):
         """Load an experiment
         
         Load an experiment into ACAS.
@@ -826,6 +826,7 @@ class client():
                    "fileToParse": data_file,
                    "reportFile": report_file,
                    "imagesFile": images_file,
+                   "moduleName": None if validate_dose_response_curves else "DoseResponseDataParserController",
                    "dryRunMode": dry_run}
         resp = self.experiment_loader_request(request)
         return resp
@@ -879,7 +880,8 @@ class client():
             response = client.\
                 dose_response_experiment_loader(**request)
         """
-        resp = self.experiment_loader(**kwargs)
+
+        resp = self.experiment_loader(validate_dose_response_curves=False, **kwargs)
         response = {
             "experiment_loader_response": resp,
             "dose_response_fit_response": None

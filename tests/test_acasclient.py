@@ -1626,6 +1626,21 @@ def csv_to_txt(data_file_to_upload, self):
                 f2.write(line.replace(',', "\t"))
     return temp_file_path
 
+def test_expected_messages(expected_messages, messages, self):
+    for expected_message in expected_messages:
+        # This matches the response error message and level to the expected message and level
+        expected_result = [m for m in messages if m['errorLevel'] == expected_message['errorLevel'] and m['message'] == expected_message['message']]
+        if 'count' in expected_message:
+            if expected_message['count'] > -1:
+                # If count is present and not -1, then we expect the number of results to be equal to the count
+                self.assertEqual(len(expected_result), expected_message['count'])
+            else:
+                # If coount is -1, then we don't care about the number of results, just as long as it has the message
+                self.assertGreaterThan(len(expected_result), 0)
+        else:
+            # Should return 1 and only 1 match
+            self.assertEqual(len(expected_result), 1)
+
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
 
@@ -1697,13 +1712,6 @@ class TestExperimentLoader(BaseAcasClientTest):
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '4 parameter D-R-validation.csv')
 
-        # Read the file as a string so that we can update the data
-        with open(data_file_to_upload, 'r') as f:
-            data_file_as_string = f.read()
-
-        # Substitute Format with "Generic" to test for warning for uploading Generic to 
-        # a Dose Response experiment
-        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
         response = experiment_load_test(data_file_to_upload, True, self)
 
         # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
@@ -1769,11 +1777,7 @@ class TestExperimentLoader(BaseAcasClientTest):
             }
         ]
         self.assertCountEqual(response['errorMessages'], expected_messages)
-        for message in response['errorMessages']:
-            # This matches the response error message and level to the expected message and level
-            expectedResult = [m for m in expected_messages if m['errorLevel'] == message['errorLevel'] and m['message'] == message['message']]
-            # Should return 1 and only 1 match
-            self.assertEqual(len(expectedResult), 1)
+        test_expected_messages(expected_messages, response['errorMessages'], self)
 
     def test_dose_response_experiment_loader(self):
         """Test dose response experiment loader."""

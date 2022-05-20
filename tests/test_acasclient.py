@@ -1808,13 +1808,16 @@ class TestAcasclient(BaseAcasClientTest):
         already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
         # if it already exists, try creating a duplicate and confirm an error is thrown
         if already_exists:
-            with self.assertRaises(requests.HTTPError) as context:
-                create_method(code=code, name=name)
-            self.assertIn('409 Client Error: Conflict', str(context.exception))
+            self._create_dupe_codetable(create_method, code, name)
         else:
             # Create and expect success
             result = create_method(code=code, name=name)
             self.assertIsNotNone(result.get('id'))
+    
+    def _create_dupe_codetable(self, create_method, code, name):
+        with self.assertRaises(requests.HTTPError) as context:
+            create_method(code=code, name=name)
+        self.assertIn('409 Client Error: Conflict', str(context.exception))
     
     def test045_register_sdf_case_insensitive(self):
         """Test register sdf with case insensitive lookups"""
@@ -1904,3 +1907,19 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(len(errors), 0)
         summary = response['summary']
         self.assertIn('New lots of existing compounds: 2', summary)
+
+        # TODO test creating with alternate case
+        CHEMIST = 'Bob'
+        CHEMIST_NAME = 'Bob Roberts'
+        STEREO_CATEGORY = 'unknown'
+        SALT_ABBREV = 'hcl'
+        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
+        PHYSICAL_STATE = 'Solid'
+        VENDOR = 'thermoFisher'
+        self._create_dupe_codetable(self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
+        self._create_dupe_codetable(self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
+        self._create_dupe_codetable(self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
+        self._create_dupe_codetable(self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
+        # TODO salt
+
+        # TODO delete the created objects

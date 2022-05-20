@@ -1514,13 +1514,35 @@ class client():
         resp.raise_for_status()
         return resp.json()
     
+    def _validate_then_save_codetable(self, url_base, codeTable: dict) -> dict:
+        """
+        Validate a codetable and save it to the database
+
+        Args:
+            url_base (str): The base URL for the codetable
+            codeTable (dict): A dict object representing the codetable to save
+
+        Returns:
+            a dict object representing the saved codetable
+        """
+        # Validate
+        resp = self.session.post(url_base + "/validateBeforeSave", json=codeTable)
+        resp.raise_for_status()
+        validation_resp = resp.json()
+        if type(validation_resp) is list and len(validation_resp) > 0:
+            raise ValueError(validation_resp[0]['message'])
+        # Create
+        resp = self.session.post(url_base, json=codeTable)
+        resp.raise_for_status()
+        return resp.json()
+    
     def create_cmpdreg_scientist(self, code, name):
         """
         Create a new scientist for CmpdReg
         """
-        resp = self.session.post("{}/api/codeTablesAdmin/compound/scientist".format(self.url), json={'code': code, 'name': name})
-        resp.raise_for_status()
-        return resp.json()
+        url_base = "{}/api/codeTablesAdmin/compound/scientist".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
     
     def get_stereo_categories(self):
         """
@@ -1534,9 +1556,9 @@ class client():
         """
         Create a new stereo category
         """
-        resp = self.session.post("{}/api/cmpdRegAdmin/stereoCategory".format(self.url), json={'code': code, 'name': name})
-        resp.raise_for_status()
-        return resp.json()
+        url_base = "{}/api/cmpdRegAdmin/stereoCategories".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
     
     def get_salts(self):
         """
@@ -1566,9 +1588,9 @@ class client():
         """
         Create a new physical state
         """
-        resp = self.session.post("{}/api/cmpdRegAdmin/physicalStates".format(self.url), json={'code': code, 'name': name})
-        resp.raise_for_status()
-        return resp.json()
+        url_base = "{}/api/cmpdRegAdmin/physicalStates".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
     
     def get_cmpdreg_vendors(self):
         """
@@ -1582,6 +1604,6 @@ class client():
         """
         Create a new vendor for CmpdReg
         """
-        resp = self.session.post("{}/api/cmpdRegAdmin/vendors".format(self.url), json={'code': code, 'name': name})
-        resp.raise_for_status()
-        return resp.json()
+        url_base = "{}/api/cmpdRegAdmin/vendors".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)

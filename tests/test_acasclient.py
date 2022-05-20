@@ -1799,6 +1799,23 @@ class TestAcasclient(BaseAcasClientTest):
             user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
         self.assertIn('500 Server Error', str(context.exception))
     
+    def _get_create_codetable(self, get_method, create_method, code, name):
+        """
+        Utility function to test creation of simple entities
+        """
+        # Get all
+        codetables = get_method()
+        already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
+        # if it already exists, try creating a duplicate and confirm an error is thrown
+        if already_exists:
+            with self.assertRaises(requests.HTTPError) as context:
+                create_method(code=code, name=name)
+            self.assertIn('409 Client Error: Conflict', str(context.exception))
+        else:
+            # Create and expect success
+            result = create_method(code=code, name=name)
+            self.assertIsNotNone(result.get('id'))
+    
     def test045_register_sdf_case_insensitive(self):
         """Test register sdf with case insensitive lookups"""
         # test values
@@ -1807,39 +1824,25 @@ class TestAcasclient(BaseAcasClientTest):
         STEREO_CATEGORY = 'Unknown'
         SALT_ABBREV = 'HCl'
         SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
-        PHYSICAL_STATE = 'plasma'
+        PHYSICAL_STATE = 'solid'
         VENDOR = 'ThermoFisher'
-        # TODO Lot Chemist, Stereo Category, Salt Abbrev, Physical State, Vendor
-        # Get Lot Chemists
-        lot_chemists = self.client.get_cmpdreg_scientists()
-        # Create Lot Chemist
-        if CHEMIST not in [c['code'] for c in lot_chemists]:
-            lot_chemist = self.client.create_cmpdreg_scientist(code=CHEMIST, name=CHEMIST_NAME)
-            self.assertIsNotNone(lot_chemist.get('id'))
-        # Get Stereo Category
-        stereo_categories = self.client.get_stereo_categories()
-        # Create Stereo Category
-        if STEREO_CATEGORY not in [c['code'] for c in stereo_categories]:
-            stereo_category = self.client.create_stereo_category(code=STEREO_CATEGORY, name=STEREO_CATEGORY)
-            self.assertIsNotNone(stereo_category.get('id'))
-        # Get Salt Abbrevs
+        # Lot Chemist
+        self._get_create_codetable(self.client.get_cmpdreg_scientists, self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
+        # Stereo Category
+        self._get_create_codetable(self.client.get_stereo_categories, self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
+        # Physical States
+        self._get_create_codetable(self.client.get_physical_states, self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
+        # Vendors
+        self._get_create_codetable(self.client.get_cmpdreg_vendors, self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
+        vendors = self.client.get_cmpdreg_vendors()
+        # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
         salts = self.client.get_salts()
         # Create Salt Abbrev
-        if SALT_ABBREV not in [s['abbrev'] for s in salts]:
+        if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
             salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
             self.assertIsNotNone(salt.get('id'))
-        # Get Physical States
-        physical_states = self.client.get_physical_states()
-        # Create Physical State
-        if PHYSICAL_STATE not in [p['code'] for p in physical_states]:
-            physical_state = self.client.create_physical_state(code=PHYSICAL_STATE, name=PHYSICAL_STATE)
-            self.assertIsNotNone(physical_state.get('id'))
-        # Get Vendors
-        vendors = self.client.get_cmpdreg_vendors()
-        # Create Vendor
-        if VENDOR not in [v['code'] for v in vendors]:
-            vendor = self.client.create_cmpdreg_vendor(code=VENDOR, name=VENDOR)
-            self.assertIsNotNone(vendor.get('id'))
+        
+        # Setup SDF registration with a file containing wrong-case lookups for above values
         upload_file_file = Path(__file__).resolve().parent.\
             joinpath('test_acasclient', 'test_045_register_sdf_case_insensitive.sdf')
         mappings = [

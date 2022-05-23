@@ -1799,24 +1799,25 @@ class TestAcasclient(BaseAcasClientTest):
             user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
         self.assertIn('500 Server Error', str(context.exception))
     
-    def _get_create_codetable(self, get_method, create_method, code, name):
+    def _get_or_create_codetable(self, get_method, create_method, code, name):
         """
         Utility function to test creation of simple entities
         """
         # Get all
         codetables = get_method()
         already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
-        # if it already exists, try creating a duplicate and confirm an error is thrown
+        # Return it if it already exists
         if already_exists:
-            self._create_dupe_codetable(create_method, code, name)
+            result = [ct for ct in codetables if ct['code'].lower() == code.lower()][0]
         else:
             # Create and expect success
             result = create_method(code=code, name=name)
             self.assertIsNotNone(result.get('id'))
+        return result
     
     def _create_dupe_codetable(self, create_method, code, name):
         with self.assertRaises(requests.HTTPError) as context:
-            create_method(code=code, name=name)
+            resp = create_method(code=code, name=name)
         self.assertIn('409 Client Error: Conflict', str(context.exception))
     
     def test045_register_sdf_case_insensitive(self):
@@ -1829,15 +1830,14 @@ class TestAcasclient(BaseAcasClientTest):
         SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
         PHYSICAL_STATE = 'solid'
         VENDOR = 'ThermoFisher'
-        # Lot Chemist
-        self._get_create_codetable(self.client.get_cmpdreg_scientists, self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
+        # Do a "get or create" to ensure the expected values are there
+        self._get_or_create_codetable(self.client.get_cmpdreg_scientists, self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
         # Stereo Category
-        self._get_create_codetable(self.client.get_stereo_categories, self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
+        self._get_or_create_codetable(self.client.get_stereo_categories, self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
         # Physical States
-        self._get_create_codetable(self.client.get_physical_states, self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
+        self._get_or_create_codetable(self.client.get_physical_states, self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
         # Vendors
-        self._get_create_codetable(self.client.get_cmpdreg_vendors, self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
-        vendors = self.client.get_cmpdreg_vendors()
+        self._get_or_create_codetable(self.client.get_cmpdreg_vendors, self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
         # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
         salts = self.client.get_salts()
         # Create Salt Abbrev
@@ -1903,23 +1903,57 @@ class TestAcasclient(BaseAcasClientTest):
         response = self.client.register_sdf(upload_file_file, "bob",
                                             mappings)
         self.assertIn('results', response)
-        errors = response['results']
+        errors = response['results']        
         self.assertEqual(len(errors), 0)
         summary = response['summary']
         self.assertIn('New lots of existing compounds: 2', summary)
+    
+    def test046_cmpdreg_admin_crud(self):
+        """Test create, read, update, delete methods for CmdpReg controlled vocabulary items"""
+        # Test values
+        CHEMIST = 'testChemist'
+        CHEMIST_NAME = 'Test Chemist'
+        STEREO_CATEGORY = 'TestCategory'
+        SALT_ABBREV = 'HBr'
+        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Br  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
+        PHYSICAL_STATE = 'plasma'
+        VENDOR = 'Test Vendor'
+        # Create
+        chemist = self.client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
+        self.assertIsNotNone(chemist.get('id'))
+        stereo_category = self.client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
+        self.assertIsNotNone(stereo_category.get('id'))
+        salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+        self.assertIsNotNone(salt.get('id'))
+        physical_state = self.client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
+        self.assertIsNotNone(physical_state.get('id'))
+        vendor = self.client.create_cmpdreg_vendor(VENDOR, VENDOR)
+        self.assertIsNotNone(vendor.get('id'))
+        # Read
+        chemists = self.client.get_cmpdreg_scientists()
+        self.assertIn(CHEMIST, [c['code'] for c in chemists])
+        stereo_categories = self.client.get_stereo_categories()
+        self.assertIn(STEREO_CATEGORY, [c['code'] for c in stereo_categories])
+        salts = self.client.get_salts()
+        self.assertIn(SALT_ABBREV, [s['abbrev'] for s in salts])
+        physical_states = self.client.get_physical_states()
+        self.assertIn(PHYSICAL_STATE, [s['code'] for s in physical_states])
+        vendors = self.client.get_cmpdreg_vendors()
+        self.assertIn(VENDOR, [v['code'] for v in vendors])
+        # TODO Update
 
-        # TODO test creating with alternate case
-        CHEMIST = 'Bob'
-        CHEMIST_NAME = 'Bob Roberts'
-        STEREO_CATEGORY = 'unknown'
-        SALT_ABBREV = 'hcl'
-        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
-        PHYSICAL_STATE = 'Solid'
-        VENDOR = 'thermoFisher'
+        # Test creating duplicates with alternate case, confirm they're rejected
+        CHEMIST = 'Testchemist'
+        STEREO_CATEGORY = 'testcategory'
+        PHYSICAL_STATE = 'plaSma'
+        VENDOR = 'tesT Vendor'
         self._create_dupe_codetable(self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
         self._create_dupe_codetable(self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
         self._create_dupe_codetable(self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
         self._create_dupe_codetable(self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
-        # TODO salt
 
-        # TODO delete the created objects
+        # Delete
+        self.client.delete_cmpdreg_scientist(chemist['id'])
+        self.client.delete_stereo_category(stereo_category['id'])
+        self.client.delete_physical_state(physical_state['id'])
+        self.client.delete_cmpdreg_vendor(vendor['id'])

@@ -1544,6 +1544,11 @@ class client():
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
     
+    def delete_cmpdreg_scientist(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/codeTablesAdmin/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+    
     def get_stereo_categories(self):
         """
         Get all stereo categories
@@ -1559,6 +1564,11 @@ class client():
         url_base = "{}/api/cmpdRegAdmin/stereoCategories".format(self.url)
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
+    
+    def delete_stereo_category(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/cmpdRegAdmin/stereoCategories/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
     
     def get_salts(self):
         """
@@ -1592,6 +1602,11 @@ class client():
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
     
+    def delete_physical_state(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/cmpdRegAdmin/physicalStates/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+    
     def get_cmpdreg_vendors(self):
         """
         Get all vendors for CmpdReg
@@ -1607,3 +1622,8 @@ class client():
         url_base = "{}/api/cmpdRegAdmin/vendors".format(self.url)
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
+    
+    def delete_cmpdreg_vendor(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/cmpdRegAdmin/vendors/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True

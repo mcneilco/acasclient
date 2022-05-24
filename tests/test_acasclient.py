@@ -1897,16 +1897,36 @@ class TestAcasclient(BaseAcasClientTest):
         response = self.client.register_sdf(upload_file_file, "bob",
                                             mappings, dry_run=True)
         self.assertIn('results', response)
-        errors = response['results']
+        messages = response['results']
+        errors = [m for m in messages if m['level'] == 'error']
+        warnings = [m for m in messages if m['level'] == 'warning']
+        if len(errors) > 0:
+            print(errors)
         self.assertEqual(len(errors), 0)
+        self.assertEqual(len(warnings), 6)
         # Register and confirm no errors
         response = self.client.register_sdf(upload_file_file, "bob",
                                             mappings)
         self.assertIn('results', response)
-        errors = response['results']        
+        messages = response['results']
+        errors = [m for m in messages if m['level'] == 'error']
+        warnings = [m for m in messages if m['level'] == 'warning']
+        if len(errors) > 0:
+            print(errors)
         self.assertEqual(len(errors), 0)
+        self.assertEqual(len(warnings), 6)
         summary = response['summary']
         self.assertIn('New lots of existing compounds: 2', summary)
+
+        # Get the lots and confirm they have user 'bob' not 'Bob'
+        registered_sdf = [f for f in response['report_files'] if '_registered.sdf' in f['name']][0]
+        registered_records = registered_sdf['parsed_content']
+        lot_corp_names = [rec['properties']['Registered Lot Corp Name'] for rec in registered_records]
+        for corp_name in lot_corp_names:
+            meta_lot = self.client.get_meta_lot(corp_name)
+            lot = meta_lot['lot']
+            self.assertEqual(lot['chemist'], 'bob')
+        
     
     @requires_node_api
     def test046_cmpdreg_admin_crud(self):

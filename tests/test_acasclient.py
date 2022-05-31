@@ -1995,9 +1995,48 @@ class TestAcasclient(BaseAcasClientTest):
         vendors = self.client.get_cmpdreg_vendors()
         self.assertIn(VENDOR, [v['code'] for v in vendors])
 
-        # TODO Update as unprivileged should fail
+        # Setup updated values
+        updated_chemist = chemist.copy()
+        updated_chemist['name'] = 'Updated Chemist'
+        updated_stereo_category = stereo_category.copy()
+        updated_stereo_category['name'] = 'Updated Category'
+        updated_physical_state = physical_state.copy()
+        updated_physical_state['name'] = 'Updated State'
+        updated_vendor = vendor.copy()
+        updated_vendor['name'] = 'Updated Vendor'
+        
+        # Update as unprivileged should fail
+        # with self.assertRaises(requests.HTTPError) as context:
+        #     user_client.update_cmpdreg_scientist(updated_chemist)
+        # self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.update_stereo_category(updated_stereo_category)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.update_physical_state(updated_physical_state)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.update_cmpdreg_vendor(updated_vendor)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
 
-        # TODO update as privileged should succeed
+        # update as privileged should succeed
+        self.client.update_cmpdreg_scientist(updated_chemist)
+        self.client.update_stereo_category(updated_stereo_category)
+        self.client.update_physical_state(updated_physical_state)
+        self.client.update_cmpdreg_vendor(updated_vendor)
+        # Read to confirm values were updated
+        chemists = self.client.get_cmpdreg_scientists()
+        chemist = [c for c in chemists if c['code'] == CHEMIST][0]
+        stereo_categories = self.client.get_stereo_categories()
+        stereo_category = [c for c in stereo_categories if c['code'] == STEREO_CATEGORY][0]
+        physical_states = self.client.get_physical_states()
+        physical_state = [s for s in physical_states if s['code'] == PHYSICAL_STATE][0]
+        vendors = self.client.get_cmpdreg_vendors()
+        vendor = [v for v in vendors if v['code'] == VENDOR][0]
+        self.assertEqual(chemist['name'], updated_chemist['name'])
+        self.assertEqual(stereo_category['name'], updated_stereo_category['name'])
+        self.assertEqual(physical_state['name'], updated_physical_state['name'])
+        self.assertEqual(vendor['name'], updated_vendor['name'])
 
         # Test creating duplicates with alternate case, confirm they're rejected
         CHEMIST = 'Testchemist'

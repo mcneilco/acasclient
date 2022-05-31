@@ -1506,14 +1506,6 @@ class client():
         resp.raise_for_status()
         return resp.json()
     
-    def get_cmpdreg_scientists(self):
-        """
-        Fetch the list of possible lot chemists for CmpdReg
-        """
-        resp = self.session.get("{}/cmpdreg/scientists".format(self.url))
-        resp.raise_for_status()
-        return resp.json()
-    
     def _validate_then_save_codetable(self, url_base, codeTable: dict) -> dict:
         """
         Validate a codetable and save it to the database
@@ -1536,6 +1528,14 @@ class client():
         resp.raise_for_status()
         return resp.json()
     
+    def get_cmpdreg_scientists(self):
+        """
+        Fetch the list of possible lot chemists for CmpdReg
+        """
+        resp = self.session.get("{}/cmpdreg/scientists".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
     def create_cmpdreg_scientist(self, code, name):
         """
         Create a new scientist for CmpdReg
@@ -1543,6 +1543,16 @@ class client():
         url_base = "{}/api/codeTablesAdmin/compound/scientist".format(self.url)
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
+    
+    def update_cmpdreg_scientist(self, scientist: dict):
+        """
+        Update a scientist for CmpdReg
+        """
+        if 'id' not in scientist:
+            raise ValueError("id attribute of scientist dict is required")
+        resp = self.session.put("{}/api/codeTablesAdmin/compound/scientist/{}".format(self.url, scientist['id']), json=scientist)
+        resp.raise_for_status()
+        return resp.json()
     
     def delete_cmpdreg_scientist(self, id: int) -> bool:
         resp = self.session.delete("{}/api/codeTablesAdmin/{}".format(self.url, id))
@@ -1564,6 +1574,16 @@ class client():
         url_base = "{}/api/cmpdRegAdmin/stereoCategories".format(self.url)
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
+    
+    def update_stereo_category(self, stereo_category: dict):
+        """
+        Update a stereo category
+        """
+        if 'id' not in stereo_category:
+            raise ValueError("id attribute of stereo_category dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/stereoCategories/{}".format(self.url, stereo_category['id']), json=stereo_category)
+        resp.raise_for_status()
+        # No return because backend doesn't return anything
     
     def delete_stereo_category(self, id: int) -> bool:
         resp = self.session.delete("{}/api/cmpdRegAdmin/stereoCategories/{}".format(self.url, id))
@@ -1602,6 +1622,16 @@ class client():
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
     
+    def update_physical_state(self, physical_state: dict):
+        """
+        Update a physical state
+        """
+        if 'id' not in physical_state:
+            raise ValueError("id attribute of physical_state dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/physicalStates/{}".format(self.url, physical_state['id']), json=physical_state)
+        resp.raise_for_status()
+        # No return because backend doesn't return anything
+    
     def delete_physical_state(self, id: int) -> bool:
         resp = self.session.delete("{}/api/cmpdRegAdmin/physicalStates/{}".format(self.url, id))
         resp.raise_for_status()
@@ -1622,6 +1652,16 @@ class client():
         url_base = "{}/api/cmpdRegAdmin/vendors".format(self.url)
         body = {'code': code, 'name': name}
         return self._validate_then_save_codetable(url_base, body)
+    
+    def update_cmpdreg_vendor(self, vendor: dict):
+        """
+        Update a vendor for CmpdReg
+        """
+        if 'id' not in vendor:
+            raise ValueError("id attribute of vendor dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/vendors/{}".format(self.url, vendor['id']), json=vendor)
+        resp.raise_for_status()
+        # No return because backend doesn't return anything
     
     def delete_cmpdreg_vendor(self, id: int) -> bool:
         resp = self.session.delete("{}/api/cmpdRegAdmin/vendors/{}".format(self.url, id))

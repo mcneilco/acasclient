@@ -988,6 +988,17 @@ class TestAcasclient(BaseAcasClientTest):
         response = experiment_load_test(txt_file, True, self)
         assert_malformed_single_quote_file(response, self)
 
+        # Test for same header with different data types
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'same-header-different-data-types.csv')
+        response = experiment_load_test(data_file_to_upload, True, self)
+        self.assertTrue(response['hasError'])
+        MSG = "The following header(s) are duplicated: 'mods'. Uploads cannot contain the same result header twice. Please rename the duplicate headers or consolidate the data and try again."
+        # We also expect a warning about the Protocol not existing
+        self.assertEqual(len(response['errorMessages']), 2)
+        self.assertEqual(response['errorMessages'][0]['message'], MSG)
+        self.assertIn(MSG, response['results']['htmlSummary'])
+
         # Speed test dry run
         try:
             # Dry run on 50 K row file with 3 columns of data should take

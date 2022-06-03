@@ -1614,17 +1614,17 @@ def experiment_load_test(data_file_to_upload, dry_run_mode, self):
         self.assertIsNotNone(response['transactionId'])
     return response
 
-def csv_to_txt(data_file_to_upload, self):
+def csv_to_txt(data_file_to_upload, dir):
     # Get the file name but change it to .txt
     file_name = data_file_to_upload.name
     file_name = file_name.replace(".csv", ".txt")
-    temp_file_path = Path(self.tempdir, file_name)
+    file_path = Path(dir, file_name)
     # Change the delim to the new delim
     with open(data_file_to_upload, 'r') as f:
-        with open(temp_file_path, 'w') as f2:
+        with open(file_path, 'w') as f2:
             for line in f:
                 f2.write(line.replace(',', "\t"))
-    return temp_file_path
+    return file_path
 
 def test_expected_messages(expected_messages, messages, self):
     for expected_message in expected_messages:
@@ -1658,7 +1658,7 @@ class TestExperimentLoader(BaseAcasClientTest):
             .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
         experiment_load_test(data_file_to_upload, True, self)
         experiment_load_test(data_file_to_upload, False, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
+        txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
         experiment_load_test(txt_file, True, self)
         experiment_load_test(txt_file, False, self)
 
@@ -1668,7 +1668,7 @@ class TestExperimentLoader(BaseAcasClientTest):
             .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
         experiment_load_test(data_file_to_upload, True, self)
         experiment_load_test(data_file_to_upload, False, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
+        txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
         experiment_load_test(txt_file, True, self)
         experiment_load_test(txt_file, False, self)
 
@@ -1687,7 +1687,7 @@ class TestExperimentLoader(BaseAcasClientTest):
             .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
         response = experiment_load_test(data_file_to_upload, True, self)
         assert_malformed_single_quote_file(response, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
+        txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
         response = experiment_load_test(txt_file, True, self)
         assert_malformed_single_quote_file(response, self)
 

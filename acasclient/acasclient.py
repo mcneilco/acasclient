@@ -639,6 +639,21 @@ class client():
 
         return return_dict
 
+    def protocol_search(self, searchTerm):
+        """Search for protocols by search term
+
+        Get an array of protocols given a protocol search term string
+
+        Args:
+            searchTerm (str): A protocol search term
+
+        Returns: Returns an array of protocols
+        """
+        resp = self.session.get("{}/api/protocols/genericSearch/{}"
+                                .format(self.url, searchTerm))
+        resp.raise_for_status()
+        return resp.json()
+
     def get_protocols_by_label(self, label):
         """Get all experiments for a protocol from a protocol label
 
@@ -779,7 +794,8 @@ class client():
             filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
                 PurePath(Path(file)).name)
             report_files.append(self.get_file(filePath))
-        return {"summary": response[0]['summary'],
+        return {"id": response[0]['id'],
+                "summary": response[0]['summary'],
                 "report_files": report_files}
 
     def experiment_loader_request(self, data):

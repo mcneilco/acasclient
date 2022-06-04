@@ -687,6 +687,25 @@ class client():
             resp.raise_for_status()
         return resp.json()
 
+    def get_experiment_by_name(self, experiment_name):
+        """Get an experiment from experiment name
+
+        Get an experiment given an experiment name
+
+        Args:
+            experiment_name (str): An experiment name
+
+        Returns: Returns an experiment object
+        """
+
+        resp = self.session.get("{}/api/experiments/experimentName/{}".
+                                format(self.url, experiment_name))
+        if resp.status_code == 500:
+            return None
+        else:
+            resp.raise_for_status()
+        return resp.json()
+
     def get_experiment_by_code(self, experiment_code, full = False):
         """Get an experiment from an experiment code
 

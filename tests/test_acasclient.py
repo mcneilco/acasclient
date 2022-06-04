@@ -273,16 +273,9 @@ def requires_basic_cmpd_reg_load(func):
     """
     @wraps(func)
     def wrapper(self):
-        if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None or self.basic_cmpd_reg_load_result is None:
-            self.basic_cmpd_reg_load_result = self.basic_cmpd_reg_load()
-        retVal = None
-        try:
-            retVal = func(self)
-        finally:
-            if self.basic_cmpd_reg_load_result is not None:
-                self.client.\
-                    purge_cmpdreg_bulk_load_file(self.basic_cmpd_reg_load_result["id"])
-        return retVal
+        if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
+            self.basic_cmpd_reg_load()
+        return func(self)
     return wrapper
 
 def requires_absent_basic_cmpd_reg_load(func):
@@ -293,6 +286,7 @@ def requires_absent_basic_cmpd_reg_load(func):
     def wrapper(self):
         meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
         if meta_lot is not None:
+            self.delete_all_experiments()
             self.delete_all_cmpd_reg_bulk_load_files()
         return func(self)   
     return wrapper
@@ -304,16 +298,17 @@ def requires_basic_experiment_load(func):
     @requires_basic_cmpd_reg_load
     @wraps(func)
     def wrapper(self):
-        if self.basic_experiment_load_code is not None:
-            experiment = self.client.get_experiment_by_code("EXPT-asdf")
-            if True:
-                self.basic_experiment_load_code = None
-        if self.basic_experiment_load_code is None:
+        experiments = self.client.get_experiment_by_name("BLAH")
+        if len(experiments) == 0:
             data_file_to_upload = Path(__file__).resolve()\
-                .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
-            response = self.experiment_load_test(data_file_to_upload, dry_run_mode = False)
-            self.basic_experiment_load_code = response['results']['experimentCode']
-
+                            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+            response = self.client.\
+                experiment_loader(data_file_to_upload, "bob", False)
+            experiments = self.client.get_experiment_by_name("BLAH")
+        for experiment in experiments:
+            if experiment['ignored'] == False and experiment['deleted'] == False:
+                break;
+        return func(self, experiment)
     return wrapper
 
 class BaseAcasClientTest(unittest.TestCase):
@@ -353,12 +348,6 @@ class BaseAcasClientTest(unittest.TestCase):
             global_project = global_project[0]
         self.global_project_code = global_project["code"]
 
-        # self.experimernt_code  is used to track if there has been a basic experiment load done
-        self.basic_experiment_load_code = None
-
-        # self.  is used to track if there has been a basic experiment load done
-        self.basic_cmpd_reg_load_result = None
-
         # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
         self.maxDiff = None
         
@@ -367,18 +356,22 @@ class BaseAcasClientTest(unittest.TestCase):
     def tearDownClass(self):
         """ Delete all experiments and bulk load files
         """
+
         try:
             self.delete_all_experiments(self)
+            print("Successfully deleted all experiments")
         except Exception as e:
             print("Error deleting experiments in tear down: " + str(e))
 
         try:
             self.delete_all_cmpd_reg_bulk_load_files(self)
+            print("Successfully deleted all cmpdreg bulk load files")
         except Exception as e:
             print("Error deleting bulkloaded files in tear down: " + str(e))
 
         try:
             self.delete_all_projects(self)
+            print("Successfully deleted all projects (except Global)")
         except Exception as e:
             print("Error deleting all projects in tear down: " + str(e))
 
@@ -411,28 +404,32 @@ class BaseAcasClientTest(unittest.TestCase):
         protocols = self.client.protocol_search("*")
         for protocol in protocols:
             for experiment in protocol["experiments"]:
-                self.client.delete_experiment(experiment["codeName"])
+                if experiment["ignored"] == False and experiment["deleted"] == False:
+                    self.client.delete_experiment(experiment["codeName"])
 
             # Verify all experiments are now gone for this protocol
         all_protocols = self.client.protocol_search("*")
+        not_deleted_experiments = []
         for protocol in all_protocols:
             # Loop through all experiments and make sure they are either deleted or ignored
             for experiment in protocol["experiments"]:
                 if experiment["ignored"] == False and experiment["deleted"] == False:
-                    self.fail(f"Experiment '{experiment['codeName']}' was not deleted during test tear down")
+                    not_deleted_experiments.append(experiment["codeName"])
+
+        if len(not_deleted_experiments) > 0:
+            raise Exception("Failed to delete all experiments: " + str(not_deleted_experiments))
                     
 
     def delete_all_cmpd_reg_bulk_load_files(self):
         """ Deletes all cmpdreg bulk load files in order by id """
-        
-        self.basic_cmpd_reg_load_result = None
+
         files = self.client.\
             get_cmpdreg_bulk_load_files()
         
         # sort by id
         files.sort(key=lambda x: x['id'])
         for file in files:
-            self.client.purge_cmpdreg_bulk_load_file(file['id'])
+            response = self.client.purge_cmpdreg_bulk_load_file(file['id'])
 
         # Verify all files are now gone
         files = self.client.\
@@ -440,7 +437,8 @@ class BaseAcasClientTest(unittest.TestCase):
         if len(files) > 0:
             # Get the ids of all the files
             ids = [file['id'] for file in files]
-            self.fail(f"Some cmpdreg bulk load files were not deleted during test tear down: {ids}")
+            # Throw exception not failure
+            raise ValueError(f"Failed to delete some cmpd reg bulk load files: {ids}")
 
 
     def delete_all_projects(self):
@@ -458,9 +456,13 @@ class BaseAcasClientTest(unittest.TestCase):
             self.client.update_ls_thing_list(projects_to_delete)
 
         projects = self.client.get_ls_things_by_type_and_kind('project', 'project')
+        not_deleted_projects = []
         for project in projects:
             if project['codeName'] != "PROJ-00000001" and project['deleted'] == False and project['ignored'] == False:
-                self.fail("Some projects were not deleted during test tear down")
+                not_deleted_projects.append(project['codeName'])
+        
+        if len(not_deleted_projects) > 0:
+            raise Exception("Failed to delete all projects: " + str(not_deleted_projects))
 
     def basic_cmpd_reg_load(self):
         """ Loads the basic cmpdreg data end result being CMPD-0000001-001 and CMPD-0000002-001 are loaded """
@@ -1093,7 +1095,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIsNotNone(response['transactionId'])
 
     @requires_basic_experiment_load
-    def test_015_get_protocols_by_label(self):
+    def test_015_get_protocols_by_label(self, experiment):
         """Test get protocols by label"""
         protocols = self.client.get_protocols_by_label("Test Protocol")
         self.assertGreater(len(protocols), 0)
@@ -1105,7 +1107,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(len(fakeProtocols), 0)
 
     @requires_basic_experiment_load
-    def test_016_get_experiments_by_protocol_code(self):
+    def test_016_get_experiments_by_protocol_code(self, experiment):
         """Test get experiments by protocol code."""
         protocols = self.client.get_protocols_by_label("Test Protocol")
         experiments = self.client.\
@@ -1120,19 +1122,20 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIsNone(experiments)
 
     @requires_basic_experiment_load
-    def test_017_get_experiment_by_code(self):
+    def test_017_get_experiment_by_code(self, experiment):
         """Test get experiment by code."""
-        experiment = self.client.get_experiment_by_code("EXPT-00000001")
+        experiment = self.client.get_experiment_by_code(experiment['codeName'])
         self.assertIn('codeName', experiment)
         self.assertIn('lsLabels', experiment)
         experiment = self.client.get_experiment_by_code("FAKECODE")
         self.assertIsNone(experiment)
 
     @requires_basic_experiment_load
-    def test_018_get_source_file_for_experient_code(self):
+    def test_018_get_source_file_for_experient_code(self, experiment):
         """Test get source file for experiment code."""
+        experiment = self.client.get_experiment_by_code(experiment['codeName'])
         source_file = self.client.\
-            get_source_file_for_experient_code("EXPT-00000001")
+            get_source_file_for_experient_code(experiment['codeName'])
         self.assertIn('content', source_file)
         self.assertIn('content-type', source_file)
         self.assertIn('name', source_file)
@@ -1143,10 +1146,10 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIsNone(source_file)
 
     @requires_basic_experiment_load
-    def test_019_write_source_file_for_experient_code(self):
+    def test_019_write_source_file_for_experient_code(self, experiment):
         """Test get source file for experiment code."""
         source_file_path = self.client.\
-            write_source_file_for_experient_code("EXPT-00000001", self.tempdir)
+            write_source_file_for_experient_code(experiment['codeName'], self.tempdir)
         self.assertTrue(source_file_path.exists())
 
     @requires_basic_cmpd_reg_load
@@ -1158,7 +1161,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(meta_lot['lot']['corpName'], 'CMPD-0000001-001')
 
     @requires_basic_experiment_load
-    def test_021_experiment_search(self):
+    def test_021_experiment_search(self, experiment):
         """Test experiment generic search."""
         results = self.client.\
             experiment_search('EXPT')
@@ -1218,15 +1221,15 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertTrue(results['success'])
 
     @requires_basic_experiment_load
-    def test_025_delete_experiment(self):
+    def test_025_delete_experiment(self, experiment):
         """Test delete experiment."""
 
         response = self.client.\
-            delete_experiment(self.basic_experiment_load_code)
+            delete_experiment(experiment['codeName'])
         self.assertIsNotNone(response)
         self.assertIn('codeValue', response)
         self.assertEqual('deleted', response['codeValue'])
-        experiment = self.client.get_experiment_by_code(self.basic_experiment_load_code)
+        experiment = self.client.get_experiment_by_code(experiment['codeName'])
         self.assertIsNotNone(experiment)
         self.assertTrue(experiment['ignored'])
         experiment_status = acasclient.\
@@ -1616,11 +1619,12 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(type(blob_data), bytes)
         self.assertEqual(blob_data, bytes_array)
 
-    @requires_basic_cmpd_reg_load
+    @requires_absent_basic_cmpd_reg_load
     def test_042_cmpd_structure_search(self):
         """Test cmpd structure search request."""
         # Get a mapping of the registered parents and their structures
-        for file in self.basic_cmpd_reg_load_result['report_files']:
+        result = self.basic_cmpd_reg_load()
+        for file in result['report_files']:
             if file['name'].endswith('registered.sdf'):
                 registered_sdf_content = file['parsed_content']
                 structures = {}

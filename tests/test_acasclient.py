@@ -367,11 +367,11 @@ class BaseAcasClientTest(unittest.TestCase):
         except Exception as e:
             print("Error deleting experiments in tear down: " + str(e))
 
-        try:
-            self.delete_all_cmpd_reg_bulk_load_files(self)
-            print("Successfully deleted all cmpdreg bulk load files")
-        except Exception as e:
-            print("Error deleting bulkloaded files in tear down: " + str(e))
+        # try:
+        #     self.delete_all_cmpd_reg_bulk_load_files(self)
+        #     print("Successfully deleted all cmpdreg bulk load files")
+        # except Exception as e:
+        #     print("Error deleting bulkloaded files in tear down: " + str(e))
 
         try:
             self.delete_all_projects(self)
@@ -431,7 +431,7 @@ class BaseAcasClientTest(unittest.TestCase):
             get_cmpdreg_bulk_load_files()
         
         # sort by id
-        files.sort(key=lambda x: x['id'])
+        files.sort(key=lambda x: x['id'], reverse=True)
         for file in files:
             response = self.client.purge_cmpdreg_bulk_load_file(file['id'])
 

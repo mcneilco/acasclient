@@ -639,6 +639,21 @@ class client():
 
         return return_dict
 
+    def protocol_search(self, search_term):
+        """Search for protocols by search term
+
+        Get an array of protocols given a protocol search term string
+
+        Args:
+            searchTerm (str): A protocol search term
+
+        Returns: Returns an array of protocols
+        """
+        resp = self.session.get("{}/api/protocols/genericSearch/{}"
+                                .format(self.url, search_term))
+        resp.raise_for_status()
+        return resp.json()
+
     def get_protocols_by_label(self, label):
         """Get all experiments for a protocol from a protocol label
 
@@ -670,6 +685,24 @@ class client():
             return None
         else:
             resp.raise_for_status()
+        return resp.json()
+
+    def get_experiment_by_name(self, experiment_name):
+        """Get an experiment from experiment name
+
+        Get an experiment given an experiment name
+
+        Args:
+            experiment_name (str): An experiment name
+
+        Returns: Returns an experiment object or None if the experiment not found
+        """
+
+        resp = self.session.get("{}/api/experiments/experimentName/{}".
+                                format(self.url, experiment_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
         return resp.json()
 
     def get_experiment_by_code(self, experiment_code, full = False):
@@ -790,7 +823,8 @@ class client():
             filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
                 PurePath(Path(file)).name)
             report_files.append(self.get_file(filePath))
-        return {"summary": response[0]['summary'],
+        return {"id": response[0]['id'],
+                "summary": response[0]['summary'],
                 "results": response[0]['results'],
                 "report_files": report_files}
 
@@ -817,7 +851,7 @@ class client():
         return resp.json()
 
     def experiment_loader(self, data_file, user, dry_run, report_file="",
-                          images_file=""):
+                          images_file="", validate_dose_response_curves=True):
         """Load an experiment
         
         Load an experiment into ACAS.
@@ -838,6 +872,7 @@ class client():
                    "fileToParse": data_file,
                    "reportFile": report_file,
                    "imagesFile": images_file,
+                   "moduleName": None if validate_dose_response_curves else "DoseResponseDataParserController",
                    "dryRunMode": dry_run}
         resp = self.experiment_loader_request(request)
         return resp
@@ -891,7 +926,8 @@ class client():
             response = client.\
                 dose_response_experiment_loader(**request)
         """
-        resp = self.experiment_loader(**kwargs)
+
+        resp = self.experiment_loader(validate_dose_response_curves=False, **kwargs)
         response = {
             "experiment_loader_response": resp,
             "dose_response_fit_response": None

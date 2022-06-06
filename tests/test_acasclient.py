@@ -267,9 +267,69 @@ def get_or_create_global_project():
     output = r.json()
     return output["messages"]
 
+def requires_basic_cmpd_reg_load(func):
+    """
+    Decorator to load the basic cmpdreg data if it is not already loaded
+    """
+    @wraps(func)
+    def wrapper(self):
+        if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
+            self.basic_cmpd_reg_load()
+        return func(self)
+    return wrapper
+
+def requires_absent_basic_cmpd_reg_load(func):
+    """
+    Decorator to load the basic cmpdreg data if it is not already loaded
+    """
+    @wraps(func)
+    def wrapper(self):
+        meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
+        if meta_lot is not None:
+            self.delete_all_experiments()
+            self.delete_all_cmpd_reg_bulk_load_files()
+        return func(self)   
+    return wrapper
+
+def requires_basic_experiment_load(func):
+    """
+    Decorator to load the basic experiment data if it is not already loaded, returns None as a fallback if the experiment is not loaded
+    """
+    @requires_basic_cmpd_reg_load
+    @wraps(func)
+    def wrapper(self):
+        experiments = self.client.get_experiment_by_name("BLAH")
+        if len(experiments) == 0:
+            data_file_to_upload = Path(__file__).resolve()\
+                            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+            response = self.client.\
+                experiment_loader(data_file_to_upload, "bob", False)
+            experiments = self.client.get_experiment_by_name("BLAH")
+
+        experiment = None
+        for experiment in experiments:
+            if experiment['ignored'] == False and experiment['deleted'] == False:
+                # If we found a valid experiment (not ignored or deleted) then we will break jump out of the loop
+                # and return the experiment.
+                break
+        return func(self, experiment)
+    return wrapper
+
 class BaseAcasClientTest(unittest.TestCase):
     """ Base class for ACAS Client tests """
+
+    # To run before EVERY test using this class
     def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+
+    # To run after EVERY test using this class
+    def tearDown(self):
+        """Tear down test fixtures, if any."""
+        shutil.rmtree(self.tempdir)
+
+    # To run ONCE before running tests using this class
+    @classmethod
+    def setUpClass(self):
         """Set up test fixtures, if any."""
         creds = acasclient.get_default_credentials()
         self.test_usernames = []
@@ -291,18 +351,285 @@ class BaseAcasClientTest(unittest.TestCase):
         else:
             global_project = global_project[0]
         self.global_project_code = global_project["code"]
-        self.tempdir = tempfile.mkdtemp()
+
         # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
         self.maxDiff = None
+        
+    # To run ONCE after running tests using this class
+    @classmethod
+    def tearDownClass(self):
+        """ Delete all experiments and bulk load files
+        """
 
-    def tearDown(self):
-        """Tear down test fixtures, if any."""
         try:
-            shutil.rmtree(self.tempdir)
+            self.delete_all_experiments(self)
+            print("Successfully deleted all experiments")
+        except Exception as e:
+            print("Error deleting experiments in tear down: " + str(e))
+
+        # try:
+        #     self.delete_all_cmpd_reg_bulk_load_files(self)
+        #     print("Successfully deleted all cmpdreg bulk load files")
+        # except Exception as e:
+        #     print("Error deleting bulkloaded files in tear down: " + str(e))
+
+        try:
+            self.delete_all_projects(self)
+            print("Successfully deleted all projects (except Global)")
+        except Exception as e:
+            print("Error deleting all projects in tear down: " + str(e))
+
+        try:    
             for username in self.test_usernames:
                 delete_backdoor_user(username)
         finally:
             self.client.close()
+
+    # Helper for testing an experiment upload was successful
+    def experiment_load_test(self, data_file_to_upload, dry_run_mode):
+        response = self.client.\
+            experiment_loader(data_file_to_upload, "bob", dry_run_mode)
+        self.assertIn('results', response)
+        self.assertIn('htmlSummary', response['results'])
+        self.assertIn('errorMessages', response)
+        self.assertIn('hasError', response)
+        self.assertIn('hasWarning', response)
+        self.assertIn('transactionId', response)
+        if dry_run_mode:
+            self.assertIsNone(response['transactionId'])
+        else:
+            self.assertIsNotNone(response['transactionId'])
+        return response
+
+    def delete_all_experiments(self):
+        """ Deletes all experiments """
+        # Currently search is the only way to get all protocols
+        self.basic_experiment_load_code = None
+        protocols = self.client.protocol_search("*")
+        for protocol in protocols:
+            for experiment in protocol["experiments"]:
+                if experiment["ignored"] == False and experiment["deleted"] == False:
+                    self.client.delete_experiment(experiment["codeName"])
+
+            # Verify all experiments are now gone for this protocol
+        all_protocols = self.client.protocol_search("*")
+        not_deleted_experiments = []
+        for protocol in all_protocols:
+            # Loop through all experiments and make sure they are either deleted or ignored
+            for experiment in protocol["experiments"]:
+                if experiment["ignored"] == False and experiment["deleted"] == False:
+                    not_deleted_experiments.append(experiment["codeName"])
+
+        if len(not_deleted_experiments) > 0:
+            raise Exception("Failed to delete all experiments: " + str(not_deleted_experiments))
+                    
+
+    def delete_all_cmpd_reg_bulk_load_files(self):
+        """ Deletes all cmpdreg bulk load files in order by id """
+
+        files = self.client.\
+            get_cmpdreg_bulk_load_files()
+        
+        # sort by id in reverse order to delete most recent first
+        files.sort(key=lambda x: x['id'], reverse=True)
+        for file in files:
+            response = self.client.purge_cmpdreg_bulk_load_file(file['id'])
+
+        # Verify all files are now gone
+        files = self.client.\
+            get_cmpdreg_bulk_load_files()
+        if len(files) > 0:
+            # Get the ids of all the files
+            ids = [file['id'] for file in files]
+            # Throw exception not failure
+            raise ValueError(f"Failed to delete some cmpd reg bulk load files: {ids}")
+
+
+    def delete_all_projects(self):
+        """ Deletes all projects except Global (PROJ-00000001) """
+        # Currently search is the only way to get all protocols
+        projects = self.client.get_ls_things_by_type_and_kind('project', 'project')
+        projects_to_delete =  []
+        for project in projects:
+            if project['codeName'] != "PROJ-00000001" and project['deleted'] == False and project['ignored'] == False:
+                project['deleted'] = True
+                project['ignored'] = True
+                projects_to_delete.append(project)
+
+        if len(projects_to_delete) > 0:
+            self.client.update_ls_thing_list(projects_to_delete)
+
+        projects = self.client.get_ls_things_by_type_and_kind('project', 'project')
+        not_deleted_projects = []
+        for project in projects:
+            if project['codeName'] != "PROJ-00000001" and project['deleted'] == False and project['ignored'] == False:
+                not_deleted_projects.append(project['codeName'])
+        
+        if len(not_deleted_projects) > 0:
+            raise Exception("Failed to delete all projects: " + str(not_deleted_projects))
+
+    def basic_cmpd_reg_load(self):
+        """ Loads the basic cmpdreg data end result being CMPD-0000001-001 and CMPD-0000002-001 are loaded """
+        
+        test_012_upload_file_file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+
+        mappings = [
+                {
+                    "dbProperty": "Parent Common Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Common Name"
+                },
+                {
+                    "dbProperty": "Parent Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Amount",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Amount Prepared"
+                },
+                {
+                    "dbProperty": "Lot Amount Units",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Amount Units"
+                },
+                {
+                    "dbProperty": "Lot Color",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Appearance"
+                },
+                {
+                    "dbProperty": "Lot Synthesis Date",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Date Prepared"
+                },
+                {
+                    "dbProperty": "Lot Notebook Page",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Notebook"
+                },
+                {
+                    "dbProperty": "Lot Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Number",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Number"
+                },
+                {
+                    "dbProperty": "Lot Purity",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Purity"
+                },
+                {
+                    "dbProperty": "Lot Comments",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Register Comment"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": "Lot Scientist"
+                },
+                {
+                    "dbProperty": "Lot Solution Amount",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Solution Amount"
+                },
+                {
+                    "dbProperty": "Lot Solution Amount Units",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Solution Amount Units"
+                },
+                {
+                    "dbProperty": "Lot Supplier",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Source"
+                },
+                {
+                    "dbProperty": "Lot Supplier ID",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Source ID"
+                },
+                {
+                    "dbProperty": "CAS Number",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "CAS"
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": self.global_project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Common Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": "Unknown",
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Parent Stereo Comment",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Structure Comment"
+                },
+                {
+                    "dbProperty": "Lot Is Virtual",
+                    "defaultVal": "False",
+                    "required": False,
+                    "sdfProperty": "Lot Is Virtual"
+                },
+                {
+                    "dbProperty": "Lot Supplier Lot",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Sample ID2"
+                },
+                {
+                    "dbProperty": "Lot Salt Abbrev",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Salt Name"
+                },
+                {
+                    "dbProperty": "Lot Salt Equivalents",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Salt Equivalents"
+                }
+            ]
+
+        response = self.client.register_sdf(test_012_upload_file_file, "bob",
+                                            mappings)
+        return response
 
 class TestAcasclient(BaseAcasClientTest):
     """Tests for `acasclient` package."""
@@ -358,6 +685,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('originalName', files['files'][0])
         self.assertEqual(files['files'][0]["originalName"], '1_1_Generic.xlsx')
 
+    @requires_absent_basic_cmpd_reg_load
     def test_005_register_sdf_request(self):
         """Test register sdf request."""
         test_012_upload_file_file = Path(__file__).resolve().parent\
@@ -377,7 +705,7 @@ class TestAcasclient(BaseAcasClientTest):
                     "dbProperty": "Parent Corp Name",
                     "defaultVal": None,
                     "required": False,
-                    "sdfProperty": "Corporate ID"
+                    "sdfProperty": "Parent Corp Name"
                 },
                 {
                     "dbProperty": "Lot Amount",
@@ -525,167 +853,13 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('summary', response[0])
         self.assertIn('Number of entries processed', response[0]['summary'])
 
+    @requires_absent_basic_cmpd_reg_load
     def test_006_register_sdf(self):
         """Test register sdf."""
-        test_012_upload_file_file = Path(__file__).resolve().parent.\
-            joinpath('test_acasclient', 'test_012_register_sdf.sdf')
-        mappings = [
-            {
-                "dbProperty": "Parent Common Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Name"
-            },
-            {
-                "dbProperty": "Parent Corp Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Corporate ID"
-            },
-            {
-                "dbProperty": "Lot Amount",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Amount Prepared"
-            },
-            {
-                "dbProperty": "Lot Amount Units",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Amount Units"
-            },
-            {
-                "dbProperty": "Lot Color",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Appearance"
-            },
-            {
-                "dbProperty": "Lot Synthesis Date",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Date Prepared"
-            },
-            {
-                "dbProperty": "Lot Notebook Page",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Notebook"
-            },
-            {
-                "dbProperty": "Lot Corp Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Corp Name"
-            },
-            {
-                "dbProperty": "Lot Number",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Number"
-            },
-            {
-                "dbProperty": "Lot Purity",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Purity"
-            },
-            {
-                "dbProperty": "Lot Comments",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Register Comment"
-            },
-            {
-                "dbProperty": "Lot Chemist",
-                "defaultVal": "bob",
-                "required": True,
-                "sdfProperty": "Lot Scientist"
-            },
-            {
-                "dbProperty": "Lot Solution Amount",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Solution Amount"
-            },
-            {
-                "dbProperty": "Lot Solution Amount Units",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Solution Amount Units"
-            },
-            {
-                "dbProperty": "Lot Supplier",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Source"
-            },
-            {
-                "dbProperty": "Lot Supplier ID",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Source ID"
-            },
-            {
-                "dbProperty": "CAS Number",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "CAS"
-            },
-            {
-                "dbProperty": "Project",
-                "defaultVal": self.global_project_code,
-                "required": True,
-                "sdfProperty": "Project Code Name"
-            },
-            {
-                "dbProperty": "Parent Common Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Name"
-            },
-            {
-                "dbProperty": "Parent Stereo Category",
-                "defaultVal": "Unknown",
-                "required": True,
-                "sdfProperty": None
-            },
-            {
-                "dbProperty": "Parent Stereo Comment",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Structure Comment"
-            },
-            {
-                "dbProperty": "Lot Is Virtual",
-                "defaultVal": "False",
-                "required": False,
-                "sdfProperty": "Lot Is Virtual"
-            },
-            {
-                "dbProperty": "Lot Supplier Lot",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Sample ID2"
-            },
-            {
-                "dbProperty": "Lot Salt Abbrev",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Salt Name"
-            },
-            {
-                "dbProperty": "Lot Salt Equivalents",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Salt Equivalents"
-            }
-        ]
-
-        response = self.client.register_sdf(test_012_upload_file_file, "bob",
-                                            mappings)
+        response = self.basic_cmpd_reg_load()
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
+        self.assertIn('id', response)
         self.assertIn('Number of entries processed', response['summary'])
         # Confirm the report.log file is created and is plaintext
         report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
@@ -694,6 +868,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertNotIn('<div', report_log_contents)
         return response
 
+    @requires_basic_cmpd_reg_load
     def test_007_cmpd_search_request(self):
         """Test cmpd search request."""
 
@@ -774,6 +949,7 @@ class TestAcasclient(BaseAcasClientTest):
             cmpd_search_request(searchRequest)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
 
+    @requires_basic_cmpd_reg_load
     def test_008_cmpd_search(self):
         """Test cmpd search request."""
 
@@ -808,6 +984,7 @@ class TestAcasclient(BaseAcasClientTest):
             cmpd_search(molStructure=molStructure)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
 
+    @requires_basic_cmpd_reg_load
     def test_009_export_cmpd_search_results(self):
         """Test export cmpd search results."""
         search_results = {
@@ -849,6 +1026,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('reportFilePath', search_results_export)
         self.assertIn('summary', search_results_export)
 
+    @requires_basic_cmpd_reg_load
     def test_010_export_cmpd_search_results_get_file(self):
         """Test export cmpd search results get file."""
         search_results = {
@@ -866,9 +1044,11 @@ class TestAcasclient(BaseAcasClientTest):
             export_cmpd_search_results(search_results)
         self.assertIn('reportFilePath', search_results_export)
         self.assertIn('summary', search_results_export)
+        self.assertEquals(search_results_export['summary'], "Successfully exported 1 lots.")
         search_results_export = self.client.\
             get_file(search_results_export['reportFilePath'])
 
+    @requires_basic_cmpd_reg_load
     def test_011_get_sdf_file_for_lots(self):
         """Test get sdf file for lots."""
         search_results_export = self.client.\
@@ -884,6 +1064,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('content-length', search_results_export)
         self.assertIn('last-modified', search_results_export)
 
+    @requires_basic_cmpd_reg_load
     def test_012_write_sdf_file_for_lots(self):
         """Test get sdf file for lots."""
         out_file_path = self.client.\
@@ -895,6 +1076,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertTrue(out_file_path.exists())
         self.assertEqual('output.sdf', out_file_path.name)
 
+    @requires_basic_cmpd_reg_load
     def test_013_experiment_loader_request(self):
         """Test experiment loader request."""
         data_file_to_upload = Path(__file__).\
@@ -921,106 +1103,8 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('transactionId', response)
         self.assertIsNotNone(response['transactionId'])
 
-    def test_014_experiment_loader(self):
-        """Test experiment loader."""
-
-        def experiment_load_test(data_file_to_upload, dry_run_mode, self):
-            response = self.client.\
-                experiment_loader(data_file_to_upload, "bob", dry_run_mode)
-            self.assertIn('results', response)
-            self.assertIn('errorMessages', response)
-            self.assertIn('hasError', response)
-            self.assertIn('hasWarning', response)
-            self.assertIn('transactionId', response)
-            if dry_run_mode:
-                self.assertIsNone(response['transactionId'])
-            else:
-                self.assertIsNotNone(response['transactionId'])
-            return response
-
-        def csv_to_txt(data_file_to_upload, self):
-            # Get the file name but change it to .txt
-            file_name = data_file_to_upload.name
-            file_name = file_name.replace(".csv", ".txt")
-            temp_file_path = Path(self.tempdir, file_name)
-            # Change the delim to the new delim
-            with open(data_file_to_upload, 'r') as f:
-                with open(temp_file_path, 'w') as f2:
-                    for line in f:
-                        f2.write(line.replace(',', "\t"))
-            return temp_file_path
-
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
-        experiment_load_test(data_file_to_upload, True, self)
-        experiment_load_test(data_file_to_upload, False, self)
-
-        
-        # Test for csv format file
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
-        experiment_load_test(data_file_to_upload, True, self)
-        experiment_load_test(data_file_to_upload, False, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
-        experiment_load_test(txt_file, True, self)
-        experiment_load_test(txt_file, False, self)
-
-        # Test for non-uniform comma format file
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
-        experiment_load_test(data_file_to_upload, True, self)
-        experiment_load_test(data_file_to_upload, False, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
-        experiment_load_test(txt_file, True, self)
-        experiment_load_test(txt_file, False, self)
-
-        # Test for malformed single quote format file
-        def assert_malformed_single_quote_file(response, self):
-            self.assertTrue(response['hasError'])
-            self.assertIn('errorMessages', response)
-            hasEOFError = False 
-            for message in response['errorMessages'] :
-                if(message['message'].endswith('EOF within quoted string')):
-                    hasEOFError = True
-            self.assertTrue(hasEOFError)
-
-            
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
-        response = experiment_load_test(data_file_to_upload, True, self)
-        assert_malformed_single_quote_file(response, self)
-        txt_file = csv_to_txt(data_file_to_upload, self)
-        response = experiment_load_test(txt_file, True, self)
-        assert_malformed_single_quote_file(response, self)
-
-        # Test for same header with different data types
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', 'same-header-different-data-types.csv')
-        response = experiment_load_test(data_file_to_upload, True, self)
-        self.assertTrue(response['hasError'])
-        MSG = "The following header(s) are duplicated: 'mods'. Uploads cannot contain the same result header twice. Please rename the duplicate headers or consolidate the data and try again."
-        # We also expect a warning about the Protocol not existing
-        self.assertEqual(len(response['errorMessages']), 2)
-        self.assertEqual(response['errorMessages'][0]['message'], MSG)
-        self.assertIn(MSG, response['results']['htmlSummary'])
-
-        # Speed test dry run
-        try:
-            # Dry run on 50 K row file with 3 columns of data should take
-            # less than 25 seconds to complete. On my machine it takes
-            # about 9 seconds. This is a sanity check to make sure the
-            # dry run hasn't slowed significantly.
-            with Timeout(seconds=25):
-                data_file_to_upload = Path(__file__).resolve()\
-                    .parent.joinpath('test_acasclient', '50k-lines.csv')
-                experiment_load_test(data_file_to_upload, True, self)
-        except TimeoutError:
-            self.fail("Timeout error")
-        else:
-            pass
-
-
-    def test_015_get_protocols_by_label(self):
+    @requires_basic_experiment_load
+    def test_015_get_protocols_by_label(self, experiment):
         """Test get protocols by label"""
         protocols = self.client.get_protocols_by_label("Test Protocol")
         self.assertGreater(len(protocols), 0)
@@ -1031,7 +1115,8 @@ class TestAcasclient(BaseAcasClientTest):
         fakeProtocols = self.client.get_protocols_by_label("Fake Protocol")
         self.assertEqual(len(fakeProtocols), 0)
 
-    def test_016_get_experiments_by_protocol_code(self):
+    @requires_basic_experiment_load
+    def test_016_get_experiments_by_protocol_code(self, experiment):
         """Test get experiments by protocol code."""
         protocols = self.client.get_protocols_by_label("Test Protocol")
         experiments = self.client.\
@@ -1045,18 +1130,21 @@ class TestAcasclient(BaseAcasClientTest):
             get_experiments_by_protocol_code("FAKECODE")
         self.assertIsNone(experiments)
 
-    def test_017_get_experiment_by_code(self):
+    @requires_basic_experiment_load
+    def test_017_get_experiment_by_code(self, experiment):
         """Test get experiment by code."""
-        experiment = self.client.get_experiment_by_code("EXPT-00000001")
+        experiment = self.client.get_experiment_by_code(experiment['codeName'])
         self.assertIn('codeName', experiment)
         self.assertIn('lsLabels', experiment)
         experiment = self.client.get_experiment_by_code("FAKECODE")
         self.assertIsNone(experiment)
 
-    def test_018_get_source_file_for_experient_code(self):
+    @requires_basic_experiment_load
+    def test_018_get_source_file_for_experient_code(self, experiment):
         """Test get source file for experiment code."""
+        experiment = self.client.get_experiment_by_code(experiment['codeName'])
         source_file = self.client.\
-            get_source_file_for_experient_code("EXPT-00000001")
+            get_source_file_for_experient_code(experiment['codeName'])
         self.assertIn('content', source_file)
         self.assertIn('content-type', source_file)
         self.assertIn('name', source_file)
@@ -1066,12 +1154,14 @@ class TestAcasclient(BaseAcasClientTest):
             get_source_file_for_experient_code("FAKECODE")
         self.assertIsNone(source_file)
 
-    def test_019_write_source_file_for_experient_code(self):
+    @requires_basic_experiment_load
+    def test_019_write_source_file_for_experient_code(self, experiment):
         """Test get source file for experiment code."""
         source_file_path = self.client.\
-            write_source_file_for_experient_code("EXPT-00000001", self.tempdir)
+            write_source_file_for_experient_code(experiment['codeName'], self.tempdir)
         self.assertTrue(source_file_path.exists())
 
+    @requires_basic_cmpd_reg_load
     def test_020_get_meta_lot(self):
         """Test get meta lot."""
         meta_lot = self.client.\
@@ -1079,7 +1169,8 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIsNotNone(meta_lot)
         self.assertEqual(meta_lot['lot']['corpName'], 'CMPD-0000001-001')
 
-    def test_021_experiment_search(self):
+    @requires_basic_experiment_load
+    def test_021_experiment_search(self, experiment):
         """Test experiment generic search."""
         results = self.client.\
             experiment_search('EXPT')
@@ -1087,6 +1178,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertGreater(len(results), 0)
         self.assertIn('codeName', results[0])
 
+    @requires_basic_cmpd_reg_load
     def test_022_get_cmpdreg_bulk_load_files(self):
         """Test get cmpdreg bulk load files."""
         results = self.client.\
@@ -1095,6 +1187,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertGreater(len(results), 0)
         self.assertIn('fileDate', results[0])
 
+    @requires_basic_cmpd_reg_load
     def test_023_check_cmpdreg_bulk_load_file_dependency(self):
         """Test cmpdreg bulk load file dependency."""
         files = self.client.\
@@ -1127,40 +1220,25 @@ class TestAcasclient(BaseAcasClientTest):
         registration_result = self.client.register_sdf(test_012_upload_file_file, "bob",
                                                        mappings)
         self.assertIn('New lots of existing compounds: 2', registration_result['summary'])
-        # not currently easy to look up a bulk load files so we will just purge the latest one
-        # get all bulk load files and then find the latest one
-        files = self.client.\
-            get_cmpdreg_bulk_load_files()
-        for index, file in enumerate(files):
-            if index == 0:
-                file_to_purge = file
-            else:
-                if file['fileDate'] > file_to_purge['fileDate']:
-                    file_to_purge = file
 
         # purge the bulk load file
         results = self.client.\
-            purge_cmpdreg_bulk_load_file(file_to_purge["id"])
+            purge_cmpdreg_bulk_load_file(registration_result["id"])
         self.assertIn('summary', results)
         self.assertIn('Successfully purged file', results['summary'])
         self.assertIn('success', results)
         self.assertTrue(results['success'])
 
-    def test_025_delete_experiment(self):
+    @requires_basic_experiment_load
+    def test_025_delete_experiment(self, experiment):
         """Test delete experiment."""
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
+
         response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", False)
-        self.assertIn('transactionId', response)
-        self.assertIsNotNone(response['transactionId'])
-        experiment_code = response['results']['experimentCode']
-        response = self.client.\
-            delete_experiment(experiment_code)
+            delete_experiment(experiment['codeName'])
         self.assertIsNotNone(response)
         self.assertIn('codeValue', response)
         self.assertEqual('deleted', response['codeValue'])
-        experiment = self.client.get_experiment_by_code(experiment_code)
+        experiment = self.client.get_experiment_by_code(experiment['codeName'])
         self.assertIsNotNone(experiment)
         self.assertTrue(experiment['ignored'])
         experiment_status = acasclient.\
@@ -1426,7 +1504,7 @@ class TestAcasclient(BaseAcasClientTest):
         assert len(results) == 1
 
 
-
+    @requires_basic_cmpd_reg_load
     def test_033_get_all_lots(self):
         """Test get all lots request."""
 
@@ -1550,17 +1628,19 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(type(blob_data), bytes)
         self.assertEqual(blob_data, bytes_array)
 
+    @requires_absent_basic_cmpd_reg_load
     def test_042_cmpd_structure_search(self):
         """Test cmpd structure search request."""
-        response = self.test_006_register_sdf()
-
         # Get a mapping of the registered parents and their structures
-        for file in response['report_files']:
+        result = self.basic_cmpd_reg_load()
+        for file in result['report_files']:
             if file['name'].endswith('registered.sdf'):
                 registered_sdf_content = file['parsed_content']
                 structures = {}
                 for compound in registered_sdf_content:
                     meta_lot = self.client.get_meta_lot(compound['properties']['Registered Lot Corp Name'])
+                    if meta_lot is None:
+                        self.fail("Expected meta lot to be found for registered compound.")
                     structures[meta_lot['lot']['parent']['id']] = compound['ctab']
                 break
 
@@ -1578,120 +1658,6 @@ class TestAcasclient(BaseAcasClientTest):
             cmpd_structure_search(molStructure=EMPTY_MOL, searchType = "duplicate_tautomer")
         self.assertEqual(len(search_results), 0)
 
-    def test_043_dose_response_experiment_loader(self):
-        """Test dose response experiment loader."""
-        data_file_to_upload = Path(__file__).resolve()\
-            .parent.joinpath('test_acasclient', '4 parameter D-R.csv')
-        request = {
-            "data_file": data_file_to_upload,
-            "user": "bob",
-            "dry_run": True,
-            "model_fit_type": "4 parameter D-R",
-            "fit_settings": {
-                "smartMode":True,
-                "inactiveThresholdMode":True,
-                "inactiveThreshold":20,
-                "theoreticalMaxMode":False,
-                "theoreticalMax":None,
-                "inverseAgonistMode":False,
-                "max":{
-                    "limitType":"none"
-                },
-                "min":
-                    {
-                        "limitType":"none"
-                },
-                "slope":{
-                    "limitType":"none"
-                },
-                "baseline":{
-                    "value":0
-                }
-            }
-        }
-        response = self.client.\
-            dose_response_experiment_loader(**request)
-        self.assertIn("experiment_loader_response", response)
-        self.assertIn('results', response["experiment_loader_response"])
-        self.assertIn('errorMessages', response["experiment_loader_response"])
-        self.assertIn('hasError', response["experiment_loader_response"])
-        self.assertIn('hasWarning', response["experiment_loader_response"])
-        self.assertIn('transactionId', response["experiment_loader_response"])
-        self.assertIsNone(response["experiment_loader_response"]['transactionId'])
-        self.assertIsNone(response['dose_response_fit_response'])
-    
-        # Read the file as a string so that we can update the data
-        with open(data_file_to_upload, 'r') as f:
-            data_file_as_string = f.read()
-
-        # Substitute Format with "Generic" to test for warning for uploading Generic to 
-        # a Dose Response experiment
-        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
-        request["data_file"] = {
-            "name": f.name,
-            "data": data_file_as_string
-        }
-        response = self.client.\
-            dose_response_experiment_loader(**request)
-
-        # Dose response load should warn that a Generic file was uploaded which had a curve id
-        self.assertIn("experiment_loader_response", response)
-        self.assertIn('results', response["experiment_loader_response"])
-        self.assertIn('hasWarning', response["experiment_loader_response"])
-        self.assertTrue(response["experiment_loader_response"]['hasWarning'])
-        self.assertIn('errorMessages', response["experiment_loader_response"])
-        # Assert that error messages has a warning message
-        genericFormatUploadedAsDoseResponse = "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly."
-        matchingMessage = None
-        for error_message in response["experiment_loader_response"]['errorMessages']:
-            if error_message['errorLevel'] == 'warning':
-                # Check if warning has the message in it
-                if "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly." in error_message['message']:
-                    matchingMessage = True
-        if matchingMessage is None:
-            self.fail("ACAS did not produce warning that 'Generic' was uploaded as 'Dose")
-        
-        # Use the original data file for further tests
-        request["data_file"] = data_file_to_upload
-        request["dry_run"] = False
-        response = self.client.\
-            dose_response_experiment_loader(**request)
-
-        self.assertIn('transactionId', response["experiment_loader_response"])
-        self.assertIsNotNone(response["experiment_loader_response"]['transactionId'])
-        self.assertIsNotNone(response["experiment_loader_response"]['results'])
-        self.assertIsNotNone(response["experiment_loader_response"]['results']['experimentCode'])
-
-        self.assertIn('dose_response_fit_response', response)
-        self.assertIn('results', response["dose_response_fit_response"])
-        self.assertIn('htmlSummary', response["dose_response_fit_response"]['results'])
-        self.assertIn('status', response["dose_response_fit_response"]['results'])
-        self.assertEqual(response["dose_response_fit_response"]['results']['status'], 'complete')
-
-        # Get Experiment results
-        experiment = self.client.\
-            get_experiment_by_code(response["experiment_loader_response"]['results']['experimentCode'], full = True)
-        self.assertIsNotNone(experiment)
-        self.assertIn("analysisGroups", experiment)
-
-        accepted_results_file_path = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', "test_dose_response_experiment_loader_accepted_results.json")
-
-        # Leaving this here to show how to update the accepted results file
-        # with open(accepted_results_file_path, 'w') as f:
-        #     json.dump(experiment, f, indent=2)
-
-        experiment = anonymize_experiment_dict(experiment)
-        
-        accepted_results_experiment  = json.loads(accepted_results_file_path.read_text())
-        accepted_results_analysis_groups = anonymize_experiment_dict(accepted_results_experiment)["analysisGroups"]
-        new_results_analysis_groups = experiment["analysisGroups"]
-
-        # Verify that the analysis groups are the same as the accepted results analysis groups
-        # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
-        for i in range(len(accepted_results_analysis_groups)):
-            self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
-    
     @requires_node_api
     def test_044_author_and_role_apis(self):
         # Test that as an admin you can fetch authors
@@ -1814,28 +1780,8 @@ class TestAcasclient(BaseAcasClientTest):
             acas_user_author_role['userName'] = test_username
             user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
         self.assertIn('500 Server Error', str(context.exception))
-    
-    def _get_or_create_codetable(self, get_method, create_method, code, name):
-        """
-        Utility function to test creation of simple entities
-        """
-        # Get all
-        codetables = get_method()
-        already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
-        # Return it if it already exists
-        if already_exists:
-            result = [ct for ct in codetables if ct['code'].lower() == code.lower()][0]
-        else:
-            # Create and expect success
-            result = create_method(code=code, name=name)
-            self.assertIsNotNone(result.get('id'))
-        return result
-    
-    def _create_dupe_codetable(self, create_method, code, name):
-        with self.assertRaises(requests.HTTPError) as context:
-            resp = create_method(code=code, name=name)
-        self.assertIn('409 Client Error: Conflict', str(context.exception))
-    
+
+
     def test045_register_sdf_case_insensitive(self):
         """Test register sdf with case insensitive lookups"""
         # test values
@@ -2083,3 +2029,314 @@ class TestAcasclient(BaseAcasClientTest):
         self.client.delete_stereo_category(stereo_category['id'])
         self.client.delete_physical_state(physical_state['id'])
         self.client.delete_cmpdreg_vendor(vendor['id'])
+
+def csv_to_txt(data_file_to_upload, dir):
+    # Get the file name but change it to .txt
+    file_name = data_file_to_upload.name
+    file_name = file_name.replace(".csv", ".txt")
+    file_path = Path(dir, file_name)
+    # Change the delim to the new delim
+    with open(data_file_to_upload, 'r') as f:
+        with open(file_path, 'w') as f2:
+            for line in f:
+                f2.write(line.replace(',', "\t"))
+    return file_path
+
+class TestExperimentLoader(BaseAcasClientTest):
+    """Tests for `Experiment Loading`."""
+    
+    # Test for malformed single quote format file
+    def assert_malformed_single_quote_file(self, response):
+        self.assertTrue(response['hasError'])
+        self.assertIn('errorMessages', response)
+        hasEOFError = False 
+        for message in response['errorMessages'] :
+            if(message['message'].endswith('EOF within quoted string')):
+                hasEOFError = True
+        self.assertTrue(hasEOFError)
+
+    # Test to check if expected messages are in messages from experiment loader
+    def check_expected_messages(self, expected_messages, messages):
+        for expected_message in expected_messages:
+            # This matches the response error message and level to the expected message and level
+            expected_result = [m for m in messages if m['errorLevel'] == expected_message['errorLevel'] and m['message'] == expected_message['message']]
+            if 'count' in expected_message:
+                if expected_message['count'] > -1:
+                    # If count is present and not -1, then we expect the number of results to be equal to the count
+                    self.assertEqual(len(expected_result), expected_message['count'])
+                else:
+                    # If coount is -1, then we don't care about the number of results, just as long as it has the message
+                    self.assertGreaterThan(len(expected_result), 0)
+            else:
+                # Should return 1 and only 1 match
+                self.assertEqual(len(expected_result), 1)
+
+    @requires_basic_cmpd_reg_load
+    def test_basic_excel(self):
+        """Test experiment loader."""
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
+        self.experiment_load_test(data_file_to_upload, True)
+        self.experiment_load_test(data_file_to_upload, False)
+
+    @requires_basic_cmpd_reg_load
+    def test_basic_csv(self):
+        # Test for csv format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        self.experiment_load_test(data_file_to_upload, True)
+        self.experiment_load_test(data_file_to_upload, False)
+        txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
+        self.experiment_load_test(txt_file, True)
+        self.experiment_load_test(txt_file, False)
+
+    @requires_basic_cmpd_reg_load
+    def test_non_unitform_comma_csv(self):
+        # Test for non-uniform comma format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
+        self.experiment_load_test(data_file_to_upload, True)
+        self.experiment_load_test(data_file_to_upload, False)
+        txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
+        self.experiment_load_test(txt_file, True)
+        self.experiment_load_test(txt_file, False)
+
+    @requires_basic_cmpd_reg_load
+    def test_malformed_single_quote(self):
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assert_malformed_single_quote_file(response)
+        txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
+        response = self.experiment_load_test(txt_file, True)
+        self.assert_malformed_single_quote_file(response)
+
+    @requires_basic_cmpd_reg_load
+    def test_speed(self):
+        # Speed test dry run
+        try:
+            # Dry run on 50 K row file with 3 columns of data should take
+            # less than 25 seconds to complete. On my machine it takes
+            # about 9 seconds. This is a sanity check to make sure the
+            # dry run hasn't slowed significantly.
+            with Timeout(seconds=25):
+                data_file_to_upload = Path(__file__).resolve()\
+                    .parent.joinpath('test_acasclient', '50k-lines.csv')
+                self.experiment_load_test(data_file_to_upload, True)
+        except TimeoutError:
+            self.fail("Timeout error")
+
+    @requires_basic_cmpd_reg_load
+    def test_experiment_loader_curve_validation(self):
+        # Test dose response curve validation
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R-validation.csv')
+
+        response = self.experiment_load_test(data_file_to_upload, True)
+
+        # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
+        self.assertTrue(response['results']['htmlSummary'].find("bv_doseResponseSummaryTable") != -1)
+
+        # Leaving this comment here on how this dict was generted in case there are expected changes we want to make to the expected results match the current results
+        # print(json.dumps(response['errorMessages'], sort_keys=True, indent=4))
+        expected_messages = [
+            {
+                "errorLevel": "error",
+                "message": "No 'Rendering Hint' was found for curve id '9629'. If a curve id is specified, it must be associated with a Rendering Hint."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following parameters were not found for curve id '9629'.  Please provide values for these parameters so that curves are drawn properly: EC50"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following parameters were not found for curve id '8836'.  Please provide values for these parameters so that curves are drawn properly: Min"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following parameters were not found for curve id '8806'.  Please provide values for these parameters so that curves are drawn properly: Max"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following parameters were not found for curve id '8788'.  Please provide values for these parameters so that curves are drawn properly: Slope"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following parameters were not found for curve id '126933'.  Please provide values for these parameters so that curves are drawn properly: Slope, Max"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following parameters were not found for curve id '126915'.  Please provide values for these parameters so that curves are drawn properly: Slope, Min, Max, EC50"
+            },
+            {
+                "errorLevel": "error",
+                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'f'"
+            },
+            {
+                "errorLevel": "warning",
+                "message": "A date is not in the proper format. Found: \"5/8/15\" This was interpreted as \"2015-08-05\". Please enter dates as YYYY-MM-DD."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following column headers have never been loaded in an Experiment before: 'Comment'. If you have loaded a similar Experiment before, please use the same headers that were used previously. If this is a new Protocol, you can proceed without worry."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The R&#178; for curve id 'a' is 0.215 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The R&#178; for curve id 'b' is 0.858 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "Experiment '4 parameter D-R - 2018-05-08' already exists, so the loader will delete its current data and replace it with your new upload. If you do not intend to delete and reload data, enter a new Experiment Name."
+            }
+        ]
+        self.assertEqual(len(response['errorMessages']), len(expected_messages))
+        self.check_expected_messages(expected_messages, response['errorMessages'])
+
+    @requires_basic_cmpd_reg_load
+    def test_dose_response_experiment_loader(self):
+        """Test dose response experiment loader."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R.csv')
+        request = {
+            "data_file": data_file_to_upload,
+            "user": "bob",
+            "dry_run": True,
+            "model_fit_type": "4 parameter D-R",
+            "fit_settings": {
+                "smartMode":True,
+                "inactiveThresholdMode":True,
+                "inactiveThreshold":20,
+                "theoreticalMaxMode":False,
+                "theoreticalMax":None,
+                "inverseAgonistMode":False,
+                "max":{
+                    "limitType":"none"
+                },
+                "min":{
+                    "limitType":"none"
+                },
+                "slope":{
+                    "limitType":"none"
+                },
+                "baseline":{
+                    "value":0
+                }
+            }
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        self.assertIn('hasError', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertIn('transactionId', response["experiment_loader_response"])
+        self.assertIsNone(response["experiment_loader_response"]['transactionId'])
+        self.assertIsNone(response['dose_response_fit_response'])
+
+        # When loading dose response data and doing a curve fit we shold NOT get a dose response summary table because acas isn't evaluating the uploaded
+        # curve fit parameters (it replaces it with it's own curve fits)
+        self.assertTrue(response["experiment_loader_response"]['results']['htmlSummary'].find("bv_doseResponseSummaryTable") == -1)
+
+        # Read the file as a string so that we can update the data
+        with open(data_file_to_upload, 'r') as f:
+            data_file_as_string = f.read()
+
+        # Substitute Format with "Generic" to test for warning for uploading Generic to 
+        # a Dose Response experiment
+        data_file_as_string = data_file_as_string.replace("Format,Dose Response", "Format,Generic")
+        request["data_file"] = {
+            "name": f.name,
+            "data": data_file_as_string
+        }
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        # Dose response load should warn that a Generic file was uploaded which had a curve id
+        self.assertIn("experiment_loader_response", response)
+        self.assertIn('results', response["experiment_loader_response"])
+        self.assertIn('hasWarning', response["experiment_loader_response"])
+        self.assertTrue(response["experiment_loader_response"]['hasWarning'])
+        self.assertIn('errorMessages', response["experiment_loader_response"])
+        # Assert that error messages has a warning message
+        genericFormatUploadedAsDoseResponse = "The upload 'Format' was set to 'Generic' and a 'curve id' column was found. Curve data may not upload correctly."
+        matchingMessage = None
+        for error_message in response["experiment_loader_response"]['errorMessages']:
+            if error_message['errorLevel'] == 'warning':
+                # Check if warning has the message in it
+                if genericFormatUploadedAsDoseResponse in error_message['message']:
+                    matchingMessage = True
+        if matchingMessage is None:
+            self.fail("ACAS did not produce warning that 'Generic' was uploaded as 'Dose")
+        
+        # Use the original data file for further tests
+        request["data_file"] = data_file_to_upload
+        request["dry_run"] = False
+        response = self.client.\
+            dose_response_experiment_loader(**request)
+
+        self.assertIn('transactionId', response["experiment_loader_response"])
+        self.assertIsNotNone(response["experiment_loader_response"]['transactionId'])
+        self.assertIsNotNone(response["experiment_loader_response"]['results'])
+        self.assertIsNotNone(response["experiment_loader_response"]['results']['experimentCode'])
+
+        self.assertIn('dose_response_fit_response', response)
+        self.assertIn('results', response["dose_response_fit_response"])
+        self.assertIn('htmlSummary', response["dose_response_fit_response"]['results'])
+        self.assertIn('status', response["dose_response_fit_response"]['results'])
+        self.assertEqual(response["dose_response_fit_response"]['results']['status'], 'complete')
+
+        # Get Experiment results
+        experiment = self.client.\
+            get_experiment_by_code(response["experiment_loader_response"]['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+
+        accepted_results_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', "test_dose_response_experiment_loader_accepted_results.json")
+
+        # Leaving this here to show how to update the accepted results file
+        # with open(accepted_results_file_path, 'w') as f:
+        #     json.dump(experiment, f, indent=2)
+
+        experiment = anonymize_experiment_dict(experiment)
+        
+        accepted_results_experiment  = json.loads(accepted_results_file_path.read_text())
+        accepted_results_analysis_groups = anonymize_experiment_dict(accepted_results_experiment)["analysisGroups"]
+        new_results_analysis_groups = experiment["analysisGroups"]
+
+        # Verify that the analysis groups are the same as the accepted results analysis groups
+        # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
+        for i in range(len(accepted_results_analysis_groups)):
+            self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
+    
+    def _get_or_create_codetable(self, get_method, create_method, code, name):
+        """
+        Utility function to test creation of simple entities
+        """
+        # Get all
+        codetables = get_method()
+        already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
+        # Return it if it already exists
+        if already_exists:
+            result = [ct for ct in codetables if ct['code'].lower() == code.lower()][0]
+        else:
+            # Create and expect success
+            result = create_method(code=code, name=name)
+            self.assertIsNotNone(result.get('id'))
+        return result
+    
+    def _create_dupe_codetable(self, create_method, code, name):
+        with self.assertRaises(requests.HTTPError) as context:
+            resp = create_method(code=code, name=name)
+        self.assertIn('409 Client Error: Conflict', str(context.exception))

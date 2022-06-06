@@ -1874,8 +1874,6 @@ class TestExperimentLoader(BaseAcasClientTest):
                 self.experiment_load_test(data_file_to_upload, True)
         except TimeoutError:
             self.fail("Timeout error")
-        else:
-            pass
 
     @requires_basic_cmpd_reg_load
     def test_experiment_loader_curve_validation(self):

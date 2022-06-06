@@ -639,7 +639,7 @@ class client():
 
         return return_dict
 
-    def protocol_search(self, searchTerm):
+    def protocol_search(self, search_term):
         """Search for protocols by search term
 
         Get an array of protocols given a protocol search term string
@@ -650,7 +650,7 @@ class client():
         Returns: Returns an array of protocols
         """
         resp = self.session.get("{}/api/protocols/genericSearch/{}"
-                                .format(self.url, searchTerm))
+                                .format(self.url, search_term))
         resp.raise_for_status()
         return resp.json()
 

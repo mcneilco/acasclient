@@ -687,6 +687,11 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
         self.assertIn('Number of entries processed', response['summary'])
+        # Confirm the report.log file is created and is plaintext
+        report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
+        report_log_contents = report_log['content'].decode('utf-8')
+        self.assertIn('Number of entries processed', report_log_contents)
+        self.assertNotIn('<div', report_log_contents)
         return response
 
     def test_007_cmpd_search_request(self):

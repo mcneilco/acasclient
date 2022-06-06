@@ -861,6 +861,11 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('summary', response)
         self.assertIn('id', response)
         self.assertIn('Number of entries processed', response['summary'])
+        # Confirm the report.log file is created and is plaintext
+        report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
+        report_log_contents = report_log['content'].decode('utf-8')
+        self.assertIn('Number of entries processed', report_log_contents)
+        self.assertNotIn('<div', report_log_contents)
         return response
 
     @requires_basic_cmpd_reg_load
@@ -1777,6 +1782,254 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('500 Server Error', str(context.exception))
 
 
+    def test045_register_sdf_case_insensitive(self):
+        """Test register sdf with case insensitive lookups"""
+        # test values
+        CHEMIST = 'bob'
+        CHEMIST_NAME = 'Bob Roberts'
+        STEREO_CATEGORY = 'Unknown'
+        SALT_ABBREV = 'HCl'
+        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
+        PHYSICAL_STATE = 'solid'
+        VENDOR = 'ThermoFisher'
+        # Do a "get or create" to ensure the expected values are there
+        self._get_or_create_codetable(self.client.get_cmpdreg_scientists, self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
+        # Stereo Category
+        self._get_or_create_codetable(self.client.get_stereo_categories, self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
+        # Physical States
+        self._get_or_create_codetable(self.client.get_physical_states, self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
+        # Vendors
+        self._get_or_create_codetable(self.client.get_cmpdreg_vendors, self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
+        # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
+        salts = self.client.get_salts()
+        # Create Salt Abbrev
+        if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
+            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            self.assertIsNotNone(salt.get('id'))
+        
+        # Setup SDF registration with a file containing wrong-case lookups for above values
+        upload_file_file = Path(__file__).resolve().parent.\
+            joinpath('test_acasclient', 'test_045_register_sdf_case_insensitive.sdf')
+        mappings = [
+            {
+                "dbProperty": "Lot Vendor",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Vendor"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "Bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": self.global_project_code,
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": "unknown",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Physical State",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Physical State"
+            },
+            {
+                "dbProperty": "Lot Salt Abbrev",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Salt Name"
+            },
+            {
+                "dbProperty": "Lot Salt Equivalents",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Salt Equivalents"
+            }
+        ]
+        
+        # Validate and confirm no errors
+        response = self.client.register_sdf(upload_file_file, "bob",
+                                            mappings, dry_run=True)
+        self.assertIn('results', response)
+        messages = response['results']
+        errors = [m for m in messages if m['level'] == 'error']
+        warnings = [m for m in messages if m['level'] == 'warning']
+        if len(errors) > 0:
+            print(errors)
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(warnings), 6)
+        # Register and confirm no errors
+        response = self.client.register_sdf(upload_file_file, "bob",
+                                            mappings)
+        self.assertIn('results', response)
+        messages = response['results']
+        errors = [m for m in messages if m['level'] == 'error']
+        warnings = [m for m in messages if m['level'] == 'warning']
+        if len(errors) > 0:
+            print(errors)
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(warnings), 6)
+        summary = response['summary']
+        self.assertIn('New lots of existing compounds: 2', summary)
+
+        # Get the lots and confirm they have user 'bob' not 'Bob'
+        registered_sdf = [f for f in response['report_files'] if '_registered.sdf' in f['name']][0]
+        registered_records = registered_sdf['parsed_content']
+        lot_corp_names = [rec['properties']['Registered Lot Corp Name'] for rec in registered_records]
+        for corp_name in lot_corp_names:
+            meta_lot = self.client.get_meta_lot(corp_name)
+            lot = meta_lot['lot']
+            self.assertEqual(lot['chemist'], 'bob')
+        
+    
+    @requires_node_api
+    def test046_cmpdreg_admin_crud(self):
+        """Test create, read, update, delete methods for CmdpReg controlled vocabulary items
+            Also test that these are properly restricted to CmpdReg admins (except for read)"""
+        # Test values
+        CHEMIST = 'testChemist'
+        CHEMIST_NAME = 'Test Chemist'
+        STEREO_CATEGORY = 'TestCategory'
+        PHYSICAL_STATE = 'plasma'
+        VENDOR = 'Test Vendor'
+        # Setup non-privileged test user
+        USER = 'test_cmpdreg_user'
+        PASS = 'test_cmpdreg_pass'
+        create_backdoor_user(USER, PASS, acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        user_creds = {
+            'username': USER,
+            'password': PASS,
+            'url': self.client.url
+        }
+        user_client = acasclient.client(user_creds)
+
+        # Create as unprivileged should fail
+        UNAUTH_ERROR = '401 Client Error: Unauthorized'
+        # TODO fix scientist
+        # with self.assertRaises(requests.HTTPError) as context:
+        #     user_client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
+        # self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+           user_client.create_cmpdreg_vendor(VENDOR, VENDOR)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+
+        # Create as privileged should succeed
+        chemist = self.client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
+        self.assertIsNotNone(chemist.get('id'))
+        stereo_category = self.client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
+        self.assertIsNotNone(stereo_category.get('id'))
+        physical_state = self.client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
+        self.assertIsNotNone(physical_state.get('id'))
+        vendor = self.client.create_cmpdreg_vendor(VENDOR, VENDOR)
+        self.assertIsNotNone(vendor.get('id'))
+
+        # Read as unprivileged should succeed
+        chemists = user_client.get_cmpdreg_scientists()
+        self.assertNotEqual(len(chemists), 0)
+        stereo_categories = user_client.get_stereo_categories()
+        self.assertNotEqual(len(stereo_categories), 0)
+        physical_states = user_client.get_physical_states()
+        self.assertNotEqual(len(physical_states), 0)
+        vendors = user_client.get_cmpdreg_vendors()
+        self.assertNotEqual(len(vendors), 0)
+
+        # Read as privileged should also work
+        chemists = self.client.get_cmpdreg_scientists()
+        self.assertIn(CHEMIST, [c['code'] for c in chemists])
+        stereo_categories = self.client.get_stereo_categories()
+        self.assertIn(STEREO_CATEGORY, [c['code'] for c in stereo_categories])
+        physical_states = self.client.get_physical_states()
+        self.assertIn(PHYSICAL_STATE, [s['code'] for s in physical_states])
+        vendors = self.client.get_cmpdreg_vendors()
+        self.assertIn(VENDOR, [v['code'] for v in vendors])
+
+        # Setup updated values
+        updated_chemist = chemist.copy()
+        updated_chemist['name'] = 'Updated Chemist'
+        updated_stereo_category = stereo_category.copy()
+        updated_stereo_category['name'] = 'Updated Category'
+        updated_physical_state = physical_state.copy()
+        updated_physical_state['name'] = 'Updated State'
+        updated_vendor = vendor.copy()
+        updated_vendor['name'] = 'Updated Vendor'
+        
+        # Update as unprivileged should fail
+        # with self.assertRaises(requests.HTTPError) as context:
+        #     user_client.update_cmpdreg_scientist(updated_chemist)
+        # self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.update_stereo_category(updated_stereo_category)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.update_physical_state(updated_physical_state)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.update_cmpdreg_vendor(updated_vendor)
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+
+        # update as privileged should succeed
+        self.client.update_cmpdreg_scientist(updated_chemist)
+        self.client.update_stereo_category(updated_stereo_category)
+        self.client.update_physical_state(updated_physical_state)
+        self.client.update_cmpdreg_vendor(updated_vendor)
+        # Read to confirm values were updated
+        chemists = self.client.get_cmpdreg_scientists()
+        chemist = [c for c in chemists if c['code'] == CHEMIST][0]
+        stereo_categories = self.client.get_stereo_categories()
+        stereo_category = [c for c in stereo_categories if c['code'] == STEREO_CATEGORY][0]
+        physical_states = self.client.get_physical_states()
+        physical_state = [s for s in physical_states if s['code'] == PHYSICAL_STATE][0]
+        vendors = self.client.get_cmpdreg_vendors()
+        vendor = [v for v in vendors if v['code'] == VENDOR][0]
+        self.assertEqual(chemist['name'], updated_chemist['name'])
+        self.assertEqual(stereo_category['name'], updated_stereo_category['name'])
+        self.assertEqual(physical_state['name'], updated_physical_state['name'])
+        self.assertEqual(vendor['name'], updated_vendor['name'])
+
+        # Test creating duplicates with alternate case, confirm they're rejected
+        CHEMIST = 'Testchemist'
+        STEREO_CATEGORY = 'testcategory'
+        PHYSICAL_STATE = 'plaSma'
+        VENDOR = 'tesT Vendor'
+        self._create_dupe_codetable(self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
+        self._create_dupe_codetable(self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
+        self._create_dupe_codetable(self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
+        self._create_dupe_codetable(self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
+
+        # Delete as unprivileged should fail
+        # with self.assertRaises(requests.HTTPError) as context:
+        #    user_client.delete_cmpdreg_scientist(chemist['id'])
+        # self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.delete_stereo_category(stereo_category['id'])
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.delete_physical_state(physical_state['id'])
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+        with self.assertRaises(requests.HTTPError) as context:
+            user_client.delete_cmpdreg_vendor(vendor['id'])
+        self.assertIn(UNAUTH_ERROR, str(context.exception))
+
+        # Delete as privileged should succeed
+        self.client.delete_cmpdreg_scientist(chemist['id'])
+        self.client.delete_stereo_category(stereo_category['id'])
+        self.client.delete_physical_state(physical_state['id'])
+        self.client.delete_cmpdreg_vendor(vendor['id'])
+
 def csv_to_txt(data_file_to_upload, dir):
     # Get the file name but change it to .txt
     file_name = data_file_to_upload.name
@@ -2066,3 +2319,24 @@ class TestExperimentLoader(BaseAcasClientTest):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
+    
+    def _get_or_create_codetable(self, get_method, create_method, code, name):
+        """
+        Utility function to test creation of simple entities
+        """
+        # Get all
+        codetables = get_method()
+        already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
+        # Return it if it already exists
+        if already_exists:
+            result = [ct for ct in codetables if ct['code'].lower() == code.lower()][0]
+        else:
+            # Create and expect success
+            result = create_method(code=code, name=name)
+            self.assertIsNotNone(result.get('id'))
+        return result
+    
+    def _create_dupe_codetable(self, create_method, code, name):
+        with self.assertRaises(requests.HTTPError) as context:
+            resp = create_method(code=code, name=name)
+        self.assertIn('409 Client Error: Conflict', str(context.exception))

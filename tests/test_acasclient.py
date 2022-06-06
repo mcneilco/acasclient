@@ -293,7 +293,7 @@ def requires_absent_basic_cmpd_reg_load(func):
 
 def requires_basic_experiment_load(func):
     """
-    Decorator to load the basic experiment data if it is not already loaded
+    Decorator to load the basic experiment data if it is not already loaded, returns None as a fallback if the experiment is not loaded
     """
     @requires_basic_cmpd_reg_load
     @wraps(func)
@@ -305,9 +305,13 @@ def requires_basic_experiment_load(func):
             response = self.client.\
                 experiment_loader(data_file_to_upload, "bob", False)
             experiments = self.client.get_experiment_by_name("BLAH")
+
+        experiment = None
         for experiment in experiments:
             if experiment['ignored'] == False and experiment['deleted'] == False:
-                break;
+                # If we found a valid experiment (not ignored or deleted) then we will break jump out of the loop
+                # and return the experiment.
+                break
         return func(self, experiment)
     return wrapper
 

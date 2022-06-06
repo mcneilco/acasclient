@@ -631,6 +631,29 @@ class BaseAcasClientTest(unittest.TestCase):
                                             mappings)
         return response
 
+
+    def _get_or_create_codetable(self, get_method, create_method, code, name):
+        """
+        Utility function to test creation of simple entities
+        """
+        # Get all
+        codetables = get_method()
+        already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
+        # Return it if it already exists
+        if already_exists:
+            result = [ct for ct in codetables if ct['code'].lower() == code.lower()][0]
+        else:
+            # Create and expect success
+            result = create_method(code=code, name=name)
+            self.assertIsNotNone(result.get('id'))
+        return result
+    
+    def _create_dupe_codetable(self, create_method, code, name):
+        with self.assertRaises(requests.HTTPError) as context:
+            resp = create_method(code=code, name=name)
+        self.assertIn('409 Client Error: Conflict', str(context.exception))
+
+
 class TestAcasclient(BaseAcasClientTest):
     """Tests for `acasclient` package."""
 
@@ -2319,24 +2342,3 @@ class TestExperimentLoader(BaseAcasClientTest):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
-    
-    def _get_or_create_codetable(self, get_method, create_method, code, name):
-        """
-        Utility function to test creation of simple entities
-        """
-        # Get all
-        codetables = get_method()
-        already_exists = code.lower() in [ct['code'].lower() for ct in codetables]
-        # Return it if it already exists
-        if already_exists:
-            result = [ct for ct in codetables if ct['code'].lower() == code.lower()][0]
-        else:
-            # Create and expect success
-            result = create_method(code=code, name=name)
-            self.assertIsNotNone(result.get('id'))
-        return result
-    
-    def _create_dupe_codetable(self, create_method, code, name):
-        with self.assertRaises(requests.HTTPError) as context:
-            resp = create_method(code=code, name=name)
-        self.assertIn('409 Client Error: Conflict', str(context.exception))

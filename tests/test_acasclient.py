@@ -1888,6 +1888,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
         self.assertTrue(response['results']['htmlSummary'].find("bv_doseResponseSummaryTable") != -1)
 
+        # Leaving this comment here on how this dict was generted in case there are expected changes we want to make to the expected results match the current results
         # print(json.dumps(response['errorMessages'], sort_keys=True, indent=4))
         expected_messages = [
             {

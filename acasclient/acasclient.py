@@ -702,8 +702,7 @@ class client():
                                 format(self.url, experiment_name))
         if resp.status_code == 500:
             return None
-        else:
-            resp.raise_for_status()
+        resp.raise_for_status()
         return resp.json()
 
     def get_experiment_by_code(self, experiment_code, full = False):

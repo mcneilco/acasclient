@@ -430,7 +430,7 @@ class BaseAcasClientTest(unittest.TestCase):
         files = self.client.\
             get_cmpdreg_bulk_load_files()
         
-        # sort by id
+        # sort by id in reverse order to delete most recent first
         files.sort(key=lambda x: x['id'], reverse=True)
         for file in files:
             response = self.client.purge_cmpdreg_bulk_load_file(file['id'])

@@ -695,7 +695,7 @@ class client():
         Args:
             experiment_name (str): An experiment name
 
-        Returns: Returns an experiment object
+        Returns: Returns an experiment object or None if the experiment not found
         """
 
         resp = self.session.get("{}/api/experiments/experimentName/{}".

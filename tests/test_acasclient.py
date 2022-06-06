@@ -367,11 +367,11 @@ class BaseAcasClientTest(unittest.TestCase):
         except Exception as e:
             print("Error deleting experiments in tear down: " + str(e))
 
-        # try:
-        #     self.delete_all_cmpd_reg_bulk_load_files(self)
-        #     print("Successfully deleted all cmpdreg bulk load files")
-        # except Exception as e:
-        #     print("Error deleting bulkloaded files in tear down: " + str(e))
+        try:
+            self.delete_all_cmpd_reg_bulk_load_files(self)
+            print("Successfully deleted all cmpdreg bulk load files")
+        except Exception as e:
+            print("Error deleting bulkloaded files in tear down: " + str(e))
 
         try:
             self.delete_all_projects(self)
@@ -1804,7 +1804,7 @@ class TestAcasclient(BaseAcasClientTest):
             user_client.update_author_roles(author_roles_to_delete=[acas_user_author_role])
         self.assertIn('500 Server Error', str(context.exception))
 
-
+    @requires_absent_basic_cmpd_reg_load
     def test045_register_sdf_case_insensitive(self):
         """Test register sdf with case insensitive lookups"""
         # test values
@@ -1901,7 +1901,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(len(errors), 0)
         self.assertEqual(len(warnings), 6)
         summary = response['summary']
-        self.assertIn('New lots of existing compounds: 2', summary)
+        self.assertIn('New compounds: 2', summary)
 
         # Get the lots and confirm they have user 'bob' not 'Bob'
         registered_sdf = [f for f in response['report_files'] if '_registered.sdf' in f['name']][0]

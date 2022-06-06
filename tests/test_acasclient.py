@@ -446,7 +446,7 @@ class BaseAcasClientTest(unittest.TestCase):
 
 
     def delete_all_projects(self):
-        """ Deletes all cmpdreg bulk load files in order by id """
+        """ Deletes all projects except Global (PROJ-00000001) """
         # Currently search is the only way to get all protocols
         projects = self.client.get_ls_things_by_type_and_kind('project', 'project')
         projects_to_delete =  []

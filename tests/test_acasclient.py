@@ -2105,8 +2105,8 @@ class TestExperimentLoader(BaseAcasClientTest):
                 self.assertEqual(len(expected_result), 1)
 
     @requires_basic_cmpd_reg_load
-    def test_basic_excel(self):
-        """Test experiment loader."""
+    def test_basic_xlsx(self):
+        """Test experiment loader xlsx format."""
 
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
@@ -2114,12 +2114,26 @@ class TestExperimentLoader(BaseAcasClientTest):
         self.experiment_load_test(data_file_to_upload, False)
 
     @requires_basic_cmpd_reg_load
+    def test_basic_xls(self):
+        """Test experiment loader xls format."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic.xls')
+        self.experiment_load_test(data_file_to_upload, True)
+        self.experiment_load_test(data_file_to_upload, False)
+
+    @requires_basic_cmpd_reg_load
     def test_basic_csv(self):
-        # Test for csv format file
+        """Test experiment loader csv format."""
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
         self.experiment_load_test(data_file_to_upload, True)
         self.experiment_load_test(data_file_to_upload, False)
+
+    @requires_basic_cmpd_reg_load
+    def test_basic_tsv(self):
+        """Test experiment loader tsv format."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
         txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
         self.experiment_load_test(txt_file, True)
         self.experiment_load_test(txt_file, False)

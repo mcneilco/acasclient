@@ -24,6 +24,8 @@ M  END
 
 ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 
+BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "BLAH"
+
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
@@ -298,21 +300,29 @@ def requires_basic_experiment_load(func):
     @requires_basic_cmpd_reg_load
     @wraps(func)
     def wrapper(self):
-        experiments = self.client.get_experiment_by_name("BLAH")
-        if len(experiments) == 0:
+        # Get experiments with the expected experiment name
+        experiments = self.client.get_experiment_by_name(BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME)
+
+        # If there is one already loaded then thats the one we want.
+        current_experiment = None
+        for experiment in experiments:
+            if experiment['ignored'] == False and experiment['deleted'] == False:
+                current_experiment = experiment
+                break
+
+        # If we don't have one already loaded, then load it
+        if current_experiment is None:
             data_file_to_upload = Path(__file__).resolve()\
                             .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
             response = self.client.\
                 experiment_loader(data_file_to_upload, "bob", False)
-            experiments = self.client.get_experiment_by_name("BLAH")
-
-        experiment = None
-        for experiment in experiments:
-            if experiment['ignored'] == False and experiment['deleted'] == False:
-                # If we found a valid experiment (not ignored or deleted) then we will break jump out of the loop
-                # and return the experiment.
-                break
-        return func(self, experiment)
+            experiments = self.client.get_experiment_by_name(BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME)
+            # Verify that th eexperiment is loaded and return it
+            for experiment in experiments:
+                if experiment['ignored'] == False and experiment['deleted'] == False:
+                    current_experiment = experiment
+                    break
+        return func(self, current_experiment)
     return wrapper
 
 class BaseAcasClientTest(unittest.TestCase):
@@ -2113,6 +2123,46 @@ class TestExperimentLoader(BaseAcasClientTest):
         txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
         self.experiment_load_test(txt_file, True)
         self.experiment_load_test(txt_file, False)
+
+    @requires_basic_experiment_load
+    def test_expt_reload(self, experiment):
+        """Test for experiment reloading."""
+        
+        code_of_previous_experiment = experiment['codeName']
+
+        # Reload the experiment
+        # It's expected that this file has the same name as that loaded by `requires_basic_cmpd_reg_load` and will delete and reload the experiment getting a new code name
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        result = self.experiment_load_test(data_file_to_upload, False)
+        expected_messages = [
+            {
+                "errorLevel": "warning",
+                "message": f"Experiment '{BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME}' already exists, so the loader will delete its current data and replace it with your new upload. If you do not intend to delete and reload data, enter a new Experiment Name."
+            }
+        ]
+        self.check_expected_messages(expected_messages, result['errorMessages'])
+
+        # Check that the code name is different
+        self.assertNotEqual(code_of_previous_experiment, result['results']['experimentCode'])
+
+        # Get the original experiment by code name and verify it was deleted and that it's modified date is newer than the reloaded experiment
+        original_experiment = self.client.get_experiment_by_code(code_of_previous_experiment)
+        self.assertTrue(original_experiment['deleted'])
+        self.assertTrue(original_experiment['ignored'])
+        self.assertGreater(original_experiment['modifiedDate'], experiment['modifiedDate'])
+
+        # Get new experiment and make sure that the "previous experiment code" value is set in ls states of the new experiment
+        new_experiment = self.client.get_experiment_by_code(result['results']['experimentCode'])
+        has_previous_code = False
+        for ls_state in new_experiment['lsStates']:
+            if ls_state['ignored'] == False and ls_state['deleted'] == False and ls_state['lsType'] == "metadata" and ls_state['lsKind'] == "experiment metadata":
+                for ls_value in ls_state['lsValues']:
+                    if ls_value['ignored'] == False and ls_value['deleted'] == False and ls_value['lsType'] == "codeValue" and ls_value['lsKind'] == "previous experiment code" and ls_value['codeValue'] == code_of_previous_experiment:
+                        has_previous_code = True
+                    
+        if not has_previous_code:
+            self.fail("Could not find previous experiment code in ls states of the reloaded experiment")
 
     @requires_basic_cmpd_reg_load
     def test_non_unitform_comma_csv(self):

@@ -2122,6 +2122,21 @@ class TestExperimentLoader(BaseAcasClientTest):
         self.experiment_load_test(data_file_to_upload, False)
 
     @requires_basic_cmpd_reg_load
+    def test_basic_xls_1995_fails(self):
+        """Test experiment loader 1995 xls format fails."""
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic-XLS_50_1995_Fail.xls')
+        response = self.experiment_load_test(data_file_to_upload, True)
+        expected_messages = [
+            {
+                "errorLevel": "error",
+                "message": "Cannot read input excel file: OldExcelFormatException (Java): The supplied spreadsheet seems to be Excel 5.0/7.0 (BIFF5) format. POI only supports BIFF8 format (from Excel versions 97/2000/XP/2003)"
+            }
+        ]
+        self.check_expected_messages(expected_messages, response['errorMessages'])
+
+    @requires_basic_cmpd_reg_load
     def test_basic_csv(self):
         """Test experiment loader csv format."""
         data_file_to_upload = Path(__file__).resolve()\

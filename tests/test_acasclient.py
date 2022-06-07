@@ -2124,7 +2124,6 @@ class TestExperimentLoader(BaseAcasClientTest):
     @requires_basic_cmpd_reg_load
     def test_basic_xls_1995_fails(self):
         """Test experiment loader 1995 xls format fails."""
-
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic-XLS_50_1995_Fail.xls')
         response = self.experiment_load_test(data_file_to_upload, True)

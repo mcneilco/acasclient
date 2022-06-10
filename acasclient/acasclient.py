@@ -335,8 +335,10 @@ class client():
 
     def get_meta_lot(self, lot_corp_name):
         """Get metalot by lot corp name
-
-        Get a meta lot object from the lot corp name
+         Granted read permission on a lot if one of these is true:
+            1. The user is the owner of the lot (chemist or recorded by)
+            2. The user has access to the project the lot is associated with
+            3. The user is a cmpdreg admin
 
         Args:
             lot_corp_name (str): A lot corp name
@@ -347,8 +349,27 @@ class client():
                                 .format(self.url, lot_corp_name))
         if resp.status_code == 500:
             return None
-        else:
-            resp.raise_for_status()
+        resp.raise_for_status()
+        return resp.json()
+
+    def save_meta_lot(self, meta_lot):
+        """Save a meta lot to the server
+         If updating a saved lot permissions are granted if one of these is true:
+            1. Edit my lots is configured to true on the system and..
+                a. The user is the owner of the lot (chemist or recorded by)
+                b. The user has access to the project the lot is associated with
+            2. The user is a cmpdreg admin
+
+        Args:
+            meta_lot (dict): A meta lot
+
+        Returns: Returns a dict meta lot object
+        """
+        resp = self.session.post("{}/cmpdreg/metalots".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(meta_lot))
+        resp.raise_for_status()
         return resp.json()
 
     def cmpd_search(self, corpNameList="", corpNameFrom="", corpNameTo="",
@@ -1703,3 +1724,20 @@ class client():
         resp = self.session.delete("{}/api/cmpdRegAdmin/vendors/{}".format(self.url, id))
         resp.raise_for_status()
         return True
+
+    def setup_items(self, item_type, items):
+        """Create or update items of a given typeKind 
+           ACAS Admin role for this operation
+
+        Args:
+            item_type (str): Type of item to create or update
+            items (list): List of items to create or update
+        """
+        allowed_types = ['experimenttypes', 'experimentkinds', 'statetypes', 'statekinds', 'valuetypes', 'valuekinds',
+                         'labeltypes', 'labelkinds', 'ddicttypes', 'ddictkinds', 'codetables','labelsequences', 'roletypes',
+                         'rolekinds', 'lsroles']
+        if item_type not in allowed_types:
+            raise ValueError("item_type must be one of {}".format(allowed_types))
+        resp = self.session.post("{}/api/setup/{}".format(self.url, item_type), json=items)
+        resp.raise_for_status()
+        return resp.json()

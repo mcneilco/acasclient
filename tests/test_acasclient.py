@@ -73,14 +73,14 @@ def remove_common_value(value):
     value["analysisGroupId"] = None
     value["stateId"] = None 
 
-    # Round numeric values to 6 digits for comparison on different systems where calculations like EC50 might be different
+    # Round numeric values to 5 digits for comparison on different systems where calculations like EC50 might be different
     if value['lsType'] == "numericValue":
         if value["numericValue"] is not None:
-            value["numericValue"] = round(value["numericValue"], 6)
+            value["numericValue"] = round(value["numericValue"], 5)
     
     # Round uncertainty values as their calculations may vary from system to system
     if 'uncertainty' in value and value['uncertainty'] is not None:
-        value["uncertainty"] = round(value["uncertainty"], 6)
+        value["uncertainty"] = round(value["uncertainty"], 5)
 
 def clean_group(group):
     group['key'] =  None
@@ -2654,5 +2654,6 @@ class TestExperimentLoader(BaseAcasClientTest):
 
         # Verify that the analysis groups are the same as the accepted results analysis groups
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
+        
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])

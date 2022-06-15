@@ -1413,7 +1413,7 @@ class TestAcasclient(BaseAcasClientTest):
         }
         user_client = acasclient.client(user_creds)
 
-        # User should still not be able to fetch the restricted lot because they aren't the owner of the lot
+        # User should still not be able to save the restricted lot because they aren't the owner of the lot
         with self.assertRaises(requests.HTTPError) as context:
             response = user_client.\
                 save_meta_lot(meta_lot)
@@ -2408,8 +2408,9 @@ class TestExperimentLoader(BaseAcasClientTest):
         self.assertNotEqual(code_of_previous_experiment, result['results']['experimentCode'])
 
         # Get the original experiment by code name and verify it was deleted and that it's modified date is newer than the reloaded experiment
-        # TODO: the tests below fail becaus the experiment.deleted = True which is different then marked deleted with experiment status "deleted"
-        # This was working and now it's broken?  Not sure why
+        # TODO: Then we changed the default config to server.project.roles.enabled=true, it broke this test
+        # Because the get experiment by code route uses this and will not return experiments which have their deleted and ignored flags set to true.
+        # We may change this behavior in the future, or come upe with way of modifying the configs during tests but for now we'll just comment this out.
         # original_experiment = self.client.get_experiment_by_code(code_of_previous_experiment)
         # self.assertTrue(original_experiment['deleted'])
         # self.assertTrue(original_experiment['ignored'])

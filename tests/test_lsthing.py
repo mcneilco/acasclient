@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # Constants
-from project_thing import (
+from tests.project_thing import (
     PROJECT_METADATA, PROJECT, STATUS, PROJECT_STATUS,PROCEDURE_DOCUMENT,PDF_DOCUMENT, 
     NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, DESCRIPTION_KEY, 
     PDF_DOCUMENT_KEY, PROCEDURE_DOCUMENT_KEY, PARENT_PROJECT_KEY, ACTIVE, INACTIVE,

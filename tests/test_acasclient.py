@@ -17,7 +17,7 @@ import requests
 # Import project ls thing
 from datetime import datetime
 # Constants
-from project_thing import (
+from tests.project_thing import (
     NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, ACTIVE, PROJECT_NAME,
     Project
 )

@@ -2298,7 +2298,7 @@ class TestAcasclient(BaseAcasClientTest):
 
     def test_047_load_sdf_with_salts(self):
         """
-        Test to Load SDF File w/ Salts to Determine Process
+        Tests to Make Sure Salt Can Only Be Derived from Structure or SDF Properties; NOT BOTH! 
         """
         test_047_load_sdf_with_salts_file = Path(__file__).resolve().parent.\
             joinpath('test_acasclient', 'test_047_register_sdf_with_salts.sdf')
@@ -2340,7 +2340,8 @@ class TestAcasclient(BaseAcasClientTest):
                 "sdfProperty": "Lot Salt Equivalents"
             }
         ]
-
+        # Ensuring HCl is registered as a salt since this test assumes that the salt parent structure
+        # is already registered in CReg
         SALT_ABBREV = 'HCl'
         SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
         # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
@@ -2352,10 +2353,14 @@ class TestAcasclient(BaseAcasClientTest):
 
         response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",
                                             mappings)
-        print(response)
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
-        self.assertIn('Number of entries processed', response['summary'])
+        self.assertIn('Number of entries processed: 4', response['summary'])
+        self.assertIn('Number of entries with error: 1', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        self.assertIn('New lots of existing compounds: 2', response['summary'])
+        self.assertIn('Salts found in both structure and SDF Property', response['summary'])
         return response
 
     def test_048_warn_existing_compound_new_id(self):
@@ -2394,10 +2399,13 @@ class TestAcasclient(BaseAcasClientTest):
         ]
         response = self.client.register_sdf(test_048_warn_existing_compound_new_id_file_one, "bob",
                                             mappings)
-        print(response)
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
         self.assertIn('Number of entries processed', response['summary'])
+        # Want to Assert Compound Registered Successfully 
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
         # Need to Do Second Round of File Since First Needs to Registered Already
         mappings = [
             {
@@ -2427,11 +2435,14 @@ class TestAcasclient(BaseAcasClientTest):
         ]
         response = self.client.register_sdf(test_048_warn_existing_compound_new_id_file_two, "bob",
                                             mappings)
-        print(response)
         self.assertIn('report_files', response)
         self.assertIn('summary', response)
         self.assertIn('Number of entries processed', response['summary'])
-
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        # There are two warnings expected here: only one is related to the feature we are testing here
+        self.assertIn('Number of warnings: 2', response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        self.assertIn('New parent will be assigned due to different stereo category', response['summary'])
         return response
 
 def csv_to_txt(data_file_to_upload, dir):

@@ -32,7 +32,7 @@ M  END
 ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 
 BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "BLAH"
-
+STEREO_CATEGORY="unknown"
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
@@ -515,13 +515,15 @@ class BaseAcasClientTest(unittest.TestCase):
             experiment_loader(data_file_to_upload, "bob", False)
         return response
 
-    def basic_cmpd_reg_load(self, project_code = None):
+    def basic_cmpd_reg_load(self, project_code = None, file = None):
         """ Loads the basic cmpdreg data end result being CMPD-0000001-001 and CMPD-0000002-001 are loaded """
         if project_code is None:
             project_code = self.global_project_code
         
-        test_012_upload_file_file = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+        if file is None:
+            file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+
 
         mappings = [
                 {
@@ -640,7 +642,7 @@ class BaseAcasClientTest(unittest.TestCase):
                 },
                 {
                     "dbProperty": "Parent Stereo Category",
-                    "defaultVal": "Unknown",
+                    "defaultVal": STEREO_CATEGORY,
                     "required": True,
                     "sdfProperty": None
                 },
@@ -673,10 +675,16 @@ class BaseAcasClientTest(unittest.TestCase):
                     "defaultVal": None,
                     "required": False,
                     "sdfProperty": "Lot Salt Equivalents"
+                },
+                {
+                    "dbProperty": "Parent Alias",
+                    "defaultVal": "unknown",
+                    "required": True,
+                    "sdfProperty": "Parent Alias"
                 }
             ]
 
-        response = self.client.register_sdf(test_012_upload_file_file, "bob",
+        response = self.client.register_sdf(file, "bob",
                                             mappings)
         return response
 
@@ -928,17 +936,31 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_absent_basic_cmpd_reg_load
     def test_006_register_sdf(self):
         """Test register sdf."""
-        response = self.basic_cmpd_reg_load()
-        self.assertIn('report_files', response)
-        self.assertIn('summary', response)
-        self.assertIn('id', response)
-        self.assertIn('Number of entries processed', response['summary'])
+        # response = self.basic_cmpd_reg_load()
+        # self.assertIn('report_files', response)
+        # self.assertIn('summary', response)
+        # self.assertIn('id', response)
+        # self.assertIn('Number of entries processed', response['summary'])
         # Confirm the report.log file is created and is plaintext
-        report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
-        report_log_contents = report_log['content'].decode('utf-8')
-        self.assertIn('Number of entries processed', report_log_contents)
-        self.assertNotIn('<div', report_log_contents)
-        return response
+        # report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
+        # report_log_contents = report_log['content'].decode('utf-8')
+        # self.assertIn('Number of entries processed', report_log_contents)
+        # self.assertNotIn('<div', report_log_contents)
+
+        # Large request
+        # 1.13.7.6
+        # Didn't slow down, was fast
+        #  Average speed (rows/min):2327.205026762858
+        # '<div><ul><li>Number of entries processed: 1000</li><li>Number of entries with error: 1</li><li>Number of warnings: 0</li><li>New compounds: 995</li><li>New lots of existing compounds: 4</li><li>New lots of new compounds in the file: 4</li></div><div><h5>Errors</h5><ul><li>1 entries had: ERROR: error: bingo-postgres: molecule search engine: error while constructing gross string: element: bad valence on I having 2 drawn bonds, charge 0, and 0 radical electrons</li></ul></div>'
+        # @Transactional - everything else removed
+        # Didn't slow down, was just as fast, but if it hits and error, it starts spewing errors about tractional rollback errors
+        # Average speed (rows/min):2322.430810915425
+        # '<div><ul><li>Number of entries processed: 1000</li><li>Number of entries with error: 0</li><li>Number of warnings: 0</li><li>New compounds: 997</li><li>New lots of existing compounds: 3</li><li>New lots of new compounds in the file: 3</li></ul></div>'
+        file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'nci1000.sdf')
+        response = self.basic_cmpd_reg_load(file = file)
+        self.assertIn('report_files', response)
+
 
     @requires_basic_cmpd_reg_load
     def test_007_cmpd_search_request(self):
@@ -1269,8 +1291,8 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(saved_ls_roles[0]['roleName'], "User")
 
     @requires_node_api
-    @requires_basic_cmpd_reg_load
-    def test_020_get_meta_lot(self):
+    @requires_basic_experiment_load
+    def test_020_get_meta_lot(self, experiment):
         """Test get meta lot."""
         # The default user is 'bob' and bob has cmpdreg admin role
         # The basic cmpdreg load has a lot registered that is unrestricted (Global project)
@@ -1343,8 +1365,8 @@ class TestAcasclient(BaseAcasClientTest):
             self.fail("User should be able to fetch the restricted lot")
 
     @requires_node_api
-    @requires_basic_cmpd_reg_load
-    def test_020_save_meta_lot(self):
+    @requires_basic_experiment_load
+    def test_020_save_meta_lot(self, experiment):
         """Test post meta lot."""
 
         # Create a restricted project 

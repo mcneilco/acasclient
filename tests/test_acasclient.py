@@ -32,7 +32,7 @@ M  END
 ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 
 BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "BLAH"
-STEREO_CATEGORY="unknown"
+STEREO_CATEGORY="Unknown"
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
@@ -936,18 +936,21 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_absent_basic_cmpd_reg_load
     def test_006_register_sdf(self):
         """Test register sdf."""
-        # response = self.basic_cmpd_reg_load()
-        # self.assertIn('report_files', response)
-        # self.assertIn('summary', response)
-        # self.assertIn('id', response)
-        # self.assertIn('Number of entries processed', response['summary'])
+        response = self.basic_cmpd_reg_load()
+        self.assertIn('report_files', response)
+        self.assertIn('summary', response)
+        self.assertIn('id', response)
+        self.assertIn('Number of entries processed', response['summary'])
         # Confirm the report.log file is created and is plaintext
-        # report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
-        # report_log_contents = report_log['content'].decode('utf-8')
-        # self.assertIn('Number of entries processed', report_log_contents)
-        # self.assertNotIn('<div', report_log_contents)
+        report_log = [rf for rf in response['report_files'] if '_report.log' in rf['name']][0]
+        report_log_contents = report_log['content'].decode('utf-8')
+        self.assertIn('Number of entries processed', report_log_contents)
+        self.assertNotIn('<div', report_log_contents)
+        return response
 
-        # Large request
+    @requires_absent_basic_cmpd_reg_load
+    def test_047_register_large_sdf_with_error(self):
+        # Large request to test performance and error handling
         # 1.13.7.6
         # Didn't slow down, was fast
         #  Average speed (rows/min):2327.205026762858
@@ -958,8 +961,21 @@ class TestAcasclient(BaseAcasClientTest):
         # '<div><ul><li>Number of entries processed: 1000</li><li>Number of entries with error: 0</li><li>Number of warnings: 0</li><li>New compounds: 997</li><li>New lots of existing compounds: 3</li><li>New lots of new compounds in the file: 3</li></ul></div>'
         file = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', 'nci1000.sdf')
+        try:
+            # SDF load of 1000 structures should take less than 45 seconds
+            # to complete. On my machine it takes 30 seconds.
+            # This is a performance check to make sure the
+            # bulk load hasn't slowed significantly.
+            with Timeout(seconds=45):
+                data_file_to_upload = Path(__file__).resolve()\
+                    .parent.joinpath('test_acasclient', '50k-lines.csv')
+                self.experiment_load_test(data_file_to_upload, True)
+        except TimeoutError:
+            self.fail("Timeout error")
         response = self.basic_cmpd_reg_load(file = file)
         self.assertIn('report_files', response)
+        self.assertIn('Number of entries processed: 1000', response['summary'])
+        self.assertIn('Number of entries with error: 1', response['summary'])
 
 
     @requires_basic_cmpd_reg_load

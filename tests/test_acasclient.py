@@ -951,14 +951,6 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_absent_basic_cmpd_reg_load
     def test_047_register_large_sdf_with_error(self):
         # Large request to test performance and error handling
-        # 1.13.7.6
-        # Didn't slow down, was fast
-        #  Average speed (rows/min):2327.205026762858
-        # '<div><ul><li>Number of entries processed: 1000</li><li>Number of entries with error: 1</li><li>Number of warnings: 0</li><li>New compounds: 995</li><li>New lots of existing compounds: 4</li><li>New lots of new compounds in the file: 4</li></div><div><h5>Errors</h5><ul><li>1 entries had: ERROR: error: bingo-postgres: molecule search engine: error while constructing gross string: element: bad valence on I having 2 drawn bonds, charge 0, and 0 radical electrons</li></ul></div>'
-        # @Transactional - everything else removed
-        # Didn't slow down, was just as fast, but if it hits and error, it starts spewing errors about tractional rollback errors
-        # Average speed (rows/min):2322.430810915425
-        # '<div><ul><li>Number of entries processed: 1000</li><li>Number of entries with error: 0</li><li>Number of warnings: 0</li><li>New compounds: 997</li><li>New lots of existing compounds: 3</li><li>New lots of new compounds in the file: 3</li></ul></div>'
         file = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', 'nci1000.sdf')
         try:
@@ -1307,8 +1299,8 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(saved_ls_roles[0]['roleName'], "User")
 
     @requires_node_api
-    @requires_basic_experiment_load
-    def test_020_get_meta_lot(self, experiment):
+    @requires_basic_cmpd_reg_load
+    def test_020_get_meta_lot(self):
         """Test get meta lot."""
         # The default user is 'bob' and bob has cmpdreg admin role
         # The basic cmpdreg load has a lot registered that is unrestricted (Global project)
@@ -1381,8 +1373,8 @@ class TestAcasclient(BaseAcasClientTest):
             self.fail("User should be able to fetch the restricted lot")
 
     @requires_node_api
-    @requires_basic_experiment_load
-    def test_020_save_meta_lot(self, experiment):
+    @requires_basic_cmpd_reg_load
+    def test_020_save_meta_lot(self):
         """Test post meta lot."""
 
         # Create a restricted project 

@@ -844,13 +844,10 @@ class client():
             filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
                 PurePath(Path(file)).name)
             report_files.append(self.get_file(filePath))
-        return { "summary": response[0]['summary'],
+        return {"id": response[0]['id'],
+                "summary": response[0]['summary'],
                 "results": response[0]['results'],
                 "report_files": report_files}
-        # return {"id": response[0]['id'],
-        #         "summary": response[0]['summary'],
-        #         "results": response[0]['results'],
-        #         "report_files": report_files}
 
     def experiment_loader_request(self, data):
         resp = self.session.post("{}/api/genericDataParser".format(self.url),

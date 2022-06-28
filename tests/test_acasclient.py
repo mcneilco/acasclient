@@ -32,7 +32,7 @@ M  END
 ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 
 BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "BLAH"
-
+STEREO_CATEGORY="Unknown"
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
@@ -515,13 +515,15 @@ class BaseAcasClientTest(unittest.TestCase):
             experiment_loader(data_file_to_upload, "bob", False)
         return response
 
-    def basic_cmpd_reg_load(self, project_code = None):
+    def basic_cmpd_reg_load(self, project_code = None, file = None):
         """ Loads the basic cmpdreg data end result being CMPD-0000001-001 and CMPD-0000002-001 are loaded """
         if project_code is None:
             project_code = self.global_project_code
         
-        test_012_upload_file_file = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+        if file is None:
+            file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+
 
         mappings = [
                 {
@@ -640,7 +642,7 @@ class BaseAcasClientTest(unittest.TestCase):
                 },
                 {
                     "dbProperty": "Parent Stereo Category",
-                    "defaultVal": "Unknown",
+                    "defaultVal": STEREO_CATEGORY,
                     "required": True,
                     "sdfProperty": None
                 },
@@ -673,10 +675,16 @@ class BaseAcasClientTest(unittest.TestCase):
                     "defaultVal": None,
                     "required": False,
                     "sdfProperty": "Lot Salt Equivalents"
+                },
+                {
+                    "dbProperty": "Parent Alias",
+                    "defaultVal": "unknown",
+                    "required": True,
+                    "sdfProperty": "Parent Alias"
                 }
             ]
 
-        response = self.client.register_sdf(test_012_upload_file_file, "bob",
+        response = self.client.register_sdf(file, "bob",
                                             mappings)
         return response
 
@@ -2060,7 +2068,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('500 Server Error', str(context.exception))
 
     @requires_absent_basic_cmpd_reg_load
-    def test045_register_sdf_case_insensitive(self):
+    def test_045_register_sdf_case_insensitive(self):
         """Test register sdf with case insensitive lookups"""
         # test values
         CHEMIST = 'bob'
@@ -2169,7 +2177,7 @@ class TestAcasclient(BaseAcasClientTest):
         
     
     @requires_node_api
-    def test046_cmpdreg_admin_crud(self):
+    def test_046_cmpdreg_admin_crud(self):
         """Test create, read, update, delete methods for CmdpReg controlled vocabulary items
             Also test that these are properly restricted to CmpdReg admins (except for read)"""
         # Test values
@@ -2307,10 +2315,179 @@ class TestAcasclient(BaseAcasClientTest):
         self.client.delete_stereo_category(stereo_category['id'])
         self.client.delete_physical_state(physical_state['id'])
         self.client.delete_cmpdreg_vendor(vendor['id'])
-        
+  
+    def test_047_load_sdf_with_salts(self):
+        """
+        Tests to Make Sure Salt Can Only Be Derived from Structure or SDF Properties; NOT BOTH! 
+        """
+        test_047_load_sdf_with_salts_file = Path(__file__).resolve().parent.\
+            joinpath('test_acasclient', 'test_047_register_sdf_with_salts.sdf')
+        mappings = [
+            {
+                "dbProperty": "Parent Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Corporate ID"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": "Lot Scientist"
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": "PROJ-00000001",
+                "required": True,
+                "sdfProperty": "Project Code Name"
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": "unknown",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Salt Abbrev",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Salt Name"
+            },
+            {
+                "dbProperty": "Lot Salt Equivalents",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Salt Equivalents"
+            }
+        ]
+        # Ensuring HCl is registered as a salt since this test assumes that the salt parent structure
+        # is already registered in CReg
+        SALT_ABBREV = 'HCl'
+        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
+        # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
+        salts = self.client.get_salts()
+        # Create Salt Abbrev
+        if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
+            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            self.assertIsNotNone(salt.get('id'))
+
+        response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",
+                                            mappings)
+        self.assertIn('report_files', response)
+        self.assertIn('summary', response)
+        self.assertIn('Number of entries processed: 4', response['summary'])
+        self.assertIn('Number of entries with error: 1', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        self.assertIn('New lots of existing compounds: 2', response['summary'])
+        self.assertIn('Salts found in both structure and SDF Property', response['summary'])
+        return response
+
+    def test_048_warn_existing_compound_new_id(self):
+        """
+        Test for Warning When Uploading A "New" Compound That Has Existing Parent and Gets New ID
+        """
+        test_048_warn_existing_compound_new_id_file_one = Path(__file__).resolve().parent.\
+            joinpath('test_acasclient', 'test_048_warn_existing_compound_new_id.sdf')
+        test_048_warn_existing_compound_new_id_file_two = Path(__file__).resolve().parent.\
+            joinpath('test_acasclient', 'test_048_warn_existing_compound_new_id_two.sdf')
+        mappings = [
+            {
+                "dbProperty": "Parent Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Corporate ID"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": "Lot Scientist"
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": "PROJ-00000001",
+                "required": True,
+                "sdfProperty": "Project Code Name"
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": "mixture",
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+        response = self.client.register_sdf(test_048_warn_existing_compound_new_id_file_one, "bob",
+                                            mappings)
+        self.assertIn('report_files', response)
+        self.assertIn('summary', response)
+        self.assertIn('Number of entries processed', response['summary'])
+        # Want to Assert Compound Registered Successfully 
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        # Need to Do Second Round of File Since First Needs to Registered Already
+        mappings = [
+            {
+                "dbProperty": "Parent Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Corporate ID"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": "Lot Scientist"
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": "PROJ-00000001",
+                "required": True,
+                "sdfProperty": "Project Code Name"
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": "unknown",
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+        response = self.client.register_sdf(test_048_warn_existing_compound_new_id_file_two, "bob",
+                                            mappings)
+        self.assertIn('report_files', response)
+        self.assertIn('summary', response)
+        self.assertIn('Number of entries processed', response['summary'])
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        # There are two warnings expected here: only one is related to the feature we are testing here
+        self.assertIn('Number of warnings: 2', response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        self.assertIn('New parent will be assigned due to different stereo category', response['summary'])
+        return response
+
+    @requires_absent_basic_cmpd_reg_load
+    def test_049_register_large_sdf_with_error(self):
+        # Large request to test performance and error handling
+        file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'nci1000.sdf')
+        try:
+            # SDF load of 1000 structures should take less than 60 seconds
+            # to complete. On my machine it takes 30 seconds.
+            # This is a performance check to make sure the
+            # bulk load hasn't slowed significantly.
+            with Timeout(seconds=60):
+                response = self.basic_cmpd_reg_load(file = file)
+        except TimeoutError:
+            self.fail("Timeout error")
+
+        self.assertIn('report_files', response)
+        self.assertIn('Number of entries processed: 1000', response['summary'])
+        self.assertIn('Number of entries with error: 1', response['summary'])
+
+      
     @requires_node_api
     @requires_basic_experiment_load
-    def test047_get_meta_lot_depedencies(self, experiment):
+    def test_050_get_meta_lot_depedencies(self, experiment):
 
         # CMPDREG-ADMIN, ACAS-ADMIN tests
         # Get meta lot dependencies
@@ -2505,156 +2682,6 @@ def get_basic_experiment_load_file_with_project(project_code, tempdir):
         f.write(data_file_contents)
 
     return data_file_to_upload
-   
-
-    def test_047_load_sdf_with_salts(self):
-        """
-        Tests to Make Sure Salt Can Only Be Derived from Structure or SDF Properties; NOT BOTH! 
-        """
-        test_047_load_sdf_with_salts_file = Path(__file__).resolve().parent.\
-            joinpath('test_acasclient', 'test_047_register_sdf_with_salts.sdf')
-        mappings = [
-            {
-                "dbProperty": "Parent Corp Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Corporate ID"
-            },
-            {
-                "dbProperty": "Lot Chemist",
-                "defaultVal": "bob",
-                "required": True,
-                "sdfProperty": "Lot Scientist"
-            },
-            {
-                "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
-                "required": True,
-                "sdfProperty": "Project Code Name"
-            },
-            {
-                "dbProperty": "Parent Stereo Category",
-                "defaultVal": "unknown",
-                "required": True,
-                "sdfProperty": None
-            },
-            {
-                "dbProperty": "Lot Salt Abbrev",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Salt Name"
-            },
-            {
-                "dbProperty": "Lot Salt Equivalents",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Lot Salt Equivalents"
-            }
-        ]
-        # Ensuring HCl is registered as a salt since this test assumes that the salt parent structure
-        # is already registered in CReg
-        SALT_ABBREV = 'HCl'
-        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
-        # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
-        salts = self.client.get_salts()
-        # Create Salt Abbrev
-        if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
-            self.assertIsNotNone(salt.get('id'))
-
-        response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",
-                                            mappings)
-        self.assertIn('report_files', response)
-        self.assertIn('summary', response)
-        self.assertIn('Number of entries processed: 4', response['summary'])
-        self.assertIn('Number of entries with error: 1', response['summary'])
-        self.assertIn('Number of warnings: 0', response['summary'])
-        self.assertIn('New compounds: 1', response['summary'])
-        self.assertIn('New lots of existing compounds: 2', response['summary'])
-        self.assertIn('Salts found in both structure and SDF Property', response['summary'])
-        return response
-
-    def test_048_warn_existing_compound_new_id(self):
-        """
-        Test for Warning When Uploading A "New" Compound That Has Existing Parent and Gets New ID
-        """
-        test_048_warn_existing_compound_new_id_file_one = Path(__file__).resolve().parent.\
-            joinpath('test_acasclient', 'test_048_warn_existing_compound_new_id.sdf')
-        test_048_warn_existing_compound_new_id_file_two = Path(__file__).resolve().parent.\
-            joinpath('test_acasclient', 'test_048_warn_existing_compound_new_id_two.sdf')
-        mappings = [
-            {
-                "dbProperty": "Parent Corp Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Corporate ID"
-            },
-            {
-                "dbProperty": "Lot Chemist",
-                "defaultVal": "bob",
-                "required": True,
-                "sdfProperty": "Lot Scientist"
-            },
-            {
-                "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
-                "required": True,
-                "sdfProperty": "Project Code Name"
-            },
-            {
-                "dbProperty": "Parent Stereo Category",
-                "defaultVal": "mixture",
-                "required": True,
-                "sdfProperty": None
-            },
-        ]
-        response = self.client.register_sdf(test_048_warn_existing_compound_new_id_file_one, "bob",
-                                            mappings)
-        self.assertIn('report_files', response)
-        self.assertIn('summary', response)
-        self.assertIn('Number of entries processed', response['summary'])
-        # Want to Assert Compound Registered Successfully 
-        self.assertIn('Number of entries with error: 0', response['summary'])
-        self.assertIn('Number of warnings: 0', response['summary'])
-        self.assertIn('New compounds: 1', response['summary'])
-        # Need to Do Second Round of File Since First Needs to Registered Already
-        mappings = [
-            {
-                "dbProperty": "Parent Corp Name",
-                "defaultVal": None,
-                "required": False,
-                "sdfProperty": "Corporate ID"
-            },
-            {
-                "dbProperty": "Lot Chemist",
-                "defaultVal": "bob",
-                "required": True,
-                "sdfProperty": "Lot Scientist"
-            },
-            {
-                "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
-                "required": True,
-                "sdfProperty": "Project Code Name"
-            },
-            {
-                "dbProperty": "Parent Stereo Category",
-                "defaultVal": "unknown",
-                "required": True,
-                "sdfProperty": None
-            },
-        ]
-        response = self.client.register_sdf(test_048_warn_existing_compound_new_id_file_two, "bob",
-                                            mappings)
-        self.assertIn('report_files', response)
-        self.assertIn('summary', response)
-        self.assertIn('Number of entries processed', response['summary'])
-        self.assertIn('Number of entries with error: 0', response['summary'])
-        # There are two warnings expected here: only one is related to the feature we are testing here
-        self.assertIn('Number of warnings: 2', response['summary'])
-        self.assertIn('New compounds: 1', response['summary'])
-        self.assertIn('New parent will be assigned due to different stereo category', response['summary'])
-        return response
 
 def csv_to_txt(data_file_to_upload, dir):
     # Get the file name but change it to .txt

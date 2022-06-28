@@ -948,28 +948,6 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertNotIn('<div', report_log_contents)
         return response
 
-    @requires_absent_basic_cmpd_reg_load
-    def test_047_register_large_sdf_with_error(self):
-        # Large request to test performance and error handling
-        file = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', 'nci1000.sdf')
-        try:
-            # SDF load of 1000 structures should take less than 45 seconds
-            # to complete. On my machine it takes 30 seconds.
-            # This is a performance check to make sure the
-            # bulk load hasn't slowed significantly.
-            with Timeout(seconds=45):
-                data_file_to_upload = Path(__file__).resolve()\
-                    .parent.joinpath('test_acasclient', '50k-lines.csv')
-                self.experiment_load_test(data_file_to_upload, True)
-        except TimeoutError:
-            self.fail("Timeout error")
-        response = self.basic_cmpd_reg_load(file = file)
-        self.assertIn('report_files', response)
-        self.assertIn('Number of entries processed: 1000', response['summary'])
-        self.assertIn('Number of entries with error: 1', response['summary'])
-
-
     @requires_basic_cmpd_reg_load
     def test_007_cmpd_search_request(self):
         """Test cmpd search request."""
@@ -2077,7 +2055,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('500 Server Error', str(context.exception))
 
     @requires_absent_basic_cmpd_reg_load
-    def test045_register_sdf_case_insensitive(self):
+    def test_045_register_sdf_case_insensitive(self):
         """Test register sdf with case insensitive lookups"""
         # test values
         CHEMIST = 'bob'
@@ -2186,7 +2164,7 @@ class TestAcasclient(BaseAcasClientTest):
         
     
     @requires_node_api
-    def test046_cmpdreg_admin_crud(self):
+    def test_046_cmpdreg_admin_crud(self):
         """Test create, read, update, delete methods for CmdpReg controlled vocabulary items
             Also test that these are properly restricted to CmpdReg admins (except for read)"""
         # Test values
@@ -2325,7 +2303,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.client.delete_physical_state(physical_state['id'])
         self.client.delete_cmpdreg_vendor(vendor['id'])
         
-
+    @requires_basic_cmpd_reg_load
     def test_047_load_sdf_with_salts(self):
         """
         Tests to Make Sure Salt Can Only Be Derived from Structure or SDF Properties; NOT BOTH! 
@@ -2474,6 +2452,25 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('New compounds: 1', response['summary'])
         self.assertIn('New parent will be assigned due to different stereo category', response['summary'])
         return response
+
+    @requires_absent_basic_cmpd_reg_load
+    def test_049_register_large_sdf_with_error(self):
+        # Large request to test performance and error handling
+        file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'nci1000.sdf')
+        try:
+            # SDF load of 1000 structures should take less than 60 seconds
+            # to complete. On my machine it takes 30 seconds.
+            # This is a performance check to make sure the
+            # bulk load hasn't slowed significantly.
+            with Timeout(seconds=60):
+                response = self.basic_cmpd_reg_load(file = file)
+        except TimeoutError:
+            self.fail("Timeout error")
+
+        self.assertIn('report_files', response)
+        self.assertIn('Number of entries processed: 1000', response['summary'])
+        self.assertIn('Number of entries with error: 1', response['summary'])
 
 def csv_to_txt(data_file_to_upload, dir):
     # Get the file name but change it to .txt

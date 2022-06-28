@@ -2303,7 +2303,6 @@ class TestAcasclient(BaseAcasClientTest):
         self.client.delete_physical_state(physical_state['id'])
         self.client.delete_cmpdreg_vendor(vendor['id'])
         
-    @requires_basic_cmpd_reg_load
     def test_047_load_sdf_with_salts(self):
         """
         Tests to Make Sure Salt Can Only Be Derived from Structure or SDF Properties; NOT BOTH! 

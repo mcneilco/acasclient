@@ -1741,3 +1741,13 @@ class client():
         resp = self.session.post("{}/api/setup/{}".format(self.url, item_type), json=items)
         resp.raise_for_status()
         return resp.json()
+
+    def get_lot_dependencies(self, lot_corp_name):
+        """Get lot dependencies for a lot by corp name
+        """
+        resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}/"
+                                .format(self.url, lot_corp_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()

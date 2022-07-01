@@ -2454,11 +2454,11 @@ class TestAcasclient(BaseAcasClientTest):
       
     @requires_node_api
     @requires_basic_experiment_load
-    def test_050_get_meta_lot_depedencies(self, experiment):
+    def test_050_get_lot_depedencies(self, experiment):
 
         # CMPDREG-ADMIN, ACAS-ADMIN tests
         # Get meta lot dependencies
-        meta_lot_depedencies = self.client.get_meta_lot_dependencies("CMPD-0000001-001")
+        meta_lot_depedencies = self.client.get_lot_dependencies("CMPD-0000001-001")
 
         # Check basic structure
         self.assertIn('batchCodes', meta_lot_depedencies)
@@ -2471,7 +2471,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # Delete the experiment and then check the meta lot dependencies again, this time the experiment should be removed from the linkedExperiments list
         self.client.delete_experiment(experiment['id'])
-        meta_lot_depedencies = self.client.get_meta_lot_dependencies("CMPD-0000001-001")
+        meta_lot_depedencies = self.client.get_lot_dependencies("CMPD-0000001-001")
         self.assertNotIn(experiment['codeName'], [e['code'] for e in meta_lot_depedencies['linkedExperiments']])
 
         # Setup for further tests
@@ -2499,7 +2499,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # Check that CMPDREG-ADMIN, ACAS-ADMIN can get all depdencies
         # Verify our cmpdreg admin can see the restricted lot in the depedencies as the new lot 
-        global_lot_dependencies = self.client.get_meta_lot_dependencies(global_project_lot_corp_name)
+        global_lot_dependencies = self.client.get_lot_dependencies(global_project_lot_corp_name)
         
         # Verify that the restricted_project_lot_corp_name is in the list of linkedLots for our cmpdreg admin
         self.assertIn(restricted_project_lot['lotCorpName'], [l['code'] for l in global_lot_dependencies['linkedLots']])
@@ -2600,6 +2600,63 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertTrue(restricted_experiment_acls['write'])
         self.assertTrue(restricted_experiment_acls['delete'])
 
+    @requires_node_api
+    @requires_basic_experiment_load
+    def test_051_delete_lot(self, experiment):
+
+        # CMPDREG-ADMIN, ACAS-ADMIN tests
+        # Verify we can get the meta lot
+        meta_lot = self.client.get_meta_lot("CMPD-0000001-001")
+        self.assertIsNotNone(meta_lot)
+
+        # Delete the meta lot
+        delete_lot_response = self.client.delete_lot("CMPD-0000001-001")
+        self.assertIn("success", delete_lot_response)
+        self.assertTrue(delete_lot_response['success'])
+
+        # Verify the metalot is gone
+        meta_lot = self.client.get_meta_lot("CMPD-0000001-001")
+        self.assertIsNone(meta_lot)
+
+        # Setup for further tests
+        # Create a restricted project 
+        project = self.create_basic_project_with_roles()
+
+        # Bulk load a compound to the restricted project
+        self.basic_cmpd_reg_load(project.code_name)
+        all_lots = self.client.get_all_lots()
+
+        # Sort lots by id and get the latest corp id
+        # This is because we dont' get the corp id in the response from the bulkload
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        global_project_lot_corp_name = all_lots[0]['lotCorpName']
+        global_project_parent_corp_name = all_lots[0]['parentCorpName']
+
+        # Find the lot that was bulk loaded with the same corp name as the global project
+        restricted_project_lot = [lot for lot in all_lots if lot['parentCorpName'] == global_project_parent_corp_name][-1]
+
+
+        # CMPDREG-USER no acas roles or restricted project roles
+        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        # The user should not be able to fetch the restricted lot
+        with self.assertRaises(requests.HTTPError) as context:
+            global_lot_dependencies = user_client.delete_lot(restricted_project_lot['lotCorpName'])
+        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
+
+        # CMPDREG-USER no acas roles or restricted project roles
+        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        # The user should not be able to fetch the restricted lot
+        with self.assertRaises(requests.HTTPError) as context:
+            global_lot_dependencies = user_client.delete_lot(restricted_project_lot['lotCorpName'])
+        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
+
+# FINALLY
+        # Check that CMPDREG-ADMIN, ACAS-ADMIN can delete the restricted lot
+        # Verify our cmpdreg admin can delete the restricted lot
+        delete_lot_response = self.client.delete_lot(restricted_project_lot['lotCorpName'])
+        self.assertTrue(delete_lot_response['success'])
+
+# ANOTHER
         # CMPDREG_ADMIN, no acas roles
         # Now create another cmpdreg admin but don't give them acas admin
         test_password = str(uuid.uuid4())
@@ -2615,7 +2672,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # User SHOULD be able to fetch the global lot depdencies
         try:
-            global_lot_dependencies = user_client.get_meta_lot_dependencies(global_project_lot_corp_name)
+            global_lot_dependencies = user_client.get_lot_dependencies(global_project_lot_corp_name)
         except requests.HTTPError:
             self.fail("User should be able to check the meta lot dependencies for the global lot")
 
@@ -2644,7 +2701,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # The user should be able to fetch global lot depedencies
         try:
-            global_lot_dependencies = user_client.get_meta_lot_dependencies(global_project_lot_corp_name)
+            global_lot_dependencies = user_client.get_lot_dependencies(global_project_lot_corp_name)
         except requests.HTTPError:
             self.fail("User should be able to check the meta lot dependencies for the global lot")
 
@@ -2671,7 +2728,7 @@ class TestAcasclient(BaseAcasClientTest):
         # User SHOULD be able to fetch the restricted lot depdencies
         try:
             restricted_lot_dependencies = user_client.\
-                get_meta_lot_dependencies(restricted_project_lot['lotCorpName'])
+                get_lot_dependencies(restricted_project_lot['lotCorpName'])
         except requests.HTTPError:
             self.fail("User should be able to fetch the restricted lot")
 
@@ -2680,7 +2737,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # Get the global lot depdencies
         global_lot_dependencies = user_client.\
-            get_meta_lot_dependencies(global_project_lot_corp_name)
+            get_lot_dependencies(global_project_lot_corp_name)
 
         # Verify that the restricted_experiment_code_name is NOT in the linkedExperiments for the user because they aren't an acas user
         # Bug that the lot does show it has linkedDataExists true and there is more than 0 experiments in the linkedExperiments
@@ -2702,11 +2759,11 @@ class TestAcasclient(BaseAcasClientTest):
         # User SHOULD be able to fetch the restricted lot depdencies
         try:
             restricted_lot_dependencies = user_client.\
-                get_meta_lot_dependencies(restricted_project_lot['lotCorpName'])
+                get_lot_dependencies(restricted_project_lot['lotCorpName'])
         except requests.HTTPError:
             self.fail("User should be able to fetch the restricted lot")
         
-        global_lot_dependencies = user_client.get_meta_lot_dependencies(global_project_lot_corp_name)
+        global_lot_dependencies = user_client.get_lot_dependencies(global_project_lot_corp_name)
 
         # Verify that the restricted_experiment_code_name is in the linkedExperiments for the user
         self.assertIn(restricted_experiment_code_name, [e['code'] for e in global_lot_dependencies['linkedExperiments']])

@@ -1751,3 +1751,13 @@ class client():
             return None
         resp.raise_for_status()
         return resp.json()
+
+    def delete_lot(self, lot_corp_name):
+        """Delete a lot
+        """
+        resp = self.session.delete("{}/cmpdReg/metalots/corpName/{}"
+                                .format(self.url, lot_corp_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()

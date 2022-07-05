@@ -2685,7 +2685,7 @@ class TestAcasclient(BaseAcasClientTest):
         meta_lot = self.client.get_meta_lot(restricted_lot_corp_name)
         meta_lot["lot"]["chemist"] = cmpdreg_user_with_restricted_project_acls.username
 
-        # Deny Rules: Not an acas user so can't delete because dependent experiment exists
+        # Deny Rule: Not an acas user so can't delete because dependent experiment exists
         self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
         # Delete the experiment (mimic asking acas_user_restricted_project_acls to delete the experiment)

@@ -16,7 +16,7 @@ jobs:
       - name: Checkout ACAS
         uses: actions/checkout@v3
         with:
-          respository: mcneilco/acas
+          repository: mcneilco/acas
           path: acas
       - name: Set ACAS_TAG to latest release
         run: |

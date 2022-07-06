@@ -2393,6 +2393,24 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('report_files', response)
         self.assertIn('Number of entries processed: 1000', response['summary'])
         self.assertIn('Number of entries with error: 1', response['summary'])
+    
+    def test_50_delete_ls_thing(self):
+        code = str(uuid.uuid4())
+        ls_thing = create_project_thing(code)
+        saved_ls_thing = self.client.save_ls_thing(ls_thing)
+        self.assertIn('codeName', saved_ls_thing)
+        self.assertEqual(code, saved_ls_thing["codeName"])
+        ls_thing = self.client.get_ls_thing("project",
+                                            "project",
+                                            code, None)
+        self.assertIn(False, [ls_thing['deleted']])
+        ls_thing = self.client.delete_ls_thing("project",
+                                            "project",
+                                            code, None) 
+        ls_thing = self.client.get_ls_thing("project",
+                                            "project",
+                                            code, None)
+        self.assertIn(True, [ls_thing['deleted']])
 
 def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None):
     data_file_to_upload = Path(__file__).resolve()\

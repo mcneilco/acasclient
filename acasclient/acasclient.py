@@ -1089,6 +1089,27 @@ class client():
         else:
             resp.raise_for_status()
         return resp.json()
+    
+    def delete_ls_thing(self, ls_type, ls_kind, code_name, format):
+        """
+            Deletes a models.LsThing object by ls_type, ls_kind, and code_name
+            Args:
+                ls_type (str): Type of ls thing
+                ls_kind (str): Kind of ls thing
+                code_name (str): Code name of ls thing
+                format (str)
+        """
+        if not format:
+            format = 'nestedfull'
+        resp = self.session.delete(
+            "{}/api/things/{}/{}/{}".format(self.url, ls_type, ls_kind,
+                                            code_name),
+            params={format: True})
+        if resp.status_code == 500:
+            return None
+        else: 
+            resp.raise_for_status()
+        return resp
 
     def save_ls_thing(self, ls_thing):
         """

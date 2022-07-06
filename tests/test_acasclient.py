@@ -1295,63 +1295,6 @@ class TestAcasclient(BaseAcasClientTest):
 
     @requires_node_api
     @requires_basic_cmpd_reg_load
-    def test_020_get_meta_lot(self):
-        """Test get meta lot."""
-        # The default user is 'bob' and bob has cmpdreg admin role
-        # The basic cmpdreg load has a lot registered that is unrestricted (Global project)
-        meta_lot = self.client.\
-            get_meta_lot('CMPD-0000001-001')
-        self.assertIsNotNone(meta_lot)
-        self.assertEqual(meta_lot['lot']['corpName'], 'CMPD-0000001-001')
-
-        # Create a restricted project 
-        project = self.create_basic_project_with_roles()
-
-        # Bulk load a compound to the restricted project
-        self.basic_cmpd_reg_load(project.code_name)
-        all_lots = self.client.get_all_lots()
-
-        # Sort lots by id and get the latest corp id
-        # This is because we dont' get the corp id in the response from the bulkload
-        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
-        restricted_project_lot_corp_name = all_lots[-1]['lotCorpName']
-        global_project_lot_corp_name = all_lots[0]['lotCorpName']
-
-        # Verify our cmpdreg admin user can fetch the restricted lot
-        meta_lot = self.client.\
-            get_meta_lot(restricted_project_lot_corp_name)
-        self.assertIsNotNone(meta_lot)
-
-        # Now create a user that is not a cmpdreg admin and does not have access to the restricted project
-        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-
-        # User SHOULD be able to fetch the global lot
-        try:
-            meta_lot = user_client.\
-                get_meta_lot(global_project_lot_corp_name)
-            self.assertIn("lot", meta_lot)
-        except requests.HTTPError:
-            self.fail("User should be able to fetch the global lot")
-        
-        # User should NOT be able fetch the restricted lot
-        with self.assertRaises(requests.HTTPError) as context:
-            meta_lot = user_client.\
-                get_meta_lot(restricted_project_lot_corp_name)
-        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
-        
-        # Now create a user which has access to the project
-        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
-
-        # User SHOULD be able to fetch the restricted lot
-        try:
-            meta_lot = user_client.\
-                get_meta_lot(restricted_project_lot_corp_name)
-            self.assertIn("lot", meta_lot)
-        except requests.HTTPError:
-            self.fail("User should be able to fetch the restricted lot")
-
-    @requires_node_api
-    @requires_basic_cmpd_reg_load
     def test_020_save_meta_lot(self):
         """Test post meta lot."""
 
@@ -2451,10 +2394,102 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('Number of entries processed: 1000', response['summary'])
         self.assertIn('Number of entries with error: 1', response['summary'])
 
-      
+def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None):
+    data_file_to_upload = Path(__file__).resolve()\
+                        .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+    # Read the data file and replace the project code with the one we want
+    with open(data_file_to_upload, 'r') as f:
+        data_file_contents = f.read()
+
+    # Replace the project code
+    data_file_contents = data_file_contents.replace('Global', project_code)
+
+    # If corp name is specified, replace the corp name
+    if corp_name is not None:
+        data_file_contents = data_file_contents.replace('CMPD-0000001-001', corp_name)
+
+    # Write the data file to the temp dir
+    file_name = f'basic-experiment-with-project-{project_code}.csv'
+    data_file_to_upload = Path(tempdir).joinpath(file_name)
+    with open(data_file_to_upload, 'w') as f:
+        f.write(data_file_contents)
+
+    return data_file_to_upload
+
+def csv_to_txt(data_file_to_upload, dir):
+    # Get the file name but change it to .txt
+    file_name = data_file_to_upload.name
+    file_name = file_name.replace(".csv", ".txt")
+    file_path = Path(dir, file_name)
+    # Change the delim to the new delim
+    with open(data_file_to_upload, 'r') as f:
+        with open(file_path, 'w') as f2:
+            for line in f:
+                f2.write(line.replace(',', "\t"))
+    return file_path
+
+class TestCmpdRegAcls(BaseAcasClientTest):
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_001_get_meta_lot(self):
+        """Test get meta lot."""
+        # The default user is 'bob' and bob has cmpdreg admin role
+        # The basic cmpdreg load has a lot registered that is unrestricted (Global project)
+        meta_lot = self.client.\
+            get_meta_lot('CMPD-0000001-001')
+        self.assertIsNotNone(meta_lot)
+        self.assertEqual(meta_lot['lot']['corpName'], 'CMPD-0000001-001')
+
+        # Create a restricted project 
+        project = self.create_basic_project_with_roles()
+
+        # Bulk load a compound to the restricted project
+        self.basic_cmpd_reg_load(project.code_name)
+        all_lots = self.client.get_all_lots()
+
+        # Sort lots by id and get the latest corp id
+        # This is because we dont' get the corp id in the response from the bulkload
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        restricted_project_lot_corp_name = all_lots[-1]['lotCorpName']
+        global_project_lot_corp_name = all_lots[0]['lotCorpName']
+
+        # Verify our cmpdreg admin user can fetch the restricted lot
+        meta_lot = self.client.\
+            get_meta_lot(restricted_project_lot_corp_name)
+        self.assertIsNotNone(meta_lot)
+
+        # Now create a user that is not a cmpdreg admin and does not have access to the restricted project
+        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+
+        # User SHOULD be able to fetch the global lot
+        try:
+            meta_lot = user_client.\
+                get_meta_lot(global_project_lot_corp_name)
+            self.assertIn("lot", meta_lot)
+        except requests.HTTPError:
+            self.fail("User should be able to fetch the global lot")
+        
+        # User should NOT be able fetch the restricted lot
+        with self.assertRaises(requests.HTTPError) as context:
+            meta_lot = user_client.\
+                get_meta_lot(restricted_project_lot_corp_name)
+        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
+        
+        # Now create a user which has access to the project
+        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+
+        # User SHOULD be able to fetch the restricted lot
+        try:
+            meta_lot = user_client.\
+                get_meta_lot(restricted_project_lot_corp_name)
+            self.assertIn("lot", meta_lot)
+        except requests.HTTPError:
+            self.fail("User should be able to fetch the restricted lot")
+
     @requires_node_api
     @requires_basic_experiment_load
-    def test_050_get_lot_depedencies(self, experiment):
+    def test_002_get_lot_depedencies(self, experiment):
 
         # CMPDREG-ADMIN, ACAS-ADMIN tests
         # Get meta lot dependencies
@@ -2602,7 +2637,7 @@ class TestAcasclient(BaseAcasClientTest):
 
     @requires_node_api
     @requires_basic_experiment_load
-    def test_051_delete_lot(self, experiment):
+    def test_003_delete_lot(self, experiment):
 
         # Create a restricted project 
         project = self.create_basic_project_with_roles()
@@ -2693,42 +2728,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
         self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
-
-
-def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None):
-    data_file_to_upload = Path(__file__).resolve()\
-                        .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
-    # Read the data file and replace the project code with the one we want
-    with open(data_file_to_upload, 'r') as f:
-        data_file_contents = f.read()
-
-    # Replace the project code
-    data_file_contents = data_file_contents.replace('Global', project_code)
-
-    # If corp name is specified, replace the corp name
-    if corp_name is not None:
-        data_file_contents = data_file_contents.replace('CMPD-0000001-001', corp_name)
-
-    # Write the data file to the temp dir
-    file_name = f'basic-experiment-with-project-{project_code}.csv'
-    data_file_to_upload = Path(tempdir).joinpath(file_name)
-    with open(data_file_to_upload, 'w') as f:
-        f.write(data_file_contents)
-
-    return data_file_to_upload
-
-def csv_to_txt(data_file_to_upload, dir):
-    # Get the file name but change it to .txt
-    file_name = data_file_to_upload.name
-    file_name = file_name.replace(".csv", ".txt")
-    file_path = Path(dir, file_name)
-    # Change the delim to the new delim
-    with open(data_file_to_upload, 'r') as f:
-        with open(file_path, 'w') as f2:
-            for line in f:
-                f2.write(line.replace(',', "\t"))
-    return file_path
-
+        
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

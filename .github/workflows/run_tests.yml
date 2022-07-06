@@ -20,7 +20,7 @@ jobs:
           path: acas
       - name: Set ACAS_TAG to latest release
         run: |
-          export ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas/releases/latest | jq -r '.tag_name')
+          echo "ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas/releases/latest | jq -r '.tag_name')" >> $GITHUB_ENV
       - name: Run docker-compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
         id: dockerComposeUp
         working-directory: acas
@@ -29,7 +29,7 @@ jobs:
           docker-compose -f "docker-compose.yml" up -d || echo ::set-output name=docker_compose_pull_failure::true
       - name: Get docker images fallback tag name
         run: |
-          echo "DEFAULT_BRANCH_ACAS_TAG=$(export ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas | jq -r '.default_branch'))" >> $GITHUB_ENV
+          echo "DEFAULT_BRANCH_ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas | jq -r '.default_branch' | sed -e 's/\//-/g')" >> $GITHUB_ENV
         if: ${{ steps.dockerComposeUp.outputs.docker_compose_pull_failure == 'true' }}
       - name: Falling back to ${{ env.DEFAULT_BRANCH_ACAS_TAG }} docker image tag for roo and racas tags
         working-directory: acas

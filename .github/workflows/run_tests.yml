@@ -18,6 +18,16 @@ jobs:
         with:
           repository: mcneilco/acas
           path: acas
+      - name: Set Up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Install acasclient and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./acasclient
       - name: Set ACAS_TAG to latest release
         run: |
           echo "ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas/releases/latest | jq -r '.tag_name')" >> $GITHUB_ENV
@@ -40,16 +50,8 @@ jobs:
           docker tag mcneilco/racas-oss:${{ env.DEFAULT_BRANCH_ACAS_TAG }} mcneilco/racas-oss:${{ env.ACAS_TAG }}
           docker-compose -f "docker-compose.yml" up -d
         if: ${{ steps.dockerComposeUp.outputs.docker_compose_pull_failure == 'true' }}
-      - name: Set Up Python 3.8
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8
-      - name: Display Python version
-        run: python -c "import sys; print(sys.version)"
-      - name: Install acasclient and dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ./acasclient
+      - name: Wait for startup then create docker bob
+        run: bash docker_bob_setup.sh
       - name: Create bob credentials for acasclient
         run: |
           mkdir ~/.acas

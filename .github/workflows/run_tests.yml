@@ -52,6 +52,7 @@ jobs:
         if: ${{ steps.dockerComposeUp.outputs.docker_compose_pull_failure == 'true' }}
       - name: Wait for startup then create docker bob
         run: bash docker_bob_setup.sh
+        working-directory: acas
       - name: Create bob credentials for acasclient
         run: |
           mkdir ~/.acas

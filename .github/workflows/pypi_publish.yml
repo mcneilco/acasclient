@@ -23,7 +23,7 @@ jobs:
           python -m build --sdist --wheel --outdir dist/ .
       - name: Publish to TestPyPI
         run: |
-          python -m twine upload -u ${{ secrets.TEST_PYPI_USERNAME }} -p ${{ secrets.TEST_PYPI_PASSWORD }} --repository-url https://test.pypi.org/legacy/ dist/*
+          python -m twine upload --skip-existing -u ${{ secrets.TEST_PYPI_USERNAME }} -p ${{ secrets.TEST_PYPI_PASSWORD }} --repository-url https://test.pypi.org/legacy/ dist/*
       - name: Publish to PyPI
         if: startsWith(github.ref, 'refs/tags')
         run: |

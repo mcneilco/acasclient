@@ -2608,7 +2608,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Now create a user that is not a cmpdreg admin and does not have access to the restricted project
         user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
               
-        # User should NOT be able fetch the restricted lot
+        # User should NOT be able save/update the restricted lot
         with self.assertRaises(requests.HTTPError) as context:
             response = user_client.\
                 save_meta_lot(meta_lot)

@@ -2417,25 +2417,25 @@ class TestCmpdReg(BaseAcasClientTest):
 
     @requires_node_api
     @requires_basic_experiment_load
-    def test_002_get_lot_depedencies(self, experiment):
+    def test_002_get_lot_dependencies(self, experiment):
 
         # CMPDREG-ADMIN, ACAS-ADMIN tests
         # Get meta lot dependencies
-        meta_lot_depedencies = self.client.get_lot_dependencies("CMPD-0000001-001")
+        meta_lot_dependencies = self.client.get_lot_dependencies("CMPD-0000001-001")
 
         # Check basic structure
-        self.assertIn('batchCodes', meta_lot_depedencies)
-        self.assertIn('linkedDataExists', meta_lot_depedencies)
-        self.assertIn('linkedExperiments', meta_lot_depedencies)
-        self.assertIn('linkedLots', meta_lot_depedencies)
+        self.assertIn('batchCodes', meta_lot_dependencies)
+        self.assertIn('linkedDataExists', meta_lot_dependencies)
+        self.assertIn('linkedExperiments', meta_lot_dependencies)
+        self.assertIn('linkedLots', meta_lot_dependencies)
         
         # Verify that the experiment code name is in the linkedExperiments list
-        self.assertIn(experiment['codeName'], [e['code'] for e in meta_lot_depedencies['linkedExperiments']])
+        self.assertIn(experiment['codeName'], [e['code'] for e in meta_lot_dependencies['linkedExperiments']])
 
         # Delete the experiment and then check the meta lot dependencies again, this time the experiment should be removed from the linkedExperiments list
         self.client.delete_experiment(experiment['id'])
-        meta_lot_depedencies = self.client.get_lot_dependencies("CMPD-0000001-001")
-        self.assertNotIn(experiment['codeName'], [e['code'] for e in meta_lot_depedencies['linkedExperiments']])
+        meta_lot_dependencies = self.client.get_lot_dependencies("CMPD-0000001-001")
+        self.assertNotIn(experiment['codeName'], [e['code'] for e in meta_lot_dependencies['linkedExperiments']])
 
         # Setup for further tests
         # Create a restricted project 
@@ -2461,13 +2461,13 @@ class TestCmpdReg(BaseAcasClientTest):
         restricted_project_lot = [lot for lot in all_lots if lot['parentCorpName'] == global_project_parent_corp_name][-1]
 
         # Check that CMPDREG-ADMIN, ACAS-ADMIN can get all depdencies
-        # Verify our cmpdreg admin can see the restricted lot in the depedencies as the new lot 
+        # Verify our cmpdreg admin can see the restricted lot in the dependencies as the new lot 
         global_lot_dependencies = self.client.get_lot_dependencies(global_project_lot_corp_name)
         
         # Verify that the restricted_project_lot_corp_name is in the list of linkedLots for our cmpdreg admin
         self.assertIn(restricted_project_lot['lotCorpName'], [l['code'] for l in global_lot_dependencies['linkedLots']])
 
-        # Verify our cmpdreg admin, acas-admin can see the restricted experiment in the depedencies as the new experiment
+        # Verify our cmpdreg admin, acas-admin can see the restricted experiment in the dependencies as the new experiment
         self.assertIn(restricted_experiment_code_name, [e['code'] for e in global_lot_dependencies['linkedExperiments']])
 
         # Get the acls for the restricted experiment from the global_lot_dependencies
@@ -2502,7 +2502,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # CMPDREG-USER no acas roles or restricted project roles
         user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
 
-        # The user should be able to fetch global lot depedencies
+        # The user should be able to fetch global lot dependencies
         try:
             global_lot_dependencies = user_client.get_lot_dependencies(global_project_lot_corp_name)
         except requests.HTTPError:

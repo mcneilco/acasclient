@@ -1765,6 +1765,50 @@ class client():
 
     def get_lot_dependencies(self, lot_corp_name):
         """Get lot dependencies for a lot by corp name
+
+        Args:
+            lot_corp_name (str): Corp name of lot to get dependencies for
+
+        Returns:
+            A dict of the lot dependencies
+            For example:
+            {
+                "batchCodes": [
+                    "CMPD-0000001-001"
+                ],
+                "linkedDataExists": true,
+                "linkedExperiments": [
+                    {
+                        "acls": {
+                            "delete": true,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "EXPT-00000009",
+                        "comments": "CMPD-0000001-001",
+                        "description": "6 results",
+                        "ignored": false,
+                        "name": "BLAH"
+                    }
+                ],
+                "linkedLots": [
+                    {
+                        "acls": {
+                            "delete": false,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "CMPD-0000001-002",
+                        "ignored": false,
+                        "name": "CMPD-0000001-002"
+                    }
+                ],
+                "lot": {
+                    ...the lot info...
+                }
+            }
+        Raises:
+            HTTPError: If permission denied
         """
         resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}/"
                                 .format(self.url, lot_corp_name))
@@ -1775,6 +1819,18 @@ class client():
 
     def delete_lot(self, lot_corp_name):
         """Delete a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to delete
+
+        Returns:
+            A dict with "success": true if successful. For example
+            {
+                "success": true
+            }
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
         """
         resp = self.session.delete("{}/cmpdReg/metalots/corpName/{}"
                                 .format(self.url, lot_corp_name))

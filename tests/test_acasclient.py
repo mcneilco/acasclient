@@ -2447,6 +2447,10 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('linkedDataExists', meta_lot_dependencies)
         self.assertIn('linkedExperiments', meta_lot_dependencies)
         self.assertIn('linkedLots', meta_lot_dependencies)
+
+        # Verify we can turn off the linked lots checking
+        meta_lot_dependencies = self.client.get_lot_dependencies("CMPD-0000001-001", include_linked_lots=False)
+        self.assertNotIn('linkedLots', meta_lot_dependencies)
         
         # Verify that the experiment code name is in the linkedExperiments list
         self.assertIn(experiment['codeName'], [e['code'] for e in meta_lot_dependencies['linkedExperiments']])

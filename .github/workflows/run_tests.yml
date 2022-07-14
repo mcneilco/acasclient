@@ -13,11 +13,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: acasclient
-      - name: Checkout ACAS
-        uses: actions/checkout@v3
-        with:
-          repository: mcneilco/acas
-          path: acas
       - name: Set Up Python 3.8
         uses: actions/setup-python@v2
         with:
@@ -31,25 +26,17 @@ jobs:
       - name: Set ACAS_TAG to latest release
         run: |
           echo "ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas/releases/latest | jq -r '.tag_name')" >> $GITHUB_ENV
+      - name: Checkout ACAS
+        uses: actions/checkout@v3
+        with:
+          repository: mcneilco/acas
+          path: acas
+          ref: ${{ env.ACAS_TAG }}
       - name: Run docker-compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
         id: dockerComposeUp
         working-directory: acas
         run: |
-          echo ::set-output name=docker_compose_pull_failure::false
-          docker-compose -f "docker-compose.yml" up -d || echo ::set-output name=docker_compose_pull_failure::true
-      - name: Get docker images fallback tag name
-        run: |
-          echo "DEFAULT_BRANCH_ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas | jq -r '.default_branch' | sed -e 's/\//-/g')" >> $GITHUB_ENV
-        if: ${{ steps.dockerComposeUp.outputs.docker_compose_pull_failure == 'true' }}
-      - name: Falling back to ${{ env.DEFAULT_BRANCH_ACAS_TAG }} docker image tag for roo and racas tags
-        working-directory: acas
-        run: |
-          docker pull  mcneilco/acas-roo-server-oss:${{ env.DEFAULT_BRANCH_ACAS_TAG }}-indigo
-          docker tag mcneilco/acas-roo-server-oss:${{ env.DEFAULT_BRANCH_ACAS_TAG}}-indigo mcneilco/acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo
-          docker pull  mcneilco/racas-oss:${{ env.DEFAULT_BRANCH_ACAS_TAG}}
-          docker tag mcneilco/racas-oss:${{ env.DEFAULT_BRANCH_ACAS_TAG }} mcneilco/racas-oss:${{ env.ACAS_TAG }}
           docker-compose -f "docker-compose.yml" up -d
-        if: ${{ steps.dockerComposeUp.outputs.docker_compose_pull_failure == 'true' }}
       - name: Wait for startup then create docker bob
         run: bash docker_bob_setup.sh
         working-directory: acas

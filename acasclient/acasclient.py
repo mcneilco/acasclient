@@ -1762,3 +1762,83 @@ class client():
         resp = self.session.post("{}/api/setup/{}".format(self.url, item_type), json=items)
         resp.raise_for_status()
         return resp.json()
+
+    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True):
+        """Get lot dependencies for a lot by corp name
+
+        Args:
+            lot_corp_name (str): Corp name of lot to get dependencies for
+            include_linked_lots (bool): Whether to include linked lots in the response, default True.  Linked lots are purely informational as they are not a dependency preventing the lot from being deleted.
+
+        Returns:
+            A dict of the lot dependencies
+            For example:
+            {
+                "batchCodes": [
+                    "CMPD-0000001-001"
+                ],
+                "linkedDataExists": true,
+                "linkedExperiments": [
+                    {
+                        "acls": {
+                            "delete": true,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "EXPT-00000009",
+                        "comments": "CMPD-0000001-001",
+                        "description": "6 results",
+                        "ignored": false,
+                        "name": "BLAH"
+                    }
+                ],
+                "linkedLots": [
+                    {
+                        "acls": {
+                            "delete": false,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "CMPD-0000001-002",
+                        "ignored": false,
+                        "name": "CMPD-0000001-002"
+                    }
+                ],
+                "lot": {
+                    ...the lot info...
+                }
+            }
+        Raises:
+            HTTPError: If permission denied
+        """
+
+        params = {'includeLinkedLots': str(include_linked_lots).lower()}
+        resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}"
+                                .format(self.url, lot_corp_name),
+                                params=params)
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+    def delete_lot(self, lot_corp_name):
+        """Delete a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to delete
+
+        Returns:
+            A dict with "success": true if successful. For example
+            {
+                "success": true
+            }
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
+        """
+        resp = self.session.delete("{}/cmpdReg/metalots/corpName/{}"
+                                .format(self.url, lot_corp_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()

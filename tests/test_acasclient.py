@@ -2755,6 +2755,44 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
         self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+    @requires_node_api
+    @requires_absent_basic_cmpd_reg_load
+    def test_005_swap_parent_structures(self):
+        """
+        Check `swap_parent_structures` can swap structures in case of parents with no duplicates or
+        parents who are duplicates of each other.
+        """
+
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_005_swap_parent_structures.sdf')
+        self.basic_cmpd_reg_load(file=file)
+
+        # CMPD-0000001 & CMPD-0000002 are duplicates of each other.
+        # CMPD-0000003 doesn't have any duplicates.
+        # CMPD-0000004 & CMPD-0000005 are duplicates of each other.
+        # CMPD-0000006 doesn't have any duplicates.
+
+        # 1 and 2 are only duplicates of each other.
+        assert self.client.swap_parent_structures(
+            corp_name1='CMPD-0000001', corp_name2= 'CMPD-0000002')
+
+        # 3 and 6 don't have any duplicates
+        assert self.client.swap_parent_structures(
+            corp_name1='CMPD-0000003', corp_name2='CMPD-0000006')
+
+        # 1 and 3 shouldn't be swappable as 1 has duplicacy with 2
+        with self.assertRaises(requests.exceptions.HTTPError):
+            self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+
+        # 1 and 4 shouldn't be swappable as 1 has duplicacy with 2 and 4 has with 5
+        with self.assertRaises(requests.exceptions.HTTPError):
+            self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+
+        # Prevent interaction with other tests.
+        self.delete_all_cmpd_reg_bulk_load_files()
         
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

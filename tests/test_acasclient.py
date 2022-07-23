@@ -2756,6 +2756,18 @@ class TestCmpdReg(BaseAcasClientTest):
         # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
         self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
         
+
+    @requires_node_api
+    @requires_absent_basic_cmpd_reg_load
+    @requires_basic_experiment_load
+    def test_004_reparent_lot(self, experiment):
+
+        # Reparent a lot
+        response = self.client.reparent_lot( "CMPD-0000001-001",  "CMPD-0000002")
+
+        #
+        print(response)
+
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

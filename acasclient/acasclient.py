@@ -1842,3 +1842,49 @@ class client():
             return None
         resp.raise_for_status()
         return resp.json()
+        
+    def reparent_lot(self, lot_corp_name, new_parent_corp_name):
+        """Reparent a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to reparent
+            new_parent_corp_name (str): Corp name of new parent
+
+        Returns:
+            A dict with. For example
+            {
+                "dependencies": {
+                    "linkedDataExists": true,
+                    "summary": "1 linked experiments: EXPT-00000015(BLAH)"
+                },
+                "modifiedBy": "bob",
+                "newLot": {
+                    "corpName": "CMPD-0000003-002",
+                    ...other lot info...
+                    "saltForm": {
+                        ...salt form info...
+                        "parent": {
+                            "corpName": "CMPD-0000003",
+                            ...other parent info...
+                    },
+                },
+                "originalLotCorpName": "CMPD-0000001-001",
+                "originalParentCorpName": "CMPD-0000001"
+            }
+
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
+        """
+        data = {
+            'lotCorpName': lot_corp_name,
+            'parentCorpName': new_parent_corp_name
+        }
+        resp = self.session.post("{}/api/cmpdRegAdmin/lotServices/reparent/lot"
+                                .format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(data))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()

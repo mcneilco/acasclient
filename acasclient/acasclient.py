@@ -1847,8 +1847,8 @@ class client():
         """Swap parent structures.
 
         Args:
-            corp_name1 (str): Corporate name of the first entity.
-            corp_name2 (str): Corporate name of the second entity.
+            corp_name1 (str): Corporate ID of the first parent compound.
+            corp_name2 (str): Corporate ID of the second parent compound.
 
         Returns:
             Whether structures were swapped.

@@ -2768,32 +2768,42 @@ class TestCmpdReg(BaseAcasClientTest):
             'test_acasclient', 'test_005_swap_parent_structures.sdf')
         self.basic_cmpd_reg_load(file=file)
 
-        # CMPD-0000001 & CMPD-0000002 are duplicates of each other.
-        # CMPD-0000003 doesn't have any duplicates.
-        # CMPD-0000004 & CMPD-0000005 are duplicates of each other.
-        # CMPD-0000006 doesn't have any duplicates.
+        # CMPD-0000001 (structure: A, stereo category: Single stereoisomer)
+        # CMPD-0000002 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer)
+        # CMPD-0000003 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer - arbitrary assign)
+        # CMPD-0000004 (structure: B, stereo category: Single stereoisomer)
+        # CMPD-0000005 (structure: C, stereo category: Unknown, stereo comment: foo)
+        # CMPD-0000006 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
+        # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category : Unkown, stereo comment: bar)
 
-        # 1 and 2 are only duplicates of each other.
-        assert self.client.swap_parent_structures(
-            corp_name1='CMPD-0000001', corp_name2= 'CMPD-0000002')
+        try:
+            # Swapping 1 and 3 will introduce duplicacy between 1 and 2.
+            with self.assertRaises(requests.exceptions.HTTPError):
+                self.client.swap_parent_structures(
+                    corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
 
-        # 3 and 6 don't have any duplicates
-        assert self.client.swap_parent_structures(
-            corp_name1='CMPD-0000003', corp_name2='CMPD-0000006')
+            # Swapping 1 and 2 will not introduce any duplicates.
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            # Restore the original structures
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
 
-        # 1 and 3 shouldn't be swappable as 1 has duplicacy with 2
-        with self.assertRaises(requests.exceptions.HTTPError):
-            self.client.swap_parent_structures(
-                corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
-
-        # 1 and 4 shouldn't be swappable as 1 has duplicacy with 2 and 4 has with 5
-        with self.assertRaises(requests.exceptions.HTTPError):
-            self.client.swap_parent_structures(
+            # Swapping 1 and 4 will not introduce any duplicates.
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            # Restore the original structures
+            assert self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
 
-        # Prevent interaction with other tests.
-        self.delete_all_cmpd_reg_bulk_load_files()
-        
+            # Swapping 5 and 6 will not introduce any duplicates.
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000005', corp_name2='CMPD-0000006')
+        finally:
+            # Prevent interaction with other tests.
+            self.delete_all_cmpd_reg_bulk_load_files()
+
+
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

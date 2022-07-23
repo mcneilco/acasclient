@@ -9,10 +9,11 @@ from pathlib import Path
 from pathlib import PurePath
 import re
 import base64
-from io import StringIO
+import hashlib
+from io import StringIO, IOBase
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "duplicate_tautomer", "duplicate_no_tautomer",
@@ -233,6 +234,9 @@ class client():
         self.url = creds['url']
         self.session = self.getSession()
 
+    def close(self):
+        self.session.close()
+
     def getSession(self):
         data = {
             'username': self.username,
@@ -241,9 +245,10 @@ class client():
         session = requests.Session()
         resp = session.post("{}/login".format(self.url),
                             headers={'Content-Type': 'application/json'},
-                            data=json.dumps(data))
+                            data=json.dumps(data),
+                            allow_redirects=False)
         resp.raise_for_status()
-        if 'location' in resp.headers and resp.headers.location == "/login":
+        if resp.status_code == 302 and 'location' in resp.headers and resp.headers.get('location') == "/login":
             raise RuntimeError("Failed to login. Please check credentials.")
         return session
 
@@ -319,13 +324,21 @@ class client():
                 filesToUpload[str(file)] = file.open('rb')
         resp = self.session.post("{}/uploads".format(self.url),
                                  files=filesToUpload)
+        # Close the open files
+        for file in filesToUpload:
+            # Check if the file is a file object
+            if isinstance(filesToUpload[file], IOBase):
+                filesToUpload[file].close()
+
         resp.raise_for_status()
         return resp.json()
 
     def get_meta_lot(self, lot_corp_name):
         """Get metalot by lot corp name
-
-        Get a meta lot object from the lot corp name
+         Granted read permission on a lot if one of these is true:
+            1. The user is the owner of the lot (chemist or recorded by)
+            2. The user has access to the project the lot is associated with
+            3. The user is a cmpdreg admin
 
         Args:
             lot_corp_name (str): A lot corp name
@@ -336,8 +349,27 @@ class client():
                                 .format(self.url, lot_corp_name))
         if resp.status_code == 500:
             return None
-        else:
-            resp.raise_for_status()
+        resp.raise_for_status()
+        return resp.json()
+
+    def save_meta_lot(self, meta_lot):
+        """Save a meta lot to the server
+         If updating a saved lot permissions are granted if one of these is true:
+            1. Edit my lots is configured to true on the system and..
+                a. The user is the owner of the lot (chemist or recorded by)
+                b. The user has access to the project the lot is associated with
+            2. The user is a cmpdreg admin
+
+        Args:
+            meta_lot (dict): A meta lot
+
+        Returns: Returns a dict meta lot object
+        """
+        resp = self.session.post("{}/cmpdreg/metalots".
+                                 format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(meta_lot))
+        resp.raise_for_status()
         return resp.json()
 
     def cmpd_search(self, corpNameList="", corpNameFrom="", corpNameTo="",
@@ -628,6 +660,21 @@ class client():
 
         return return_dict
 
+    def protocol_search(self, search_term):
+        """Search for protocols by search term
+
+        Get an array of protocols given a protocol search term string
+
+        Args:
+            searchTerm (str): A protocol search term
+
+        Returns: Returns an array of protocols
+        """
+        resp = self.session.get("{}/api/protocols/genericSearch/{}"
+                                .format(self.url, search_term))
+        resp.raise_for_status()
+        return resp.json()
+
     def get_protocols_by_label(self, label):
         """Get all experiments for a protocol from a protocol label
 
@@ -659,6 +706,24 @@ class client():
             return None
         else:
             resp.raise_for_status()
+        return resp.json()
+
+    def get_experiment_by_name(self, experiment_name):
+        """Get an experiment from experiment name
+
+        Get an experiment given an experiment name
+
+        Args:
+            experiment_name (str): An experiment name
+
+        Returns: Returns an experiment object or None if the experiment not found
+        """
+
+        resp = self.session.get("{}/api/experiments/experimentName/{}".
+                                format(self.url, experiment_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
         return resp.json()
 
     def get_experiment_by_code(self, experiment_code, full = False):
@@ -747,8 +812,16 @@ class client():
                                  data=json.dumps(data))
         resp.raise_for_status()
         return resp.json()
+    
+    def _validate_sdf_request(self, data):
+        resp = self.session.post("{}/api/cmpdRegBulkLoader/validateCmpds"
+                                 .format(self.url),
+                                 headers={'Content-Type': 'application/json'},
+                                 data=json.dumps(data))
+        resp.raise_for_status()
+        return resp.json()
 
-    def register_sdf(self, file, userName, mappings, prefix=None):
+    def register_sdf(self, file, userName, mappings, prefix=None, dry_run=False):
         files = self.upload_files([file])
         request = {
             "fileName": files['files'][0]["name"],
@@ -762,13 +835,18 @@ class client():
                 "labelTypeAndKind": "id_corpName",
                 "thingTypeAndKind": "parent_compound"
             }
-        response = self.register_sdf_request(request)
+        if dry_run:
+            response = self._validate_sdf_request(request)
+        else:
+            response = self.register_sdf_request(request)
         report_files = []
         for file in response[0]['reportFiles']:
             filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
                 PurePath(Path(file)).name)
             report_files.append(self.get_file(filePath))
-        return {"summary": response[0]['summary'],
+        return {"id": response[0]['id'],
+                "summary": response[0]['summary'],
+                "results": response[0]['results'],
                 "report_files": report_files}
 
     def experiment_loader_request(self, data):
@@ -794,7 +872,7 @@ class client():
         return resp.json()
 
     def experiment_loader(self, data_file, user, dry_run, report_file="",
-                          images_file=""):
+                          images_file="", validate_dose_response_curves=True):
         """Load an experiment
         
         Load an experiment into ACAS.
@@ -815,6 +893,7 @@ class client():
                    "fileToParse": data_file,
                    "reportFile": report_file,
                    "imagesFile": images_file,
+                   "moduleName": None if validate_dose_response_curves else "DoseResponseDataParserController",
                    "dryRunMode": dry_run}
         resp = self.experiment_loader_request(request)
         return resp
@@ -868,7 +947,8 @@ class client():
             response = client.\
                 dose_response_experiment_loader(**request)
         """
-        resp = self.experiment_loader(**kwargs)
+
+        resp = self.experiment_loader(validate_dose_response_curves=False, **kwargs)
         response = {
             "experiment_loader_response": resp,
             "dose_response_fit_response": None
@@ -1009,6 +1089,27 @@ class client():
         else:
             resp.raise_for_status()
         return resp.json()
+    
+    def delete_ls_thing(self, ls_type, ls_kind, code_name, format):
+        """
+            Deletes a models.LsThing object by ls_type, ls_kind, and code_name
+            Args:
+                ls_type (str): Type of ls thing
+                ls_kind (str): Kind of ls thing
+                code_name (str): Code name of ls thing
+                format (str)
+        """
+        if not format:
+            format = 'nestedfull'
+        resp = self.session.delete(
+            "{}/api/things/{}/{}/{}".format(self.url, ls_type, ls_kind,
+                                            code_name),
+            params={format: True})
+        if resp.status_code == 500:
+            return None
+        else: 
+            resp.raise_for_status()
+        return resp
 
     def save_ls_thing(self, ls_thing):
         """
@@ -1374,3 +1475,370 @@ class client():
                                 .format(self.url, valueId))
         resp.raise_for_status()
         return resp.content
+    
+    def get_authors(self):
+        """
+        Get all authors
+
+        Returns:
+            a list of dict objects representing the authors
+        """
+        resp = self.session.get("{}/api/authors".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_author_by_username(self, username):
+        """
+        Get author by username
+            
+        Args:
+            username (str): The username of the author to fetch
+
+        Returns:
+            a dict object representing the author
+        """
+        resp = self.session.get("{}/api/authorByUsername/{}".format(self.url, username))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_author(self, author):
+        """
+        Create an author
+
+        Args:
+            author (dict): A dict object representing the author to create
+
+        Returns:
+            a dict object representing the new author
+        """
+        def hash_password(password):
+            """ Calculate the base64-encoded sha1 hash of the password for ACAS built-in authentication """
+            hasher = hashlib.sha1()
+            hasher.update(password.encode('utf-8'))
+            return base64.b64encode(hasher.digest()).decode('utf-8')
+        if 'password' in author:
+            author['password'] = hash_password(author['password'])
+        resp = self.session.post("{}/api/author".format(self.url),
+                                    json=author)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def update_author(self, author):
+        """Update an author
+
+        Args:
+            author (dict): A dict object representing the author to update
+
+        Returns:
+            a dict object representing the updated author
+        """
+        if 'id' not in author:
+            raise ValueError("id attribute of author dict is required")
+        resp = self.session.put("{}/api/author/{}".format(self.url, author.get('id')),
+                                    json=author)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_authors(self, authors):
+        """
+        Create authors
+
+        Args:
+            authors (list): A list of dicts representing the authors to create
+            
+        Returns:
+            a list of dict objects representing the saved authors
+        """
+        return [self.create_author(author) for author in authors]
+    
+    def update_author_roles(self, new_author_roles=None, author_roles_to_delete=None):
+        """
+        Update author roles
+        
+        Args:
+            new_author_roles (list): A list of dicts representing the new author roles to create
+            author_roles_to_delete (list): A list of dicts representing the author roles to delete
+            
+        Returns:
+            a list of dict objects representing the saved author roles
+        """
+        body = {
+            'newAuthorRoles': new_author_roles or [],
+            'authorRolesToDelete': author_roles_to_delete or [],
+        }
+        resp = self.session.post("{}/api/updateAuthorRoles".format(self.url),
+                                    json=body)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def update_project_roles(self, new_author_roles=None, author_roles_to_delete=None):
+        """
+        Same as update author roles but with a different endpoint name.
+        """
+        body = {
+            'newAuthorRoles': new_author_roles or [],
+            'authorRolesToDelete': author_roles_to_delete or [],
+        }
+        resp = self.session.post("{}/api/projects/updateProjectRoles".format(self.url),
+                                    json=body)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def _validate_then_save_codetable(self, url_base, codeTable: dict) -> dict:
+        """
+        Validate a codetable and save it to the database
+
+        Args:
+            url_base (str): The base URL for the codetable
+            codeTable (dict): A dict object representing the codetable to save
+
+        Returns:
+            a dict object representing the saved codetable
+        """
+        # Validate
+        resp = self.session.post(url_base + "/validateBeforeSave", json=codeTable)
+        resp.raise_for_status()
+        validation_resp = resp.json()
+        if type(validation_resp) is list and len(validation_resp) > 0:
+            raise ValueError(validation_resp[0]['message'])
+        # Create
+        resp = self.session.post(url_base, json=codeTable)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_cmpdreg_scientists(self):
+        """
+        Fetch the list of possible lot chemists for CmpdReg
+        """
+        resp = self.session.get("{}/cmpdreg/scientists".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_cmpdreg_scientist(self, code, name):
+        """
+        Create a new scientist for CmpdReg
+        """
+        url_base = "{}/api/codeTablesAdmin/compound/scientist".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
+    
+    def update_cmpdreg_scientist(self, scientist: dict):
+        """
+        Update a scientist for CmpdReg
+        """
+        if 'id' not in scientist:
+            raise ValueError("id attribute of scientist dict is required")
+        resp = self.session.put("{}/api/codeTablesAdmin/compound/scientist/{}".format(self.url, scientist['id']), json=scientist)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def delete_cmpdreg_scientist(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/codeTablesAdmin/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+    
+    def get_stereo_categories(self):
+        """
+        Get all stereo categories
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/stereoCategories".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_stereo_category(self, code, name):
+        """
+        Create a new stereo category
+        """
+        url_base = "{}/api/cmpdRegAdmin/stereoCategories".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
+    
+    def update_stereo_category(self, stereo_category: dict):
+        """
+        Update a stereo category
+        """
+        if 'id' not in stereo_category:
+            raise ValueError("id attribute of stereo_category dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/stereoCategories/{}".format(self.url, stereo_category['id']), json=stereo_category)
+        resp.raise_for_status()
+        # No return because backend doesn't return anything
+    
+    def delete_stereo_category(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/cmpdRegAdmin/stereoCategories/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+    
+    def get_salts(self):
+        """
+        Get all salts
+        """
+        resp = self.session.get("{}/cmpdreg/salts".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_salt(self, abbrev, name, mol_structure):
+        """
+        Create a new salt
+        """
+        resp = self.session.post("{}/cmpdreg/salts".format(self.url), json={'abbrev': abbrev, 'name': name, 'molStructure': mol_structure})
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_physical_states(self):
+        """
+        Get all physical states
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/physicalStates".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_physical_state(self, code, name):
+        """
+        Create a new physical state
+        """
+        url_base = "{}/api/cmpdRegAdmin/physicalStates".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
+    
+    def update_physical_state(self, physical_state: dict):
+        """
+        Update a physical state
+        """
+        if 'id' not in physical_state:
+            raise ValueError("id attribute of physical_state dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/physicalStates/{}".format(self.url, physical_state['id']), json=physical_state)
+        resp.raise_for_status()
+        # No return because backend doesn't return anything
+    
+    def delete_physical_state(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/cmpdRegAdmin/physicalStates/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+    
+    def get_cmpdreg_vendors(self):
+        """
+        Get all vendors for CmpdReg
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/vendors".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_cmpdreg_vendor(self, code, name):
+        """
+        Create a new vendor for CmpdReg
+        """
+        url_base = "{}/api/cmpdRegAdmin/vendors".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
+    
+    def update_cmpdreg_vendor(self, vendor: dict):
+        """
+        Update a vendor for CmpdReg
+        """
+        if 'id' not in vendor:
+            raise ValueError("id attribute of vendor dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/vendors/{}".format(self.url, vendor['id']), json=vendor)
+        resp.raise_for_status()
+        # No return because backend doesn't return anything
+    
+    def delete_cmpdreg_vendor(self, id: int) -> bool:
+        resp = self.session.delete("{}/api/cmpdRegAdmin/vendors/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+
+    def setup_items(self, item_type, items):
+        """Create or update items of a given typeKind 
+           ACAS Admin role for this operation
+
+        Args:
+            item_type (str): Type of item to create or update
+            items (list): List of items to create or update
+        """
+        allowed_types = ['experimenttypes', 'experimentkinds', 'statetypes', 'statekinds', 'valuetypes', 'valuekinds',
+                         'labeltypes', 'labelkinds', 'ddicttypes', 'ddictkinds', 'codetables','labelsequences', 'roletypes',
+                         'rolekinds', 'lsroles']
+        if item_type not in allowed_types:
+            raise ValueError("item_type must be one of {}".format(allowed_types))
+        resp = self.session.post("{}/api/setup/{}".format(self.url, item_type), json=items)
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True):
+        """Get lot dependencies for a lot by corp name
+
+        Args:
+            lot_corp_name (str): Corp name of lot to get dependencies for
+            include_linked_lots (bool): Whether to include linked lots in the response, default True.  Linked lots are purely informational as they are not a dependency preventing the lot from being deleted.
+
+        Returns:
+            A dict of the lot dependencies
+            For example:
+            {
+                "batchCodes": [
+                    "CMPD-0000001-001"
+                ],
+                "linkedDataExists": true,
+                "linkedExperiments": [
+                    {
+                        "acls": {
+                            "delete": true,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "EXPT-00000009",
+                        "comments": "CMPD-0000001-001",
+                        "description": "6 results",
+                        "ignored": false,
+                        "name": "BLAH"
+                    }
+                ],
+                "linkedLots": [
+                    {
+                        "acls": {
+                            "delete": false,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "CMPD-0000001-002",
+                        "ignored": false,
+                        "name": "CMPD-0000001-002"
+                    }
+                ],
+                "lot": {
+                    ...the lot info...
+                }
+            }
+        Raises:
+            HTTPError: If permission denied
+        """
+
+        params = {'includeLinkedLots': str(include_linked_lots).lower()}
+        resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}"
+                                .format(self.url, lot_corp_name),
+                                params=params)
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+    def delete_lot(self, lot_corp_name):
+        """Delete a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to delete
+
+        Returns:
+            A dict with "success": true if successful. For example
+            {
+                "success": true
+            }
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
+        """
+        resp = self.session.delete("{}/cmpdReg/metalots/corpName/{}"
+                                .format(self.url, lot_corp_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()

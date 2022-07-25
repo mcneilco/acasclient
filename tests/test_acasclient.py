@@ -780,7 +780,7 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('<Parent Corp Name>\\nCMPD-0000001', content)
         self.assertIn('<Lot Corp Name>\\nCMPD-0000001-001', content)
         self.assertIn('<Project>\\nPROJ-00000001', content)
-        self.assertIn('<Parent Stereo Category>\\nunknown', content)
+        self.assertIn('<Parent Stereo Category>\\nUnknown', content)
         self.assertIn('content-type', search_results_export)
         self.assertIn('name', search_results_export)
         self.assertIn('content-length', search_results_export)
@@ -867,7 +867,7 @@ class TestAcasclient(unittest.TestCase):
 
     def test_017_get_experiment_by_code(self):
         """Test get experiment by code."""
-        experiment = self.client.get_experiment_by_code("EXPT-00000001")
+        experiment = self.client.get_experiment_by_code("EXPT-00000002")
         self.assertIn('codeName', experiment)
         self.assertIn('lsLabels', experiment)
         experiment = self.client.get_experiment_by_code("FAKECODE")
@@ -876,7 +876,7 @@ class TestAcasclient(unittest.TestCase):
     def test_018_get_source_file_for_experient_code(self):
         """Test get source file for experiment code."""
         source_file = self.client.\
-            get_source_file_for_experient_code("EXPT-00000001")
+            get_source_file_for_experient_code("EXPT-00000002")
         self.assertIn('content', source_file)
         self.assertIn('content-type', source_file)
         self.assertIn('name', source_file)
@@ -889,7 +889,7 @@ class TestAcasclient(unittest.TestCase):
     def test_019_write_source_file_for_experient_code(self):
         """Test get source file for experiment code."""
         source_file_path = self.client.\
-            write_source_file_for_experient_code("EXPT-00000001", self.tempdir)
+            write_source_file_for_experient_code("EXPT-00000002", self.tempdir)
         self.assertTrue(source_file_path.exists())
 
     def test_020_get_meta_lot(self):

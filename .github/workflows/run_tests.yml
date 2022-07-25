@@ -37,6 +37,11 @@ jobs:
       - name: Set ACAS_TAG to the docker escaped version of ${{ env.ACAS_REF }}
         run: |
           echo "ACAS_TAG=$(echo ${{ env.ACAS_REF }} | sed 's/\//-/g')" >> $GITHUB_ENV
+      - name: Override ACAS_REF and ACAS_TAG if branch is "main"
+        run: |
+          echo "ACAS_REF=master" >> $GITHUB_ENV
+          echo "ACAS_TAG=latest" >> $GITHUB_ENV
+        if: github.ref == 'refs/heads/main'
       - name: Checkout ACAS
         uses: actions/checkout@v3
         with:

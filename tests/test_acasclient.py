@@ -10,6 +10,7 @@ import shutil
 import uuid
 import json
 import operator
+import signal
 # SETUP
 # "bob" user name registered
 # "PROJ-00000001" registered
@@ -21,6 +22,17 @@ EMPTY_MOL = """
 M  END
 """
 
+class Timeout:
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
 
 # Code to anonymize experiments for testing
 def remove_common(object):
@@ -49,6 +61,15 @@ def remove_common_value(value):
     value["analysisGroupCode"] = None
     value["analysisGroupId"] = None
     value["stateId"] = None 
+
+    # Round numeric values to 6 digits for comparison on different systems where calculations like EC50 might be different
+    if value['lsType'] == "numericValue":
+        if value["numericValue"] is not None:
+            value["numericValue"] = round(value["numericValue"], 6)
+    
+    # Round uncertainty values as their calculations may vary from system to system
+    if 'uncertainty' in value and value['uncertainty'] is not None:
+        value["uncertainty"] = round(value["uncertainty"], 6)
 
 def clean_group(group):
     group['key'] =  None
@@ -209,10 +230,13 @@ class TestAcasclient(unittest.TestCase):
         creds = acasclient.get_default_credentials()
         self.client = acasclient.client(creds)
         self.tempdir = tempfile.mkdtemp()
+        # Set TestCase - maxDiff to None to allow for a full diff output when comparing large dictionaries
+        self.maxDiff = None
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
         shutil.rmtree(self.tempdir)
+        self.client.close()
 
     def test_000_creds_from_file(self):
         """Test creds from file."""
@@ -242,7 +266,8 @@ class TestAcasclient(unittest.TestCase):
     def test_002_client_initialization(self):
         """Test initializing client."""
         creds = acasclient.get_default_credentials()
-        acasclient.client(creds)
+        client = acasclient.client(creds)
+        client.close()
 
     def test_003_projects(self):
         """Test projects."""
@@ -769,7 +794,6 @@ class TestAcasclient(unittest.TestCase):
         self.assertIn('summary', search_results_export)
         search_results_export = self.client.\
             get_file(search_results_export['reportFilePath'])
-        print(search_results_export)
 
     def test_011_get_sdf_file_for_lots(self):
         """Test get sdf file for lots."""
@@ -825,20 +849,91 @@ class TestAcasclient(unittest.TestCase):
 
     def test_014_experiment_loader(self):
         """Test experiment loader."""
+
+        def experiment_load_test(data_file_to_upload, dry_run_mode, self):
+            response = self.client.\
+                experiment_loader(data_file_to_upload, "bob", dry_run_mode)
+            self.assertIn('results', response)
+            self.assertIn('errorMessages', response)
+            self.assertIn('hasError', response)
+            self.assertIn('hasWarning', response)
+            self.assertIn('transactionId', response)
+            if dry_run_mode:
+                self.assertIsNone(response['transactionId'])
+            else:
+                self.assertIsNotNone(response['transactionId'])
+            return response
+
+        def csv_to_txt(data_file_to_upload, self):
+            # Get the file name but change it to .txt
+            file_name = data_file_to_upload.name
+            file_name = file_name.replace(".csv", ".txt")
+            temp_file_path = Path(self.tempdir, file_name)
+            # Change the delim to the new delim
+            with open(data_file_to_upload, 'r') as f:
+                with open(temp_file_path, 'w') as f2:
+                    for line in f:
+                        f2.write(line.replace(',', "\t"))
+            return temp_file_path
+
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic.xlsx')
-        response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", True)
-        self.assertIn('results', response)
-        self.assertIn('errorMessages', response)
-        self.assertIn('hasError', response)
-        self.assertIn('hasWarning', response)
-        self.assertIn('transactionId', response)
-        self.assertIsNone(response['transactionId'])
-        response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", False)
-        self.assertIn('transactionId', response)
-        self.assertIsNotNone(response['transactionId'])
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+
+        
+        # Test for csv format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        experiment_load_test(txt_file, True, self)
+        experiment_load_test(txt_file, False, self)
+
+        # Test for non-uniform comma format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'non-uniform-commas-with-quoted-text.csv')
+        experiment_load_test(data_file_to_upload, True, self)
+        experiment_load_test(data_file_to_upload, False, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        experiment_load_test(txt_file, True, self)
+        experiment_load_test(txt_file, False, self)
+
+        # Test for malformed single quote format file
+        def assert_malformed_single_quote_file(response, self):
+            self.assertTrue(response['hasError'])
+            self.assertIn('errorMessages', response)
+            hasEOFError = False 
+            for message in response['errorMessages'] :
+                if(message['message'].endswith('EOF within quoted string')):
+                    hasEOFError = True
+            self.assertTrue(hasEOFError)
+
+            
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
+        response = experiment_load_test(data_file_to_upload, True, self)
+        assert_malformed_single_quote_file(response, self)
+        txt_file = csv_to_txt(data_file_to_upload, self)
+        response = experiment_load_test(txt_file, True, self)
+        assert_malformed_single_quote_file(response, self)
+
+        # Speed test dry run
+        try:
+            # Dry run on 50 K row file with 3 columns of data should take
+            # less than 25 seconds to complete. On my machine it takes
+            # about 9 seconds. This is a sanity check to make sure the
+            # dry run hasn't slowed significantly.
+            with Timeout(seconds=25):
+                data_file_to_upload = Path(__file__).resolve()\
+                    .parent.joinpath('test_acasclient', '50k-lines.csv')
+                experiment_load_test(data_file_to_upload, True, self)
+        except TimeoutError:
+            self.fail("Timeout error")
+        else:
+            pass
+
 
     def test_015_get_protocols_by_label(self):
         """Test get protocols by label"""
@@ -1511,3 +1606,4 @@ class TestAcasclient(unittest.TestCase):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
+

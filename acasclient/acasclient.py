@@ -1855,7 +1855,7 @@ class client():
             {
                 "dependencies": {
                     "linkedDataExists": true,
-                    "summary": "1 linked experiments: EXPT-00000015(BLAH)"
+                    ...other dependency data...
                 },
                 "modifiedBy": "bob",
                 "newLot": {
@@ -1870,6 +1870,7 @@ class client():
                 },
                 "originalLotCorpName": "CMPD-0000001-001",
                 "originalParentCorpName": "CMPD-0000001"
+                "originalParentDeleted": true
             }
 
             Or None if there was an error

@@ -556,10 +556,16 @@ class BaseAcasClientTest(unittest.TestCase):
                     "sdfProperty": "Parent Corp Name"
                 },
                 {
+                    "dbProperty": "Lot Barcode",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Barcode"
+                },
+                {
                     "dbProperty": "Lot Amount",
                     "defaultVal": None,
                     "required": False,
-                    "sdfProperty": "Lot Amount Prepared"
+                    "sdfProperty": "Lot Amount"
                 },
                 {
                     "dbProperty": "Lot Amount Units",
@@ -2377,6 +2383,23 @@ def csv_to_txt(data_file_to_upload, dir):
 
 class TestCmpdReg(BaseAcasClientTest):
 
+    def create_restricted_lot(self, project_code):
+        # Bulk load a compound to the restricted project
+        response = self.basic_cmpd_reg_load(project_code)
+        # Assert that the are no errors in the response results level
+        all_lots = self.client.get_all_lots()
+
+        # Sort lots by id and get the latest corp id
+        # This is because we dont' get the corp id in the response from the bulkload
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        global_project_parent_corp_name = all_lots[0]['parentCorpName']
+
+        # Find the lot that was bulk loaded with the same corp name as the global project
+        restricted_project_lot = [lot for lot in all_lots if lot['parentCorpName'] == global_project_parent_corp_name][-1]
+        restricted_lot_corp_name = restricted_project_lot["lotCorpName"]
+
+        return restricted_lot_corp_name
+
     @requires_node_api
     @requires_basic_cmpd_reg_load
     def test_001_get_meta_lot(self):
@@ -2688,23 +2711,6 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertTrue(response['success'])
             return True
 
-        def create_restricted_lot(self, project_code):
-            # Bulk load a compound to the restricted project
-            response = self.basic_cmpd_reg_load(project_code)
-            # Assert that the are no errors in the response results level
-            all_lots = self.client.get_all_lots()
-
-            # Sort lots by id and get the latest corp id
-            # This is because we dont' get the corp id in the response from the bulkload
-            all_lots = sorted(all_lots, key=lambda lot: lot['id'])
-            global_project_parent_corp_name = all_lots[0]['parentCorpName']
-            
-            # Find the lot that was bulk loaded with the same corp name as the global project
-            restricted_project_lot = [lot for lot in all_lots if lot['parentCorpName'] == global_project_parent_corp_name][-1]
-            restricted_lot_corp_name = restricted_project_lot["lotCorpName"]
-
-            return restricted_lot_corp_name
-
         # Global compound, with experiment in Global project
         ## Deny Rule: Not an acas user so can't delete because dependent experiment exists
         self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
@@ -2715,7 +2721,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIsNone(meta_lot)
 
         # Create a restricted lot by project
-        restricted_lot_corp_name = create_restricted_lot(self, project.code_name)
+        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
 
         # Deny Rule: No access to lot project
         self.assertFalse(can_delete_lot(self, cmpdreg_user, restricted_lot_corp_name, set_owner_first=True))
@@ -2733,11 +2739,11 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertTrue(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
         # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
-        restricted_lot_corp_name = create_restricted_lot(self, project.code_name)
+        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
         self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
         # Load an experiment to the newly created restricted project using the global project lots
-        restricted_lot_corp_name = create_restricted_lot(self, project.code_name)
+        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
         file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
@@ -2760,13 +2766,49 @@ class TestCmpdReg(BaseAcasClientTest):
     @requires_node_api
     @requires_absent_basic_cmpd_reg_load
     @requires_basic_experiment_load
-    def test_004_reparent_lot(self, experiment):
+    def test_005_reparent_lot(self, experiment):
+
+        # Create a restricted project 
+        project = self.create_basic_project_with_roles()
+
+
+        def can_reparent_lot(self, user_client, lot_corp_name, parent_corp_name):
+            try:
+                response = user_client.reparent_lot(lot_corp_name, parent_corp_name)
+            except requests.HTTPError:
+                return False
+            self.assertIn("newLot", response)
+            self.assertIn("modifiedBy", response)
+            self.assertIn("originalLotCorpName", response)
+            self.assertIn("originalParentCorpName", response)
+            self.assertIn("originalParentDeleted", response)
+            self.assertEqual(response['newLot']["parent"]["corpName"], parent_corp_name)
+            return True
+
+        # Create a bunch of users with various roles and project access
+        cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_user = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
+        acas_user_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_admin = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
+        cmpdreg_admin = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
+
+
+        # Create a restricted lot by project
+        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
 
         # Reparent a lot
-        response = self.client.reparent_lot( "CMPD-0000001-001",  "CMPD-0000002")
+        self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002"))
 
-        #
-        print(response)
+        # Deny Rule: Must be cmpdreg admin
+        self.assertFalse(can_reparent_lot(self, cmpdreg_user, restricted_lot_corp_name, "CMPD-0000002"))
+        self.assertFalse(can_reparent_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000002"))
+        self.assertFalse(can_reparent_lot(self, acas_user, restricted_lot_corp_name, "CMPD-0000002"))
+        self.assertFalse(can_reparent_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000002"))
+        self.assertFalse(can_reparent_lot(self, acas_admin, restricted_lot_corp_name, "CMPD-0000002"))
+        
+        # Allow Rule: CmpdReg Admin
+        self.assertTrue(can_reparent_lot(self, cmpdreg_admin, restricted_lot_corp_name,  "CMPD-0000002"))
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

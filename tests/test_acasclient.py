@@ -2819,13 +2819,29 @@ class TestCmpdReg(BaseAcasClientTest):
         cmpdreg_admin = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
 
         # Verify dry run works by doing a dry run reparent
+        # Starting state is 2 lots (1 on CMPD-0000001 and 1 on CMPD-0000002)
         self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002", dry_run = True))
+        # Current state is 2 lots (1 on CMPD-0000002 and 1 on CMPD-0000002)
+
 
         # Reparent a lot
         self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002", dry_run = False))
+        
+        # Verify that the assay data has moved to the new lot which should be CMPD-0000002-002 dependencies
+        depdencies = self.client.get_lot_dependencies("CMPD-0000002-002")
+        self.assertIn("linkedExperiments", depdencies)
+        hasExperiment = False
+        for depExperiment in depdencies["linkedExperiments"]:
+            if depExperiment["code"] == experiment["codeName"]:
+                hasExperiment = True
+        self.assertTrue(hasExperiment)
+        
+        # Current state is 2 lots (2 on CMPD-0000002 and 0 on CMPD-0000002 (which is now deleted))
 
         # Create a restricted lot by project to verify we can reparent it for our user auth tests
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+        # Current state is 4 lots (3 on CMPD-0000002 and 1 on CMPD-0000001 (which is now re-created))
+        self.assertEqual(restricted_lot_corp_name, "CMPD-0000002-003")
 
         # Deny Rule: Must be cmpdreg admin
         self.assertFalse(can_reparent_lot(self, cmpdreg_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
@@ -2833,10 +2849,28 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertFalse(can_reparent_lot(self, acas_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         self.assertFalse(can_reparent_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         self.assertFalse(can_reparent_lot(self, acas_admin, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
-        
+        # Current state has not changed)
+
         # Allow Rule: CmpdReg Admin
         self.assertTrue(can_reparent_lot(self, cmpdreg_admin, restricted_lot_corp_name,  "CMPD-0000001", dry_run = True))
         self.assertTrue(can_reparent_lot(self, cmpdreg_admin, restricted_lot_corp_name,  "CMPD-0000001", dry_run = False))
+        # Current state is 4 lots (2 on CMPD-0000002 and 2 on CMPD-0000001)
+
+        # Verify we have our expected current state by counting lots and parents
+        all_lots = self.client.get_all_lots()
+        self.assertEqual(len(all_lots), 4)
+        
+        # Get a count of lots per parent
+        parents = {}
+        for lot in all_lots:
+            if lot["parentCorpName"] not in parents:
+                parents[lot["parentCorpName"]] = 1
+            else:
+                parents[lot["parentCorpName"]] += 1
+
+        # Verify we have 2 lots per parent after the re-arranging we did
+        self.assertEqual(parents["CMPD-0000002"], 2)
+        self.assertEqual(parents["CMPD-0000001"], 2)
     
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

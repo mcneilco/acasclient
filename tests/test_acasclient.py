@@ -2774,7 +2774,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # CMPD-0000004 (structure: B, stereo category: Single stereoisomer)
         # CMPD-0000005 (structure: C, stereo category: Unknown, stereo comment: foo)
         # CMPD-0000006 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
-        # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category : Unkown, stereo comment: bar)
+        # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: bar)
 
         try:
             # Swapping 1 and 3 will introduce duplicacy between 1 and 2.

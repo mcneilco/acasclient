@@ -2823,7 +2823,6 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002", dry_run = True))
         # Current state is 2 lots (1 on CMPD-0000002 and 1 on CMPD-0000002)
 
-
         # Reparent a lot
         self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002", dry_run = False))
         

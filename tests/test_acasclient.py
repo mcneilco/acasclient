@@ -3097,3 +3097,50 @@ class TestExperimentLoader(BaseAcasClientTest):
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
 
+    @requires_basic_cmpd_reg_load
+    def test_012_escaped_quotes_xls(self):
+        """Test experiment loader with escaped quotes in xls file"""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'escaped_quotes.xls')
+        self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, False)
+        # Check the loaded experiment
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+        # Find the clobValue
+        clob_value = None
+        for analysis_group in experiment["analysisGroups"]:
+            for state in analysis_group["lsStates"]:
+                for value in state["lsValues"]:
+                    if value["lsKind"] == "Test JSON":
+                        clob_value = value["clobValue"]
+        # Ensure the clob value can be parsed as JSON
+        self.assertIsNotNone(clob_value)
+        parsed_json = json.loads(clob_value)
+        self.assertIsNotNone(parsed_json)
+    
+    @requires_basic_cmpd_reg_load
+    def test_012_escaped_quotes_csv(self):
+        """Test experiment loader with escaped quotes in csv file"""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'escaped_quotes.csv')
+        self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, False)
+        # Check the loaded experiment
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+        # Find the clobValue
+        clob_value = None
+        for analysis_group in experiment["analysisGroups"]:
+            for state in analysis_group["lsStates"]:
+                for value in state["lsValues"]:
+                    if value["lsKind"] == "Test JSON":
+                        clob_value = value["clobValue"]
+        # Ensure the clob value can be parsed as JSON
+        self.assertIsNotNone(clob_value)
+        parsed_json = json.loads(clob_value)
+        self.assertIsNotNone(parsed_json)

@@ -1843,12 +1843,13 @@ class client():
         resp.raise_for_status()
         return resp.json()
         
-    def reparent_lot(self, lot_corp_name, new_parent_corp_name):
+    def reparent_lot(self, lot_corp_name, new_parent_corp_name, dry_run=True):
         """Reparent a lot
 
         Args:
             lot_corp_name (str): Corp name of lot to reparent
             new_parent_corp_name (str): Corp name of new parent
+            dry_run (bool): Whether to perform a dry run, default True
 
         Returns:
             A dict with. For example
@@ -1881,8 +1882,13 @@ class client():
             'lotCorpName': lot_corp_name,
             'parentCorpName': new_parent_corp_name
         }
+
+        # Set dry run url param
+        params = {'dryRun': str(dry_run).lower()}
+
         resp = self.session.post("{}/api/cmpdRegAdmin/lotServices/reparent/lot"
                                 .format(self.url),
+                                 params=params,
                                  headers={'Content-Type': "application/json"},
                                  data=json.dumps(data))
         if resp.status_code == 500:

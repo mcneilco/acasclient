@@ -2772,17 +2772,42 @@ class TestCmpdReg(BaseAcasClientTest):
         project = self.create_basic_project_with_roles()
 
 
-        def can_reparent_lot(self, user_client, lot_corp_name, parent_corp_name):
+        def can_reparent_lot(self, user_client, lot_corp_name, adopting_parent_corp_name, dry_run):
             try:
-                response = user_client.reparent_lot(lot_corp_name, parent_corp_name)
+                original_meta_lot = self.client.get_meta_lot(lot_corp_name)
+                dry_run_response = user_client.reparent_lot(lot_corp_name, adopting_parent_corp_name, True)
+                self.assertIn("newLot", dry_run_response)
+                self.assertIn("modifiedBy", dry_run_response)
+                self.assertIn("originalLotCorpName", dry_run_response)
+                self.assertIn("originalParentCorpName", dry_run_response)
+                self.assertIn("originalParentDeleted", dry_run_response)
+                self.assertEqual(dry_run_response['newLot']["parent"]["corpName"], adopting_parent_corp_name)
+                
+                # Make sure we can still find the original lot corp name if we haven't done a wet run yet
+                meta_lot = self.client.get_meta_lot(lot_corp_name)
+                self.assertEqual(meta_lot["lot"]["parent"]["corpName"], original_meta_lot["lot"]["parent"]["corpName"])
+                self.assertEqual(meta_lot["lot"]["saltForm"]["corpName"], original_meta_lot["lot"]["parent"]["corpName"])
+
+                if not dry_run:
+                    wet_run_response = user_client.reparent_lot(lot_corp_name, adopting_parent_corp_name, False)
+                    self.assertIn("newLot", wet_run_response)
+                    self.assertIn("modifiedBy", wet_run_response)
+                    self.assertIn("originalLotCorpName", wet_run_response)
+                    self.assertIn("originalParentCorpName", wet_run_response)
+                    self.assertIn("originalParentDeleted", wet_run_response)
+                    self.assertEqual(wet_run_response['newLot']["parent"]["corpName"], adopting_parent_corp_name)
+
+                    # Make sure the predicted lot corp name is the same as the actual lot corp name we changed to
+                    self.assertEqual(wet_run_response["newLot"]["corpName"], dry_run_response["newLot"]["corpName"])
+
+                    # Make sure we canf ind the new lot and that the parent and salt form are same as new corp name
+                    meta_lot = self.client.get_meta_lot(wet_run_response["newLot"]["corpName"])
+                    self.assertEqual(meta_lot["lot"]["parent"]["corpName"], adopting_parent_corp_name)
+                    self.assertEqual(meta_lot["lot"]["saltForm"]["corpName"], adopting_parent_corp_name)        
+
             except requests.HTTPError:
                 return False
-            self.assertIn("newLot", response)
-            self.assertIn("modifiedBy", response)
-            self.assertIn("originalLotCorpName", response)
-            self.assertIn("originalParentCorpName", response)
-            self.assertIn("originalParentDeleted", response)
-            self.assertEqual(response['newLot']["parent"]["corpName"], parent_corp_name)
+            
             return True
 
         # Create a bunch of users with various roles and project access
@@ -2793,23 +2818,26 @@ class TestCmpdReg(BaseAcasClientTest):
         acas_admin = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
         cmpdreg_admin = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
 
-
-        # Create a restricted lot by project
-        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+        # Verify dry run works by doing a dry run reparent
+        self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002", dry_run = True))
 
         # Reparent a lot
-        self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002"))
+        self.assertTrue(can_reparent_lot(self, self.client, "CMPD-0000001-001",  "CMPD-0000002", dry_run = False))
+
+        # Create a restricted lot by project to verify we can reparent it for our user auth tests
+        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
 
         # Deny Rule: Must be cmpdreg admin
-        self.assertFalse(can_reparent_lot(self, cmpdreg_user, restricted_lot_corp_name, "CMPD-0000002"))
-        self.assertFalse(can_reparent_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000002"))
-        self.assertFalse(can_reparent_lot(self, acas_user, restricted_lot_corp_name, "CMPD-0000002"))
-        self.assertFalse(can_reparent_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000002"))
-        self.assertFalse(can_reparent_lot(self, acas_admin, restricted_lot_corp_name, "CMPD-0000002"))
+        self.assertFalse(can_reparent_lot(self, cmpdreg_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
+        self.assertFalse(can_reparent_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
+        self.assertFalse(can_reparent_lot(self, acas_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
+        self.assertFalse(can_reparent_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
+        self.assertFalse(can_reparent_lot(self, acas_admin, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         
         # Allow Rule: CmpdReg Admin
-        self.assertTrue(can_reparent_lot(self, cmpdreg_admin, restricted_lot_corp_name,  "CMPD-0000002"))
-
+        self.assertTrue(can_reparent_lot(self, cmpdreg_admin, restricted_lot_corp_name,  "CMPD-0000001", dry_run = True))
+        self.assertTrue(can_reparent_lot(self, cmpdreg_admin, restricted_lot_corp_name,  "CMPD-0000001", dry_run = False))
+    
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

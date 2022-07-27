@@ -1,0 +1,43 @@
+﻿Experiment Meta Data,,,,,
+Format,Generic,,,,
+Project,Global,,,,
+Protocol Name,Escaped Quotes Protocol,,,,
+Experiment Name,Escaped Quotes Experiment,,"Do not change green cells, they are required by the loader",,
+Scientist,bob,,,,
+Notebook,1,,,,
+Page,12,,,,
+Assay Date,2018-05-22,,,,
+,,,,,
+Calculated Results,,,,,
+Datatype,Text,,,,
+Corporate Batch ID,Test JSON,,,,
+CMPD-0000001-001,"[
+	{
+		""1"": {
+			""foo"": 1.111111,
+			""bar"": """"
+		},
+		""2"": {
+			""foo"": 2.222222,
+			""bar"": ""x""
+		},
+		""3"": {
+			""foo"": 3.333333,
+			""bar"": ""x""
+		},
+		""4"": {
+			""foo"": 4.444444,
+			""bar"": ""x""
+		},
+		""5"": {
+			""foo"": 5.555555,
+			""bar"": ""x""
+		},
+		""6"": {
+			""foo"": 6.666666,
+			""bar"": ""x""
+		}
+	}
+]",,,,
+,,,,,
+,,,,,

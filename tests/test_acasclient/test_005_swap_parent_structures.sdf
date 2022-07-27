@@ -1,0 +1,625 @@
+
+  -INDIGO-07232218072D
+
+  6  5  0  0  1  0  0  0  0  0999 V2000
+    3.1670   -4.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.0330   -4.2500    0.0000 C   0  0  1  0  0  0  0  0  0  0  0  0
+    4.8990   -4.7500    0.0000 C   0  0  1  0  0  0  0  0  0  0  0  0
+    5.7651   -4.2500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.8990   -5.7500    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0
+    4.0330   -3.2500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  3  5  1  1  0  0  0
+  2  6  1  6  0  0  0
+M  END
+>  <Buid>
+50
+
+>  <Chemist>
+bob
+
+>  <Color>
+
+
+>  <Comments>
+
+
+>  <Lot Corp Name>
+CMPD-0000002-001
+
+>  <Is Virtual>
+false
+
+>  <Lot Mol Weight>
+106.594
+
+>  <Lot Number>
+1
+
+>  <Modified By>
+bob
+
+>  <Notebook Page>
+nb2
+
+>  <Project>
+PROJ-00000001
+
+>  <Registration Date>
+2022-07-23
+
+>  <Lot Registered By>
+bob
+
+>  <Supplier>
+
+
+>  <Supplier ID>
+
+
+>  <Supplier Lot>
+
+
+>  <Synthesis Date>
+2022-07-23
+
+>  <Salt Form Corp Name>
+CMPD-0000002
+
+>  <CAS Number>
+
+
+>  <Parent Corp Name>
+CMPD-0000002
+
+>  <Parent Number>
+2
+
+>  <Parent Stereo Category>
+Single stereoisomer
+
+>  <Parent Stereo Comment>
+
+
+>  <Parent Mol Weight>
+106.594
+
+>  <Parent Exact Mass>
+106.054928
+
+>  <Parent Mol Formula>
+C5 H11 Cl
+
+>  <Parent Registration Date>
+2022-07-23
+
+>  <Parent Comment>
+
+
+$$$$
+
+  -INDIGO-07232218072D
+
+  6  5  0  0  1  0  0  0  0  0999 V2000
+    4.6420   -3.9500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    5.5080   -3.4500    0.0000 C   0  0  1  0  0  0  0  0  0  0  0  0
+    6.3740   -3.9500    0.0000 C   0  0  1  0  0  0  0  0  0  0  0  0
+    7.2401   -3.4500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    6.3740   -4.9500    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0
+    5.5080   -2.4500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  3  5  1  1  0  0  0
+  2  6  1  6  0  0  0
+M  END
+>  <Buid>
+53
+
+>  <Chemist>
+bob
+
+>  <Color>
+
+
+>  <Comments>
+
+
+>  <Lot Corp Name>
+CMPD-0000003-001
+
+>  <Is Virtual>
+false
+
+>  <Lot Mol Weight>
+106.594
+
+>  <Lot Number>
+1
+
+>  <Modified By>
+bob
+
+>  <Notebook Page>
+nb3
+
+>  <Project>
+PROJ-00000001
+
+>  <Registration Date>
+2022-07-23
+
+>  <Lot Registered By>
+bob
+
+>  <Supplier>
+
+
+>  <Supplier ID>
+
+
+>  <Supplier Lot>
+
+
+>  <Synthesis Date>
+2022-07-23
+
+>  <Salt Form Corp Name>
+CMPD-0000003
+
+>  <CAS Number>
+
+
+>  <Parent Corp Name>
+CMPD-0000003
+
+>  <Parent Number>
+3
+
+>  <Parent Stereo Category>
+Unknown
+
+>  <Parent Stereo Comment>
+
+
+>  <Parent Mol Weight>
+106.594
+
+>  <Parent Exact Mass>
+106.054928
+
+>  <Parent Mol Formula>
+C5 H11 Cl
+
+>  <Parent Registration Date>
+2022-07-23
+
+>  <Parent Comment>
+
+
+$$$$
+
+  -INDIGO-07232218072D
+
+ 11 11  0  0  1  0  0  0  0  0999 V2000
+    5.1750   -4.4000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    6.0410   -4.9000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    6.0410   -5.9000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    5.1750   -6.4000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.3090   -5.9000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.3090   -4.9000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    6.9070   -4.4000    0.0000 C   0  0  1  0  0  0  0  0  0  0  0  0
+    7.7731   -4.9000    0.0000 C   0  0  1  0  0  0  0  0  0  0  0  0
+    8.6391   -4.4000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    7.7731   -5.9000    0.0000 F   0  0  0  0  0  0  0  0  0  0  0  0
+    6.9070   -3.4000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  4  5  1  0  0  0  0
+  5  6  1  0  0  0  0
+  6  1  1  0  0  0  0
+  2  7  1  0  0  0  0
+  7  8  1  0  0  0  0
+  8  9  1  0  0  0  0
+  8 10  1  1  0  0  0
+  7 11  1  6  0  0  0
+M  END
+>  <Buid>
+62
+
+>  <Chemist>
+bob
+
+>  <Color>
+
+
+>  <Comments>
+
+
+>  <Lot Corp Name>
+CMPD-0000006-001
+
+>  <Is Virtual>
+false
+
+>  <Lot Mol Weight>
+158.256
+
+>  <Lot Number>
+1
+
+>  <Modified By>
+bob
+
+>  <Notebook Page>
+nb6
+
+>  <Project>
+PROJ-00000001
+
+>  <Registration Date>
+2022-07-23
+
+>  <Lot Registered By>
+bob
+
+>  <Supplier>
+
+
+>  <Supplier ID>
+
+
+>  <Supplier Lot>
+
+
+>  <Synthesis Date>
+2022-07-23
+
+>  <Salt Form Corp Name>
+CMPD-0000006
+
+>  <CAS Number>
+
+
+>  <Parent Corp Name>
+CMPD-0000006
+
+>  <Parent Number>
+6
+
+>  <Parent Stereo Category>
+Single stereoisomer - partial assign
+
+>  <Parent Stereo Comment>
+
+
+>  <Parent Mol Weight>
+158.256
+
+>  <Parent Exact Mass>
+158.147079
+
+>  <Parent Mol Formula>
+C10 H19 F
+
+>  <Parent Registration Date>
+2022-07-23
+
+>  <Parent Comment>
+
+
+$$$$
+
+  -INDIGO-07232218072D
+
+ 11 11  0  0  1  0  0  0  0  0999 V2000
+    4.9500   -2.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    5.8160   -3.2500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    5.8160   -4.2500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.9500   -4.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.0840   -4.2500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.0840   -3.2500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    6.6820   -2.7500    0.0000 C   0  0  2  0  0  0  0  0  0  0  0  0
+    7.5481   -3.2500    0.0000 C   0  0  2  0  0  0  0  0  0  0  0  0
+    8.4141   -2.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    7.5481   -4.2500    0.0000 F   0  0  0  0  0  0  0  0  0  0  0  0
+    6.6820   -1.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  4  5  1  0  0  0  0
+  5  6  1  0  0  0  0
+  6  1  1  0  0  0  0
+  2  7  1  0  0  0  0
+  7  8  1  0  0  0  0
+  8  9  1  0  0  0  0
+  8 10  1  6  0  0  0
+  7 11  1  1  0  0  0
+M  END
+>  <Buid>
+59
+
+>  <Chemist>
+bob
+
+>  <Color>
+
+
+>  <Comments>
+
+
+>  <Lot Corp Name>
+CMPD-0000005-001
+
+>  <Is Virtual>
+false
+
+>  <Lot Mol Weight>
+158.256
+
+>  <Lot Number>
+1
+
+>  <Modified By>
+bob
+
+>  <Notebook Page>
+nb5
+
+>  <Project>
+PROJ-00000001
+
+>  <Registration Date>
+2022-07-23
+
+>  <Lot Registered By>
+bob
+
+>  <Supplier>
+
+
+>  <Supplier ID>
+
+
+>  <Supplier Lot>
+
+
+>  <Synthesis Date>
+2022-07-23
+
+>  <Salt Form Corp Name>
+CMPD-0000005
+
+>  <CAS Number>
+
+
+>  <Parent Corp Name>
+CMPD-0000005
+
+>  <Parent Number>
+5
+
+>  <Parent Stereo Category>
+Single stereoisomer - arbitrary assign
+
+>  <Parent Stereo Comment>
+
+
+>  <Parent Mol Weight>
+158.256
+
+>  <Parent Exact Mass>
+158.147079
+
+>  <Parent Mol Formula>
+C10 H19 F
+
+>  <Parent Registration Date>
+2022-07-23
+
+>  <Parent Comment>
+
+
+$$$$
+
+  -INDIGO-07232218072D
+
+  4  4  0  0  0  0  0  0  0  0999 V2000
+    4.4000   -5.4250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.4000   -6.4250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    5.4000   -5.4250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    5.4000   -6.4250    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  1  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  4  2  1  0  0  0  0
+M  END
+>  <Buid>
+56
+
+>  <Chemist>
+bob
+
+>  <Color>
+
+
+>  <Comments>
+
+
+>  <Lot Corp Name>
+CMPD-0000004-001
+
+>  <Is Virtual>
+false
+
+>  <Lot Mol Weight>
+56.106
+
+>  <Lot Number>
+1
+
+>  <Modified By>
+bob
+
+>  <Notebook Page>
+nb4
+
+>  <Project>
+PROJ-00000001
+
+>  <Registration Date>
+2022-07-23
+
+>  <Lot Registered By>
+bob
+
+>  <Supplier>
+
+
+>  <Supplier ID>
+
+
+>  <Supplier Lot>
+
+
+>  <Synthesis Date>
+2022-07-23
+
+>  <Salt Form Corp Name>
+CMPD-0000004
+
+>  <CAS Number>
+
+
+>  <Parent Corp Name>
+CMPD-0000004
+
+>  <Parent Number>
+4
+
+>  <Parent Stereo Category>
+Single stereoisomer
+
+>  <Parent Stereo Comment>
+
+
+>  <Parent Mol Weight>
+56.106
+
+>  <Parent Exact Mass>
+56.0626
+
+>  <Parent Mol Formula>
+C4 H8
+
+>  <Parent Registration Date>
+2022-07-23
+
+>  <Parent Comment>
+
+
+$$$$
+
+  -INDIGO-07232218072D
+
+  6  5  0  0  1  0  0  0  0  0999 V2000
+    3.0670   -4.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    3.9330   -3.6500    0.0000 C   0  0  2  0  0  0  0  0  0  0  0  0
+    4.7990   -4.1500    0.0000 C   0  0  2  0  0  0  0  0  0  0  0  0
+    5.6651   -3.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    4.7990   -5.1500    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0
+    3.9330   -2.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  3  5  1  6  0  0  0
+  2  6  1  1  0  0  0
+M  END
+>  <Buid>
+47
+
+>  <Chemist>
+bob
+
+>  <Color>
+
+
+>  <Comments>
+
+
+>  <Lot Corp Name>
+CMPD-0000001-001
+
+>  <Is Virtual>
+false
+
+>  <Lot Mol Weight>
+106.594
+
+>  <Lot Number>
+1
+
+>  <Modified By>
+bob
+
+>  <Notebook Page>
+nb1
+
+>  <Project>
+PROJ-00000001
+
+>  <Registration Date>
+2022-07-23
+
+>  <Lot Registered By>
+bob
+
+>  <Supplier>
+
+
+>  <Supplier ID>
+
+
+>  <Supplier Lot>
+
+
+>  <Synthesis Date>
+2022-07-23
+
+>  <Salt Form Corp Name>
+CMPD-0000001
+
+>  <CAS Number>
+
+
+>  <Parent Corp Name>
+CMPD-0000001
+
+>  <Parent Number>
+1
+
+>  <Parent Stereo Category>
+Single stereoisomer
+
+>  <Parent Stereo Comment>
+
+
+>  <Parent Mol Weight>
+106.594
+
+>  <Parent Exact Mass>
+106.054928
+
+>  <Parent Mol Formula>
+C5 H11 Cl
+
+>  <Parent Registration Date>
+2022-07-23
+
+>  <Parent Comment>
+
+
+$$$$

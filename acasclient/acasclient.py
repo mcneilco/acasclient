@@ -1842,3 +1842,19 @@ class client():
             return None
         resp.raise_for_status()
         return resp.json()
+
+    def swap_parent_structures(self, corp_name1: str, corp_name2: str) -> bool:
+        """Swap parent structures.
+
+        Args:
+            corp_name1 (str): Corporate ID of the first parent compound.
+            corp_name2 (str): Corporate ID of the second parent compound.
+
+        Returns:
+            Whether structures were swapped.
+        """
+
+        data = {'corpName1': corp_name1, 'corpName2': corp_name2}
+        resp = self.session.post(f'{self.url}/cmpdreg/swapParentStructures/', json=data)
+        resp.raise_for_status()
+        return not resp.json()["hasError"]

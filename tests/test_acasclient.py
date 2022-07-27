@@ -2781,6 +2781,7 @@ class TestCmpdReg(BaseAcasClientTest):
                 self.assertIn("originalLotCorpName", dry_run_response)
                 self.assertIn("originalParentCorpName", dry_run_response)
                 self.assertIn("originalParentDeleted", dry_run_response)
+                self.assertIn("originalLotNumber", dry_run_response)
                 self.assertEqual(dry_run_response['newLot']["parent"]["corpName"], adopting_parent_corp_name)
                 
                 # Make sure we can still find the original lot corp name if we haven't done a wet run yet
@@ -2795,6 +2796,8 @@ class TestCmpdReg(BaseAcasClientTest):
                     self.assertIn("originalLotCorpName", wet_run_response)
                     self.assertIn("originalParentCorpName", wet_run_response)
                     self.assertIn("originalParentDeleted", wet_run_response)
+                    self.assertIn("originalLotNumber", wet_run_response)
+
                     self.assertEqual(wet_run_response['newLot']["parent"]["corpName"], adopting_parent_corp_name)
 
                     # Make sure the predicted lot corp name is the same as the actual lot corp name we changed to
@@ -2842,7 +2845,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Current state is 4 lots (3 on CMPD-0000002 and 1 on CMPD-0000001 (which is now re-created))
         self.assertEqual(restricted_lot_corp_name, "CMPD-0000002-003")
 
-        # Deny Rule: Must be cmpdreg admin
+        # Deny Rule: Must be cmp1dreg admin
         self.assertFalse(can_reparent_lot(self, cmpdreg_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         self.assertFalse(can_reparent_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         self.assertFalse(can_reparent_lot(self, acas_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))

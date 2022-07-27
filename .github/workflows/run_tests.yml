@@ -1,0 +1,62 @@
+name: Launch ACAS and run python tests
+
+on:
+  push:
+    branches: ["main", "release/*"]
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  acas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout acasclient
+        uses: actions/checkout@v3
+        with:
+          path: acasclient
+      - name: Set Up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Install acasclient and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./acasclient
+      # The following steps are all to figure out the right ACAS_REF (git ref) and ACAS_TAG (docker tag) of ACAS to use
+      # If main or release branch, run tests on matching release branch of ACAS
+      - name: Set ACAS_REF to the current branch ${{ github.ref }}
+        run: |
+          echo "ACAS_REF=${{ github.ref }}" >> $GITHUB_ENV
+        if: github.event_name == 'push'
+      # If a PR, run tests on ACAS branch matching destination of PR
+      - name: Set ACAS_REF to the PR destination branch ${{ github.base_ref }}
+        run: |
+          echo "ACAS_REF=${{ github.base_ref }}" >> $GITHUB_ENV
+        if: github.event_name == 'pull_request'
+      - name: Set ACAS_TAG to the docker escaped version of ${{ env.ACAS_REF }}
+        run: |
+          echo "ACAS_TAG=$(echo ${{ env.ACAS_REF }} | sed 's/\//-/g')" >> $GITHUB_ENV
+      - name: Checkout ACAS
+        uses: actions/checkout@v3
+        with:
+          repository: mcneilco/acas
+          path: acas
+          ref: ${{ env.ACAS_REF }}
+      - name: Run docker-compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
+        id: dockerComposeUp
+        working-directory: acas
+        run: |
+          docker-compose -f "docker-compose.yml" up -d
+      - name: Wait for startup then create docker bob
+        run: bash docker_bob_setup.sh
+        working-directory: acas
+      - name: Create bob credentials for acasclient
+        run: |
+          mkdir ~/.acas
+          echo "[default]" >> ~/.acas/credentials
+          echo "username=bob" >> ~/.acas/credentials
+          echo "password=secret" >> ~/.acas/credentials
+          echo "url=http://localhost:3000" >> ~/.acas/credentials
+      - name: Run tests
+        run: python -m unittest discover -s ./acasclient -p "test_*.py" -v

@@ -2841,6 +2841,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Current state is 2 lots (2 on CMPD-0000002 and 0 on CMPD-0000002 (which is now deleted))
 
         # Create a restricted lot by project to verify we can reparent it for our user auth tests
+        # This actually creates 2 lots in the system but returns one back by corp name
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
         # Current state is 4 lots (3 on CMPD-0000002 and 1 on CMPD-0000001 (which is now re-created))
         self.assertEqual(restricted_lot_corp_name, "CMPD-0000002-003")

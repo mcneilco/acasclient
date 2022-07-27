@@ -27,7 +27,7 @@ jobs:
       # If main or release branch, run tests on matching release branch of ACAS
       - name: Set ACAS_REF to the current branch ${{ github.ref }}
         run: |
-          echo "ACAS_REF=${{ github.ref }}" >> $GITHUB_ENV
+          echo "ACAS_REF=$(echo ${{ github.ref }} | sed 's/refs\/heads\///g')" >> $GITHUB_ENV
         if: github.event_name == 'push'
       # If a PR, run tests on ACAS branch matching destination of PR
       - name: Set ACAS_REF to the PR destination branch ${{ github.base_ref }}

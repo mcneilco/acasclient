@@ -2845,7 +2845,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Current state is 4 lots (3 on CMPD-0000002 and 1 on CMPD-0000001 (which is now re-created))
         self.assertEqual(restricted_lot_corp_name, "CMPD-0000002-003")
 
-        # Deny Rule: Must be cmp1dreg admin
+        # Deny Rule: Must be cmpdreg admin
         self.assertFalse(can_reparent_lot(self, cmpdreg_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         self.assertFalse(can_reparent_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))
         self.assertFalse(can_reparent_lot(self, acas_user, restricted_lot_corp_name, "CMPD-0000001", dry_run = False))

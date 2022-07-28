@@ -2767,11 +2767,7 @@ class TestCmpdReg(BaseAcasClientTest):
     @requires_absent_basic_cmpd_reg_load
     @requires_basic_experiment_load
     def test_005_reparent_lot(self, experiment):
-
-        # Create a restricted project 
-        project = self.create_basic_project_with_roles()
-
-
+        # Function with test to verify reparent lot functionality
         def can_reparent_lot(self, user_client, lot_corp_name, adopting_parent_corp_name, dry_run):
             try:
                 original_meta_lot = self.client.get_meta_lot(lot_corp_name)
@@ -2813,6 +2809,9 @@ class TestCmpdReg(BaseAcasClientTest):
             
             return True
 
+        # Create a restricted project 
+        project = self.create_basic_project_with_roles()
+        
         # Create a bunch of users with various roles and project access
         cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
         cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])

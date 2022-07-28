@@ -1852,7 +1852,7 @@ class client():
             dry_run (bool): Whether to perform a dry run, default True
 
         Returns:
-            A dict with. For example
+            A dict with information about expected changes
             {
                 "dependencies": {
                     "linkedDataExists": true,

@@ -2317,7 +2317,7 @@ class TestAcasclient(BaseAcasClientTest):
             # to complete. On my machine it takes 30 seconds.
             # This is a performance check to make sure the
             # bulk load hasn't slowed significantly.
-            with Timeout(seconds=60):
+            with Timeout(seconds=90):
                 response = self.basic_cmpd_reg_load(file = file)
         except TimeoutError:
             self.fail("Timeout error")

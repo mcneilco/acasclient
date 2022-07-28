@@ -1858,3 +1858,56 @@ class client():
         resp = self.session.post(f'{self.url}/cmpdreg/swapParentStructures/', json=data)
         resp.raise_for_status()
         return not resp.json()["hasError"]
+        
+    def reparent_lot(self, lot_corp_name, new_parent_corp_name, dry_run=True):
+        """Reparent a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to reparent
+            new_parent_corp_name (str): Corp name of new parent
+            dry_run (bool): Whether to perform a dry run, default True
+
+        Returns:
+            A dict with information about expected changes
+            {
+                "dependencies": {
+                    "linkedDataExists": true,
+                    ...other dependency data...
+                },
+                "modifiedBy": "bob",
+                "newLot": {
+                    "corpName": "CMPD-0000003-002",
+                    ...other lot info...
+                    "saltForm": {
+                        ...salt form info...
+                        "parent": {
+                            "corpName": "CMPD-0000003",
+                            ...other parent info...
+                    },
+                },
+                "originalLotCorpName": "CMPD-0000001-001",
+                "originalParentCorpName": "CMPD-0000001"
+                "originalParentDeleted": true
+            }
+
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
+        """
+        data = {
+            'lotCorpName': lot_corp_name,
+            'parentCorpName': new_parent_corp_name
+        }
+
+        # Set dry run url param
+        params = {'dryRun': str(dry_run).lower()}
+
+        resp = self.session.post("{}/api/cmpdRegAdmin/lotServices/reparent/lot"
+                                .format(self.url),
+                                 params=params,
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(data))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()

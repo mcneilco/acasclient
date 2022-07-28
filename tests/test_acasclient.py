@@ -2761,12 +2761,61 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
         self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+    @requires_node_api
+    @requires_absent_basic_cmpd_reg_load
+    def test_005_swap_parent_structures(self):
+        """
+        Check `swap_parent_structures` can swap structures in case of parents with no duplicates or
+        parents who are duplicates of each other.
+        """
+
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_005_swap_parent_structures.sdf')
+        self.basic_cmpd_reg_load(file=file)
+
+        # CMPD-0000001 (structure: A, stereo category: Single stereoisomer)
+        # CMPD-0000002 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer)
+        # CMPD-0000003 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer - arbitrary assign)
+        # CMPD-0000004 (structure: B, stereo category: Single stereoisomer)
+        # CMPD-0000005 (structure: C, stereo category: Unknown, stereo comment: foo)
+        # CMPD-0000006 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
+        # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: bar)
+
+        try:
+            # Swapping 1 and 3 will introduce duplicacy between 1 and 2.
+            with self.assertRaises(requests.exceptions.HTTPError):
+                self.client.swap_parent_structures(
+                    corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+
+            # Swapping 1 and 2 will not introduce any duplicates.
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            # Restore the original structures
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+
+            # Swapping 1 and 4 will not introduce any duplicates.
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            # Restore the original structures
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+
+            # Swapping 5 and 6 will not introduce any duplicates.
+            assert self.client.swap_parent_structures(
+                corp_name1='CMPD-0000005', corp_name2='CMPD-0000006')
+        finally:
+            # Prevent interaction with other tests.
+            self.delete_all_cmpd_reg_bulk_load_files()
+
+
         
 
     @requires_node_api
     @requires_absent_basic_cmpd_reg_load
     @requires_basic_experiment_load
-    def test_005_reparent_lot(self, experiment):
+    def test_006_reparent_lot(self, experiment):
         # Function with test to verify reparent lot functionality
         def can_reparent_lot(self, user_client, lot_corp_name, adopting_parent_corp_name, dry_run):
             try:
@@ -3215,3 +3264,50 @@ class TestExperimentLoader(BaseAcasClientTest):
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
 
+    @requires_basic_cmpd_reg_load
+    def test_012_escaped_quotes_xls(self):
+        """Test experiment loader with escaped quotes in xls file"""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'escaped_quotes.xls')
+        self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, False)
+        # Check the loaded experiment
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+        # Find the clobValue
+        clob_value = None
+        for analysis_group in experiment["analysisGroups"]:
+            for state in analysis_group["lsStates"]:
+                for value in state["lsValues"]:
+                    if value["lsKind"] == "Test JSON":
+                        clob_value = value["clobValue"]
+        # Ensure the clob value can be parsed as JSON
+        self.assertIsNotNone(clob_value)
+        parsed_json = json.loads(clob_value)
+        self.assertIsNotNone(parsed_json)
+    
+    @requires_basic_cmpd_reg_load
+    def test_012_escaped_quotes_csv(self):
+        """Test experiment loader with escaped quotes in csv file"""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'escaped_quotes.csv')
+        self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, False)
+        # Check the loaded experiment
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+        # Find the clobValue
+        clob_value = None
+        for analysis_group in experiment["analysisGroups"]:
+            for state in analysis_group["lsStates"]:
+                for value in state["lsValues"]:
+                    if value["lsKind"] == "Test JSON":
+                        clob_value = value["clobValue"]
+        # Ensure the clob value can be parsed as JSON
+        self.assertIsNotNone(clob_value)
+        parsed_json = json.loads(clob_value)
+        self.assertIsNotNone(parsed_json)

@@ -2,7 +2,7 @@ name: Launch ACAS and run python tests
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "release/*"]
   pull_request:
     types: [opened, synchronize]
 jobs:
@@ -23,15 +23,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ./acasclient
-      - name: Set ACAS_TAG to latest release
+      # The following steps are all to figure out the right ACAS_REF (git ref) and ACAS_TAG (docker tag) of ACAS to use
+      # If main or release branch, run tests on matching release branch of ACAS
+      - name: Set ACAS_REF to the current branch ${{ github.ref }}
         run: |
-          echo "ACAS_TAG=$(curl -s https://api.github.com/repos/mcneilco/acas/releases/latest | jq -r '.tag_name')" >> $GITHUB_ENV
+          echo "ACAS_REF=$(echo ${{ github.ref }} | sed 's/refs\/heads\///g')" >> $GITHUB_ENV
+        if: github.event_name == 'push'
+      # If a PR, run tests on ACAS branch matching destination of PR
+      - name: Set ACAS_REF to the PR destination branch ${{ github.base_ref }}
+        run: |
+          echo "ACAS_REF=${{ github.base_ref }}" >> $GITHUB_ENV
+        if: github.event_name == 'pull_request'
+      - name: Set ACAS_TAG to the docker escaped version of ${{ env.ACAS_REF }}
+        run: |
+          echo "ACAS_TAG=$(echo ${{ env.ACAS_REF }} | sed 's/\//-/g')" >> $GITHUB_ENV
       - name: Checkout ACAS
         uses: actions/checkout@v3
         with:
           repository: mcneilco/acas
           path: acas
-          ref: ${{ env.ACAS_TAG }}
+          ref: ${{ env.ACAS_REF }}
       - name: Run docker-compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
         id: dockerComposeUp
         working-directory: acas

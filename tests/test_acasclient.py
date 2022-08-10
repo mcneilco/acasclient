@@ -768,6 +768,14 @@ class TestAcasclient(BaseAcasClientTest):
         client = acasclient.client(creds)
         client.close()
 
+        # Verify bad creds 401 response
+        bad_creds = acasclient.get_default_credentials()
+        bad_creds['password'] = 'badpassword'
+        with self.assertRaises(RuntimeError) as context:
+            acasclient.client(bad_creds)
+        self.assertIn('Failed to login. Please check credentials.', str(context.exception))
+
+
     def test_003_projects(self):
         """Test projects."""
         projects = self.client.projects()

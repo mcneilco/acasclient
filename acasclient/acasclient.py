@@ -1667,23 +1667,63 @@ class client():
         resp = self.session.delete("{}/api/cmpdRegAdmin/stereoCategories/{}".format(self.url, id))
         resp.raise_for_status()
         return True
+
+    def search_salts(self, query):
+        """
+        Query salts
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/salts/search/{}".format(self.url,query))
+        resp.raise_for_status()
+        return resp.json()
     
     def get_salts(self):
         """
         Get all salts
         """
-        resp = self.session.get("{}/cmpdreg/salts".format(self.url))
+        resp = self.session.get("{}/api/cmpdRegAdmin/salts".format(self.url))
         resp.raise_for_status()
         return resp.json()
     
-    def create_salt(self, abbrev, name, mol_structure):
+    def get_salts_sdf(self):
+        """
+        Get all salts in SDF Format
+        """
+        resp = self.session.get("{}/api/cmpdRegAdmin/salts/sdf".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+
+    def create_salt(self, dryrun, abbrev, name, mol_structure):
         """
         Create a new salt
         """
-        resp = self.session.post("{}/cmpdreg/salts".format(self.url), json={'abbrev': abbrev, 'name': name, 'molStructure': mol_structure})
+        resp = self.session.post("{}/api/cmpdRegAdmin/salts?dryrun={}".format(self.url, dryrun),  json={"abbrev": abbrev, "name": name, "molStructure": mol_structure})
         resp.raise_for_status()
         return resp.json()
-    
+
+    def delete_salt(self,id):
+        """
+        Deletes a Salt 
+        """
+        resp = self.session.delete("{}/api/cmpdRegAdmin/salts/{}".format(self.url, id))
+        resp.raise_for_status()
+        return resp.json()
+
+    def edit_salt(self, id, dryrun, abbrev, name, mol_structure):
+        """
+        Edit a salt
+        """
+        resp = self.session.put("{}/api/cmpdRegAdmin/salts/edit/{}?dryrun={}".format(self.url, id, dryrun), json={"abbrev": abbrev, "name": name, "molStructure": mol_structure})
+        resp.raise_for_status()
+        return resp.json()
+
+    def render_salt(self, mol_structure, height, width, format):
+        """
+        Renders a png image of a salt based on the molecular structure provided 
+        """
+        resp = self.session.post("{}/api/chemStructure/renderMolStructureBase64".format(self.url),  json={"molStructure": mol_structure, "height": height, "width": width, "format" : format})
+        resp.raise_for_status()
+        return resp.json()
+
     def get_physical_states(self):
         """
         Get all physical states

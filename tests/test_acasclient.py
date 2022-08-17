@@ -2,8 +2,11 @@
 
 """Tests for `acasclient` package."""
 
+from ast import Assert
 from functools import wraps
 import unittest
+
+from attr import set_run_validators
 from acasclient import acasclient
 from pathlib import Path
 import tempfile
@@ -1940,7 +1943,7 @@ class TestAcasclient(BaseAcasClientTest):
         salts = self.client.get_salts()
         # Create Salt Abbrev
         if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            salt = self.client.create_salt("false", abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
             self.assertIsNotNone(salt.get('id'))
         
         # Setup SDF registration with a file containing wrong-case lookups for above values
@@ -2210,7 +2213,7 @@ class TestAcasclient(BaseAcasClientTest):
         salts = self.client.get_salts()
         # Create Salt Abbrev
         if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            salt = self.client.create_salt("false",abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
             self.assertIsNotNone(salt.get('id'))
 
         response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",
@@ -2343,6 +2346,188 @@ class TestAcasclient(BaseAcasClientTest):
                                             "project",
                                             code, None)
         self.assertIn(True, [ls_thing['deleted']])
+
+    def registerTestSalt(self):
+        dryrun = "false"
+        abbrev = "BzCOOH"
+        name = "Benzoic Acid"
+        mol_structure = "\n  Ketcher 08172213212D 1   1.00000     0.00000     0\n\n  9  9  0     1  0            999 V2000\n    5.7250   -4.9750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5910   -5.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5910   -6.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7250   -6.9750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8590   -6.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8590   -5.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.4570   -4.9750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.3231   -5.4750    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.4570   -3.9750    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\nM  END\n"
+        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+
+    def removeAllSalts(self):
+        salts = self.client.get_salts()
+        for salt in salts:
+            self.client.delete_salt(salt["id"])
+
+    def test_51_get_all_salts(self):
+        self.registerTestSalt()
+        salts = self.client.get_salts()
+        self.assertNotEqual([], salts)
+        self.removeAllSalts()
+
+    def test_52_get_all_salts_no_data(self):
+        self.removeAllSalts()
+        salts = self.client.get_salts()
+        self.assertEqual([], salts)
+        
+    def test_53_get_all_salts_sdf(self):
+        self.registerTestSalt()
+        salts_sdf = self.client.get_salts_sdf()
+        self.assertNotEqual([], salts_sdf)
+        self.removeAllSalts()
+
+    def test_54_create_salt_dryrun(self):
+        dryrun = "true"
+        abbrev = "I"
+        name = "Iodine"
+        mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
+        valid_salt = self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        self.assertIn("Iodine", valid_salt['name'])
+
+    def test_55_create_salt_register(self):
+        dryrun = "false"
+        abbrev = "I"
+        name = "Iodine"
+        mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
+        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        search_query = self.client.search_salts("Iodine")
+        self.assertIn("Iodine", search_query[0]["name"])
+        delete_response = self.client.delete_salt(search_query[0]["id"])
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+
+    def test_56_search_empty(self):
+        search_results = self.client.search_salts("ABCDEFGHIJKL")
+        self.assertEquals([], search_results)
+
+    def test_57_valid_query(self):
+        self.registerTestSalt()
+        search_results = self.client.search_salts("BzCOOH")
+        self.assertIn("Benzoic Acid", search_results[0]["name"])
+        self.removeAllSalts()
+
+    def test_58_all_salts_query(self):
+        self.registerTestSalt()
+        search_query = "*"
+        search_response = self.client.search_salts(search_query)
+        self.assertEqual(1, len(search_response))
+        self.removeAllSalts()
+
+    def test_59_delete_salt_valid(self):
+        try: # Registration Already Tested So Not Concerned About This Try Except
+            self.registerTestSalt()
+        except:
+            pass
+        search_result = self.client.search_salts("Benzoic Acid")
+        self.assertIn("BzCOOH", search_result[0]["abbrev"])
+        id = search_result[0]["id"]
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+
+    def test_60_edit_valid_id_dryrun_valid_salt(self):
+        self.registerTestSalt() 
+        search_result = self.client.search_salts("Benzoic Acid")
+        id = search_result[0]["id"]
+        updated_struct = "\n  Ketcher 08172213572D 1   1.00000     0.00000     0\n\n 11 11  0     1  0            999 V2000\n    5.2250   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2250   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -5.1500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -3.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6891   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\n  8 10  1  0     0  0\n 10 11  1  0     0  0\nM  END\n"
+        updated_name = "Ethyl benzoate"
+        updated_abbrev = "BzCOOCH2CH3"
+        dryrun = "true"
+        edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, updated_struct)
+        self.assertIn("The abbreviation of this salt will be changed.", edit_response[0]["message"])
+        self.assertIn("The name of this salt will be changed.", edit_response[1]["message"])
+        self.assertIn("The weight of this salt will be changed.", edit_response[2]["message"])
+        search_result = self.client.search_salts("Benzoic Acid")
+        self.assertIn("BzCOOH", search_result[0]["abbrev"])
+        id = search_result[0]["id"]
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+
+    def test_61_edit_valid_id_update_valid_salt(self):
+        self.registerTestSalt() 
+        search_result = self.client.search_salts("Benzoic Acid")
+        id = search_result[0]["id"]
+        updated_struct = "\n  Ketcher 08172213572D 1   1.00000     0.00000     0\n\n 11 11  0     1  0            999 V2000\n    5.2250   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2250   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -5.1500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -3.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6891   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\n  8 10  1  0     0  0\n 10 11  1  0     0  0\nM  END\n"
+        updated_name = "Ethyl benzoate"
+        updated_abbrev = "BzCOOCH2CH3"
+        dryrun = "false"
+        edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, updated_struct)
+        self.assertIn("The abbreviation of this salt will be changed.", edit_response[0]["message"])
+        self.assertIn("The name of this salt will be changed.", edit_response[1]["message"])
+        self.assertIn("The weight of this salt will be changed.", edit_response[2]["message"])
+        search_result = self.client.search_salts("Ethyl benzoate")
+        self.assertIn("BzCOOCH2CH3", search_result[0]["abbrev"])
+        id = search_result[0]["id"]
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+
+    def test_62_edit_salt_check_salt_same_name_or_abbrev(self):
+        # Register Benzoic Acid 
+        self.registerTestSalt() 
+        # Register Iodine 
+        dryrun = "false"
+        abbrev = "I"
+        name = "Iodine"
+        mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
+        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        # Try to Change Benzoic Acid Abbreviation and Name to Iodine's Abbreviation and Name 
+        search_result = self.client.search_salts("Benzoic Acid")
+        id = search_result[0]["id"]
+        updated_struct = "\n  Ketcher 08172213572D 1   1.00000     0.00000     0\n\n 11 11  0     1  0            999 V2000\n    5.2250   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2250   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -5.1500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -3.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6891   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\n  8 10  1  0     0  0\n 10 11  1  0     0  0\nM  END\n"
+        updated_name = "Iodine"
+        updated_abbrev = "I"
+        dryrun = "true"
+        edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, updated_struct)
+        self.assertIn("Duplicate salt name. Another salt exist with the same name.", edit_response)
+        self.assertIn("Duplicate salt abbreviation. Another salt exist with the same abbreviation.", edit_response) 
+        # Remove The Salts Registered For This Test 
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+        search_result = self.client.search_salts("Iodine")
+        id = search_result[0]["id"]
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+
+    def test_63_edit_salt_check_existing_salt_same_formula(self):
+        # Register Benzoic Acid 
+        self.registerTestSalt() 
+        # Register Iodine 
+        dryrun = "false"
+        abbrev = "I"
+        name = "Iodine"
+        mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
+        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        # Try to Change Benzoic Acids Structure to Iodine's Formula
+        search_result = self.client.search_salts("Benzoic Acid")
+        id = search_result[0]["id"]
+        updated_struct = "\n  Ketcher 08172213572D 1   1.00000     0.00000     0\n\n 11 11  0     1  0            999 V2000\n    5.2250   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2250   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -5.1500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -3.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6891   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\n  8 10  1  0     0  0\n 10 11  1  0     0  0\nM  END\n"
+        updated_name = "Benzoic Acid"
+        updated_abbrev = "BzCOOH"
+        dryrun = "true"
+        edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, mol_structure)
+        self.assertIn("Duplicate salt formula. Another salt exist with the same formula.", edit_response)
+        # Remove The Salts Registered For This Test 
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+        search_result = self.client.search_salts("Iodine")
+        id = search_result[0]["id"]
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
+
+    def test_64_edit_salt_check_update_lot_molecular_weight(self):
+        self.registerTestSalt() 
+        search_result = self.client.search_salts("Benzoic Acid")
+        original_weight = search_result[0]["molWeight"]
+        id = search_result[0]["id"]
+        updated_struct = "\n  Ketcher 08172213572D 1   1.00000     0.00000     0\n\n 11 11  0     1  0            999 V2000\n    5.2250   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2250   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -5.1500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -3.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6891   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\n  8 10  1  0     0  0\n 10 11  1  0     0  0\nM  END\n"
+        updated_name = "Ethyl benzoate"
+        updated_abbrev = "BzCOOCH2CH3"
+        dryrun = "false"
+        edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, updated_struct)
+        search_result = self.client.search_salts("Ethyl benzoate")
+        self.assertIn("BzCOOCH2CH3", search_result[0]["abbrev"])
+        id = search_result[0]["id"]
+        self.assertNotEqual(original_weight, search_result[0]["molWeight"])
+        delete_response = self.client.delete_salt(id)
+        self.assertIn("There were no lot dependencies found for this salt.", delete_response)
 
 
 def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None, file_name = None):

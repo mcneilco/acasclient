@@ -400,10 +400,10 @@ class BaseAcasClientTest(unittest.TestCase):
             self.client.close()
 
     @requires_node_api
-    def create_and_connect_backdoor_user(self, username = None, password = None, **kwargs):
+    def create_and_connect_backdoor_user(self, username = None, password = None, prefix = "acas-user-", **kwargs):
         """ Creates a backdoor user and connects them to the ACAS node API """
         if username is None:
-            username = "acas-user-"+str(uuid.uuid4())
+            username = prefix+str(uuid.uuid4())
         if password is None:
             password = str(uuid.uuid4())
         create_backdoor_user(username = username, password = password, **kwargs)
@@ -2701,12 +2701,12 @@ class TestCmpdReg(BaseAcasClientTest):
         project = self.create_basic_project_with_roles()
 
         # Create a bunch of users with various roles and project access
-        cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-        cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
-        acas_user = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
-        acas_user_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
-        acas_admin = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
-        cmpdreg_admin = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
+        cmpdreg_user = self.create_and_connect_backdoor_user(prefix="cmpdreg-user-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(prefix="cmpdreg-user-acls-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_user = self.create_and_connect_backdoor_user(prefix="acas-user-", acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
+        acas_user_restricted_project_acls = self.create_and_connect_backdoor_user(prefix="acas-user-acls-", acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_admin = self.create_and_connect_backdoor_user(prefix="acas-admin-", acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
+        cmpdreg_admin = self.create_and_connect_backdoor_user(prefix="cmpdreg-admin-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
 
         def can_delete_lot(self, user_client, lot_corp_name, set_owner_first=True):
             if set_owner_first:

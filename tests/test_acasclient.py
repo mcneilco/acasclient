@@ -2725,7 +2725,7 @@ class TestCmpdReg(BaseAcasClientTest):
             experiment = self.client.get_experiment_by_code(experiment_code_name, full = True)
             # when experiment is deleted, the analysis groups for the lot are deleted
             for analysis_group in experiment["analysisGroups"]:
-                if analysis_group["deleted"] == True:
+                if analysis_group["deleted"] == True or analysis_group["ignored"] == True:
                     continue
                 for state in analysis_group["lsStates"]:
                     for value in state["lsValues"]:

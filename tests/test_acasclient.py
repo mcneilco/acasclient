@@ -2779,7 +2779,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Get the experiment and verify the lot is deleted
         self.assertFalse(check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
 
-        # TODO: The following tests depent on a non default configuration: client.cmpdreg.metaLot.disableDeleteMyLots = false so we can't test this by default. We should turn this back on when we have a testing system which can change the configurations of acas.
+        # TODO: The following tests are dependent on a non default configuration: client.cmpdreg.metaLot.disableDeleteMyLots = false so we can't test this by default. We should turn this back on when we have a testing system which can change the configurations of acas.
         # # Global compound, with experiment in Global project
         # ## Deny Rule: Not an acas user so can't delete because dependent experiment exists
         # self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))

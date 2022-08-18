@@ -2705,6 +2705,8 @@ class TestCmpdReg(BaseAcasClientTest):
         cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
         acas_user = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
         acas_user_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_admin = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
+        cmpdreg_admin = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
 
         def can_delete_lot(self, user_client, lot_corp_name, set_owner_first=True):
             if set_owner_first:
@@ -2719,56 +2721,115 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertTrue(response['success'])
             return True
 
-        # Global compound, with experiment in Global project
-        ## Deny Rule: Not an acas user so can't delete because dependent experiment exists
-        self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
+        def check_lot_exists_in_experiment(self, lot_corp_name, experiment_code_name):
+            experiment = self.client.get_experiment_by_code(experiment_code_name, full = True)
+            # when experiment is deleted, the analysis groups for the lot are deleted
+            for analysis_group in experiment["analysisGroups"]:
+                if analysis_group["deleted"] == True:
+                    continue
+                for state in analysis_group["lsStates"]:
+                    for value in state["lsValues"]:
+                        if value["lsKind"] == "batch code" and value["codeValue"] == lot_corp_name:
+                            return True
+            return False
 
-        ## Allow Rule: An acas user with access to delete global experiment and global compound
-        self.assertTrue(can_delete_lot(self, acas_user, "CMPD-0000001-001", set_owner_first=True))
+        # Deny Rule: Not an ACAS user and there is assay data for the lot
+        self.assertFalse(can_delete_lot(self, cmpdreg_admin, "CMPD-0000001-001", set_owner_first=True))
+
+        # Delete the assay data on the lot
+        response = self.client.delete_experiment(experiment["codeName"])
+
+        ## Deny Rule: Not a Creg admin and disableDeleteMyLots=true by default
+        self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, acas_user, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, acas_user_restricted_project_acls, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, acas_admin, "CMPD-0000001-001", set_owner_first=True))
+
+        # Allow Rule: Creg admin and no assay data on the lot
+        self.assertTrue(can_delete_lot(self, cmpdreg_admin, "CMPD-0000001-001", set_owner_first=False))
+
+        # Verify lot is actually deleted
         meta_lot = self.client.get_meta_lot("CMPD-0000001-001")
         self.assertIsNone(meta_lot)
 
-        # Create a restricted lot by project
+        # Create a restricted lot
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
 
-        # Deny Rule: No access to lot project
-        self.assertFalse(can_delete_lot(self, cmpdreg_user, restricted_lot_corp_name, set_owner_first=True))
-
-        # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
-        self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
-
-        # Deny Rule: No access to lot project
-        self.assertFalse(can_delete_lot(self, acas_user, restricted_lot_corp_name, set_owner_first=False))
-
-        # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
-        self.assertFalse(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
-
-        # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
-        self.assertTrue(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
-
-        # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
-        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
-        self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
-
-        # Load an experiment to the newly created restricted project using the global project lots
+        # Load an experiment to the newly created restricted project using the restricted lot
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
         file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
-        restricted_experiment_code_name = response['results']['experimentCode']
+        self.assertTrue(check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
+                        
+        # Deny rule: Creg admin is not an acas user
+        self.assertFalse(can_delete_lot(self, cmpdreg_admin, restricted_lot_corp_name, set_owner_first=True))
+ 
+        # Deny rule: ACAS admin is not a creg admin
+        self.assertFalse(can_delete_lot(self, acas_admin, restricted_lot_corp_name, set_owner_first=True))
 
-        # Update the lot and make the cmpdreg_user_with_restricted_project_acls the chemist of the lot
+        # Deny rule: CregAdmin/ACASAdmin can delete the lot and assay data
+        self.assertTrue(can_delete_lot(self, self.client, restricted_lot_corp_name, set_owner_first=True))
+
+        # Verify lot is actually deleted
         meta_lot = self.client.get_meta_lot(restricted_lot_corp_name)
-        meta_lot["lot"]["chemist"] = cmpdreg_user_with_restricted_project_acls.username
+        self.assertIsNone(meta_lot)
 
-        # Deny Rule: Not an acas user so can't delete because dependent experiment exists
-        self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+        # Get the experiment and verify the lot is deleted
+        self.assertFalse(check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
 
-        # Delete the experiment (mimic asking acas_user_restricted_project_acls to delete the experiment)
-        response = acas_user_restricted_project_acls.delete_experiment(restricted_experiment_code_name)
+        # TODO: The following tests depent on a non default configuration: client.cmpdreg.metaLot.disableDeleteMyLots = false so we can't test this by default. We should turn this back on when we have a testing system which can change the configurations of acas.
+        # # Global compound, with experiment in Global project
+        # ## Deny Rule: Not an acas user so can't delete because dependent experiment exists
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
 
-        # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
-        self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+        # ## Allow Rule: An acas user with access to delete global experiment and global compound
+        # self.assertTrue(can_delete_lot(self, acas_user, "CMPD-0000001-001", set_owner_first=True))
+        # meta_lot = self.client.get_meta_lot("CMPD-0000001-001")
+        # self.assertIsNone(meta_lot)
+
+        # # Create a restricted lot by project
+        # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+
+        # # Deny Rule: No access to lot project
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
+
+        # # Deny Rule: No access to lot project
+        # self.assertFalse(can_delete_lot(self, acas_user, restricted_lot_corp_name, set_owner_first=False))
+
+        # # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
+        # self.assertFalse(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
+
+        # # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
+        # self.assertTrue(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
+        # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+        # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Load an experiment to the newly created restricted project using the global project lots
+        # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+        # file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
+        # response = self.client.\
+        #     experiment_loader(file_to_upload, "bob", False)
+        # restricted_experiment_code_name = response['results']['experimentCode']
+
+        # # Update the lot and make the cmpdreg_user_with_restricted_project_acls the chemist of the lot
+        # meta_lot = self.client.get_meta_lot(restricted_lot_corp_name)
+        # meta_lot["lot"]["chemist"] = cmpdreg_user_with_restricted_project_acls.username
+
+        # # Deny Rule: Not an acas user so can't delete because dependent experiment exists
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Delete the experiment (mimic asking acas_user_restricted_project_acls to delete the experiment)
+        # response = acas_user_restricted_project_acls.delete_experiment(restricted_experiment_code_name)
+
+        # # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
+        # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
     @requires_node_api
     @requires_absent_basic_cmpd_reg_load

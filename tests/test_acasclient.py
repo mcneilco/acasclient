@@ -2460,6 +2460,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn("There were no lot dependencies found for this salt.", delete_response)
 
     def test_62_edit_salt_check_salt_same_name_or_abbrev(self):
+        self.removeAllSalts()
         # Register Benzoic Acid 
         self.registerTestSalt() 
         # Register Iodine 
@@ -2471,13 +2472,14 @@ class TestAcasclient(BaseAcasClientTest):
         # Try to Change Benzoic Acid Abbreviation and Name to Iodine's Abbreviation and Name 
         search_result = self.client.search_salts("Benzoic Acid")
         id = search_result[0]["id"]
-        updated_struct = "\n  Ketcher 08172213572D 1   1.00000     0.00000     0\n\n 11 11  0     1  0            999 V2000\n    5.2250   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.0910   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.2250   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.3590   -5.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -4.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -5.1500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    6.9570   -3.6500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.8231   -6.1500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.6891   -6.6500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\n  8 10  1  0     0  0\n 10 11  1  0     0  0\nM  END\n"
+        updated_struct = search_result[0]["molStructure"]
+        self.assertIn("INDIGO", updated_struct)
         updated_name = "Iodine"
         updated_abbrev = "I"
         dryrun = "true"
         edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, updated_struct)
-        self.assertIn("Duplicate salt name. Another salt exist with the same name.", edit_response)
-        self.assertIn("Duplicate salt abbreviation. Another salt exist with the same abbreviation.", edit_response) 
+        self.assertIn("Duplicate salt name. Another salt exist with the same name.", edit_response[3]["message"])
+        self.assertIn("Duplicate salt abbreviation. Another salt exist with the same abbreviation.", edit_response[4]["message"]) 
         # Remove The Salts Registered For This Test 
         delete_response = self.client.delete_salt(id)
         self.assertIn("There were no lot dependencies found for this salt.", delete_response)
@@ -2487,6 +2489,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn("There were no lot dependencies found for this salt.", delete_response)
 
     def test_63_edit_salt_check_existing_salt_same_formula(self):
+        self.removeAllSalts()
         # Register Benzoic Acid 
         self.registerTestSalt() 
         # Register Iodine 
@@ -2503,7 +2506,7 @@ class TestAcasclient(BaseAcasClientTest):
         updated_abbrev = "BzCOOH"
         dryrun = "true"
         edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, mol_structure)
-        self.assertIn("Duplicate salt formula. Another salt exist with the same formula.", edit_response)
+        self.assertIn("Duplicate salt formula. Another salt exist with the same formula.", edit_response[4]["message"])
         # Remove The Salts Registered For This Test 
         delete_response = self.client.delete_salt(id)
         self.assertIn("There were no lot dependencies found for this salt.", delete_response)

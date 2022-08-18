@@ -2769,7 +2769,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Deny rule: ACAS admin is not a creg admin
         self.assertFalse(can_delete_lot(self, acas_admin, restricted_lot_corp_name, set_owner_first=True))
 
-        # Deny rule: CregAdmin/ACASAdmin can delete the lot and assay data
+        # Allow rule: CregAdmin/ACASAdmin can delete the lot and assay data
         self.assertTrue(can_delete_lot(self, self.client, restricted_lot_corp_name, set_owner_first=True))
 
         # Verify lot is actually deleted

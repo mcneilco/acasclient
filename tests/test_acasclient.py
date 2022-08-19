@@ -3193,7 +3193,7 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "error",
-                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'f'"
+                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'g'"
             },
             {
                 "errorLevel": "warning",
@@ -3210,6 +3210,10 @@ class TestExperimentLoader(BaseAcasClientTest):
             {
                 "errorLevel": "warning",
                 "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following numeric parameters were not found for curve id 'f': Max. Please provide numeric values for these parameters so that curves are drawn properly."
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])

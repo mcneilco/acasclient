@@ -3015,7 +3015,7 @@ class TestExperimentLoader(BaseAcasClientTest):
                     # If count is present and not -1, then we expect the number of results to be equal to the count
                     self.assertEqual(len(expected_result), expected_message['count'])
                 else:
-                    # If coount is -1, then we don't care about the number of results, just as long as it has the message
+                    # If count is -1, then we don't care about the number of results, just as long as it has the message
                     self.assertGreaterThan(len(expected_result), 0)
             else:
                 # Should return 1 and only 1 match
@@ -3169,31 +3169,31 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '9629'.  Please provide values for these parameters so that curves are drawn properly: EC50"
+                "message": "The following numeric parameters were not found for curve id '9629': EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8836'.  Please provide values for these parameters so that curves are drawn properly: Min"
+                "message": "The following numeric parameters were not found for curve id '8836': Min. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8806'.  Please provide values for these parameters so that curves are drawn properly: Max"
+                "message": "The following numeric parameters were not found for curve id '8806': Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8788'.  Please provide values for these parameters so that curves are drawn properly: Slope"
+                "message": "The following numeric parameters were not found for curve id '8788': Slope. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126933'.  Please provide values for these parameters so that curves are drawn properly: Slope, Max"
+                "message": "The following numeric parameters were not found for curve id '126933': Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126915'.  Please provide values for these parameters so that curves are drawn properly: Slope, Min, Max, EC50"
+                "message": "The following numeric parameters were not found for curve id '126915': Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "error",
-                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'f'"
+                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'g'"
             },
             {
                 "errorLevel": "warning",
@@ -3210,9 +3210,22 @@ class TestExperimentLoader(BaseAcasClientTest):
             {
                 "errorLevel": "warning",
                 "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following numeric parameters were not found for curve id 'f': Max. Please provide numeric values for these parameters so that curves are drawn properly."
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])
+
+        # Specific tests for when a user uploads a file without any flags in the raw data section
+        # See details here: https://github.com/mcneilco/acas/pull/989
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R-validation-no-flags.csv')
+
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assertFalse(response['hasError'])
+
 
     @requires_basic_cmpd_reg_load
     def test_011_dose_response_experiment_loader(self):

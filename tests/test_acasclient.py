@@ -3015,7 +3015,7 @@ class TestExperimentLoader(BaseAcasClientTest):
                     # If count is present and not -1, then we expect the number of results to be equal to the count
                     self.assertEqual(len(expected_result), expected_message['count'])
                 else:
-                    # If coount is -1, then we don't care about the number of results, just as long as it has the message
+                    # If count is -1, then we don't care about the number of results, just as long as it has the message
                     self.assertGreaterThan(len(expected_result), 0)
             else:
                 # Should return 1 and only 1 match
@@ -3213,6 +3213,15 @@ class TestExperimentLoader(BaseAcasClientTest):
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])
+
+        # Specific tests for when a user uploads a file without any flags in the raw data section
+        # See details here: https://github.com/mcneilco/acas/pull/989
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R-validation-no-flags.csv')
+
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assertFalse(response['hasError'])
+
 
     @requires_basic_cmpd_reg_load
     def test_011_dose_response_experiment_loader(self):

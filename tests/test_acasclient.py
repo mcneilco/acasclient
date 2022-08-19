@@ -3169,27 +3169,27 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '9629'.  Please provide values for these parameters so that curves are drawn properly: EC50"
+                "message": "The following numeric parameters were not found for curve id '9629': EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8836'.  Please provide values for these parameters so that curves are drawn properly: Min"
+                "message": "The following numeric parameters were not found for curve id '8836': Min. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8806'.  Please provide values for these parameters so that curves are drawn properly: Max"
+                "message": "The following numeric parameters were not found for curve id '8806': Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8788'.  Please provide values for these parameters so that curves are drawn properly: Slope"
+                "message": "The following numeric parameters were not found for curve id '8788': Slope. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126933'.  Please provide values for these parameters so that curves are drawn properly: Slope, Max"
+                "message": "The following numeric parameters were not found for curve id '126933': Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126915'.  Please provide values for these parameters so that curves are drawn properly: Slope, Min, Max, EC50"
+                "message": "The following numeric parameters were not found for curve id '126915': Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "error",

@@ -2642,6 +2642,17 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(meta_lot['lot']['corpName'], restricted_project_lot_corp_name)
         self.assertIsNone(meta_lot["lot"]["modifiedDate"])  # Lot is not modified
 
+        # Create a user that is not a cmpdreg admin and does not have access to the restricted project
+        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+
+        # User should NOT be able save/update the restricted lot
+        with self.assertRaises(requests.HTTPError) as context:
+            response = user_client.\
+                save_meta_lot(meta_lot)
+        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
+        meta_lot = self.client.get_meta_lot(restricted_project_lot_corp_name)
+        self.assertIsNone(meta_lot["lot"]["modifiedDate"])  # Lot is not modified
+
         # Verify our cmpdreg admin user can save the restricted lot
         meta_lot["lot"]["color"] = "red"
         response = self.client.\
@@ -2661,15 +2672,6 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn("lot", response["metalot"])
         self.assertEqual(response["metalot"]["lot"]["project"], project.code_name)
 
-        # Now create a user that is not a cmpdreg admin and does not have access to the restricted project
-        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-              
-        # User should NOT be able save/update the restricted lot
-        with self.assertRaises(requests.HTTPError) as context:
-            response = user_client.\
-                save_meta_lot(meta_lot)
-        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
-        
         # Now create a user which has access to the project
         user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
 

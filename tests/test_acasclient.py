@@ -2640,6 +2640,7 @@ class TestCmpdReg(BaseAcasClientTest):
             get_meta_lot(restricted_project_lot_corp_name)
         self.assertIsNotNone(meta_lot)
         self.assertEqual(meta_lot['lot']['corpName'], restricted_project_lot_corp_name)
+        self.assertIsNone(meta_lot["lot"]["modifiedDate"])  # Lot is not modified
 
         # Verify our cmpdreg admin user can save the restricted lot
         meta_lot["lot"]["color"] = "red"
@@ -2649,6 +2650,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn("metalot", response)
         self.assertIn("lot", response["metalot"])
         self.assertEqual(response["metalot"]["lot"]["color"], "red")
+        self.assertIsNotNone(response["metalot"]["lot"]["modifiedDate"])  # Lot is modified
 
         # Verify our admin user can update the project
         meta_lot["lot"]["project"] = project.code_name

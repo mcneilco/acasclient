@@ -2650,8 +2650,8 @@ class TestCmpdReg(BaseAcasClientTest):
             response = user_client.\
                 save_meta_lot(meta_lot)
         self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
-        meta_lot = self.client.get_meta_lot(restricted_project_lot_corp_name)
-        self.assertIsNone(meta_lot["lot"]["modifiedDate"])  # Lot is not modified
+        _meta_lot = self.client.get_meta_lot(restricted_project_lot_corp_name)
+        self.assertIsNone(_meta_lot["lot"]["modifiedDate"])  # Lot is not modified
 
         # Verify our cmpdreg admin user can save the restricted lot
         meta_lot["lot"]["color"] = "red"

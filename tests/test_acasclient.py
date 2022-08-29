@@ -3448,3 +3448,12 @@ class TestExperimentLoader(BaseAcasClientTest):
         # self.assertIsNotNone(clob_value)
         # parsed_json = json.loads(clob_value)
         # self.assertIsNotNone(parsed_json)
+
+    @requires_basic_cmpd_reg_load
+    def test_012_only_empty_quotes_in_columns(self):
+        """Test experiment loader when reading xlsx files that have an empty columns which is interpreted as "" instead of NA (special character causes ""). See for deails: https://github.com/mcneilco/racas/pull/77"""
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic_empty_column.xlsx')
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assertFalse(response['hasError'])

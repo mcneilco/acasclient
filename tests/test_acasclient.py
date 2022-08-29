@@ -667,13 +667,13 @@ class BaseAcasClientTest(unittest.TestCase):
                     "dbProperty": "Parent Stereo Category",
                     "defaultVal": STEREO_CATEGORY,
                     "required": True,
-                    "sdfProperty": None
+                    "sdfProperty": "Parent Stereo Category"
                 },
                 {
                     "dbProperty": "Parent Stereo Comment",
                     "defaultVal": None,
                     "required": False,
-                    "sdfProperty": "Structure Comment"
+                    "sdfProperty": "Parent Stereo Comment"
                 },
                 {
                     "dbProperty": "Lot Is Virtual",
@@ -2853,27 +2853,37 @@ class TestCmpdReg(BaseAcasClientTest):
 
         try:
             # Swapping 1 and 3 will introduce duplicacy between 1 and 2.
-            with self.assertRaises(requests.exceptions.HTTPError):
-                self.client.swap_parent_structures(
-                    corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+            exp_error_msg = ("Swapping corpName1=CMPD-0000001 & "
+                    "corpName2=CMPD-0000003 creates duplicates.")
+            response = self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+            assert response["hasError"] is True
+            self.assertEqual(response["errorMessage"], exp_error_msg)
 
             # Swapping 1 and 2 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            self.assertFalse(response["hasError"])
+
             # Restore the original structures
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            self.assertFalse(response["hasError"])  # Sanity Check
 
             # Swapping 1 and 4 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            self.assertFalse(response["hasError"])
+
             # Restore the original structures
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            self.assertFalse(response["hasError"])  # Sanity Check
 
             # Swapping 5 and 6 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000005', corp_name2='CMPD-0000006')
+            self.assertFalse(response["hasError"])
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()

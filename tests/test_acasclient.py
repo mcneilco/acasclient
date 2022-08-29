@@ -2883,7 +2883,7 @@ class TestCmpdReg(BaseAcasClientTest):
             _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 2 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
             self.assertFalse(response["hasError"])
 
@@ -2891,7 +2891,7 @@ class TestCmpdReg(BaseAcasClientTest):
             _check_mol_weights('CMPD-0000001-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
             _check_mol_weights('CMPD-0000002-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
             # Restore the original structures
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
             self.assertFalse(response["hasError"])  # Sanity Check
             # Check the molweights and mol formulas have been restored
@@ -2899,7 +2899,7 @@ class TestCmpdReg(BaseAcasClientTest):
             _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 4 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
             self.assertFalse(response["hasError"])
 

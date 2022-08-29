@@ -2851,29 +2851,66 @@ class TestCmpdReg(BaseAcasClientTest):
         # CMPD-0000006 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
         # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: bar)
 
+        def _get_mol_weights_and_formula(lot_corp_name):
+            meta_lot = self.client.get_meta_lot(lot_corp_name)
+            lot = meta_lot["lot"]
+            parent = lot["parent"]
+            return parent["molWeight"], lot["lotMolWeight"], parent["molFormula"]
+
+        def _check_mol_weights(lot_corp_name, expected_parent_mw, expected_lot_mw, expected_mol_formula):
+            parent_mw, lot_mw, mol_formula = _get_mol_weights_and_formula(lot_corp_name)
+            self.assertAlmostEqual(parent_mw, expected_parent_mw, places=3)
+            self.assertEqual(mol_formula, expected_mol_formula)
+            self.assertAlmostEqual(lot_mw, expected_lot_mw, places=3)
+        
+        # Gather original mol weights and mol formulas
+        exp_001_tuple = _get_mol_weights_and_formula('CMPD-0000001-001')
+        exp_002_tuple = _get_mol_weights_and_formula('CMPD-0000002-001')
+        exp_004_tuple = _get_mol_weights_and_formula('CMPD-0000004-001')
+        exp_005_tuple = _get_mol_weights_and_formula('CMPD-0000005-001')
+        exp_006_tuple = _get_mol_weights_and_formula('CMPD-0000006-001')
+
         try:
             # Swapping 1 and 3 will introduce duplicacy between 1 and 2.
             with self.assertRaises(requests.exceptions.HTTPError):
                 self.client.swap_parent_structures(
                     corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+            # Confirm that 1 and 3's lot mol weights and formulae didn't change
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 2 will not introduce any duplicates.
             assert self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            # Check the mol weights and mol formulas have been swapped
+            _check_mol_weights('CMPD-0000001-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
             # Restore the original structures
             assert self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            # Check the molweights and mol formulas have been restored
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 4 will not introduce any duplicates.
             assert self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            # Check the mol weights and mol formulas have been swapped
+            _check_mol_weights('CMPD-0000001-001', exp_004_tuple[0], exp_004_tuple[1], exp_004_tuple[2])
+            _check_mol_weights('CMPD-0000004-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
             # Restore the original structures
             assert self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            # Check the molweights and mol formulas have been restored
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000004-001', exp_004_tuple[0], exp_004_tuple[1], exp_004_tuple[2])
 
             # Swapping 5 and 6 will not introduce any duplicates.
             assert self.client.swap_parent_structures(
                 corp_name1='CMPD-0000005', corp_name2='CMPD-0000006')
+            # Check the mol weights and mol formulas have been swapped
+            _check_mol_weights('CMPD-0000005-001', exp_006_tuple[0], exp_006_tuple[1], exp_006_tuple[2])
+            _check_mol_weights('CMPD-0000006-001', exp_005_tuple[0], exp_005_tuple[1], exp_005_tuple[2])
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()

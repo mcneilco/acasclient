@@ -11,6 +11,8 @@ import re
 import base64
 import hashlib
 from io import StringIO, IOBase
+from typing import Dict
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -1843,7 +1845,7 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def swap_parent_structures(self, corp_name1: str, corp_name2: str) -> bool:
+    def swap_parent_structures(self, corp_name1: str, corp_name2: str) -> Dict[str, str]:
         """Swap parent structures.
 
         Args:
@@ -1851,13 +1853,18 @@ class client():
             corp_name2 (str): Corporate ID of the second parent compound.
 
         Returns:
-            Whether structures were swapped.
+            A dict with "hasError" and "errorMessage" keys. For example
+            {
+                "hasError": True,
+                "errorMessage": "Swapping corpName1=CMPD-1 & corpName2=CMPD-2 creates duplicates."
+            }
         """
 
         data = {'corpName1': corp_name1, 'corpName2': corp_name2}
         resp = self.session.post(f'{self.url}/cmpdreg/swapParentStructures/', json=data)
-        resp.raise_for_status()
-        return not resp.json()["hasError"]
+        if resp.status_code != 500:
+            resp.raise_for_status()
+        return resp.json()
         
     def reparent_lot(self, lot_corp_name, new_parent_corp_name, dry_run=True):
         """Reparent a lot

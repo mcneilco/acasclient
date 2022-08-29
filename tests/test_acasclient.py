@@ -2797,12 +2797,10 @@ class TestCmpdReg(BaseAcasClientTest):
             return parent["molWeight"], lot["lotMolWeight"], parent["molFormula"]
 
         def _check_mol_weights(lot_corp_name, expected_parent_mw, expected_lot_mw, expected_mol_formula):
-            meta_lot = self.client.get_meta_lot(lot_corp_name)
-            lot = meta_lot["lot"]
-            parent = lot["parent"]
-            self.assertAlmostEqual(parent["molWeight"], expected_parent_mw, places=3)
-            self.assertEqual(parent["molFormula"], expected_mol_formula)
-            self.assertAlmostEqual(lot["lotMolWeight"], expected_lot_mw, places=3)
+            parent_mw, lot_mw, mol_formula = _get_mol_weights_and_formula(lot_corp_name)
+            self.assertAlmostEqual(parent_mw, expected_parent_mw, places=3)
+            self.assertEqual(mol_formula, expected_mol_formula)
+            self.assertAlmostEqual(lot_mw, expected_lot_mw, places=3)
         
         # Gather original mol weights and mol formulas
         exp_001_tuple = _get_mol_weights_and_formula('CMPD-0000001-001')
@@ -2816,6 +2814,9 @@ class TestCmpdReg(BaseAcasClientTest):
             with self.assertRaises(requests.exceptions.HTTPError):
                 self.client.swap_parent_structures(
                     corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+            # Confirm that 1 and 3's lot mol weights and formulae didn't change
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 2 will not introduce any duplicates.
             assert self.client.swap_parent_structures(

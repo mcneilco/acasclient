@@ -1951,7 +1951,7 @@ class TestAcasclient(BaseAcasClientTest):
         salts = self.client.get_salts()
         # Create Salt Abbrev
         if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt("false", abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            salt = self.client.create_salt("false" , abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
             self.assertIsNotNone(salt.get('id'))
         
         # Setup SDF registration with a file containing wrong-case lookups for above values
@@ -2221,7 +2221,7 @@ class TestAcasclient(BaseAcasClientTest):
         salts = self.client.get_salts()
         # Create Salt Abbrev
         if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt("false",abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            salt = self.client.create_salt("false" ,abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
             self.assertIsNotNone(salt.get('id'))
 
         response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",

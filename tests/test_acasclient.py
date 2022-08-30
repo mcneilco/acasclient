@@ -2361,8 +2361,6 @@ def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name
     # Read the data file and replace the project code with the one we want
     with open(data_file_to_upload, 'r') as f:
         data_file_contents = f.read()
-    f.close()
-    
 
     # Replace the project code
     data_file_contents = data_file_contents.replace('Global', project_code)
@@ -2376,7 +2374,7 @@ def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name
     data_file_to_upload = Path(tempdir).joinpath(file_name)
     with open(data_file_to_upload, 'w') as f:
         f.write(data_file_contents)
-    f.close()
+
     return data_file_to_upload
 
 def csv_to_txt(data_file_to_upload, dir):
@@ -2389,8 +2387,6 @@ def csv_to_txt(data_file_to_upload, dir):
         with open(file_path, 'w') as f2:
             for line in f:
                 f2.write(line.replace(',', "\t"))
-        f2.close()
-    f.close()
     return file_path
 
 class TestCmpdReg(BaseAcasClientTest):
@@ -3331,7 +3327,6 @@ class TestExperimentLoader(BaseAcasClientTest):
         # Read the file as a string so that we can update the data
         with open(data_file_to_upload, 'r') as f:
             data_file_as_string = f.read()
-        f.close()
 
         # Substitute Format with "Generic" to test for warning for uploading Generic to 
         # a Dose Response experiment

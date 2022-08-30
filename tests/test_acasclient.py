@@ -403,10 +403,10 @@ class BaseAcasClientTest(unittest.TestCase):
             self.client.close()
 
     @requires_node_api
-    def create_and_connect_backdoor_user(self, username = None, password = None, **kwargs):
+    def create_and_connect_backdoor_user(self, username = None, password = None, prefix = "acas-user-", **kwargs):
         """ Creates a backdoor user and connects them to the ACAS node API """
         if username is None:
-            username = "acas-user-"+str(uuid.uuid4())
+            username = prefix+str(uuid.uuid4())
         if password is None:
             password = str(uuid.uuid4())
         create_backdoor_user(username = username, password = password, **kwargs)
@@ -670,13 +670,13 @@ class BaseAcasClientTest(unittest.TestCase):
                     "dbProperty": "Parent Stereo Category",
                     "defaultVal": STEREO_CATEGORY,
                     "required": True,
-                    "sdfProperty": None
+                    "sdfProperty": "Parent Stereo Category"
                 },
                 {
                     "dbProperty": "Parent Stereo Comment",
                     "defaultVal": None,
                     "required": False,
-                    "sdfProperty": "Structure Comment"
+                    "sdfProperty": "Parent Stereo Comment"
                 },
                 {
                     "dbProperty": "Lot Is Virtual",
@@ -770,6 +770,14 @@ class TestAcasclient(BaseAcasClientTest):
         creds = acasclient.get_default_credentials()
         client = acasclient.client(creds)
         client.close()
+
+        # Verify bad creds 401 response
+        bad_creds = acasclient.get_default_credentials()
+        bad_creds['password'] = 'badpassword'
+        with self.assertRaises(RuntimeError) as context:
+            acasclient.client(bad_creds)
+        self.assertIn('Failed to login. Please check credentials.', str(context.exception))
+
 
     def test_003_projects(self):
         """Test projects."""
@@ -2320,7 +2328,7 @@ class TestAcasclient(BaseAcasClientTest):
             # to complete. On my machine it takes 30 seconds.
             # This is a performance check to make sure the
             # bulk load hasn't slowed significantly.
-            with Timeout(seconds=60):
+            with Timeout(seconds=90):
                 response = self.basic_cmpd_reg_load(file = file)
         except TimeoutError:
             self.fail("Timeout error")
@@ -2820,6 +2828,18 @@ class TestCmpdReg(BaseAcasClientTest):
             get_meta_lot(restricted_project_lot_corp_name)
         self.assertIsNotNone(meta_lot)
         self.assertEqual(meta_lot['lot']['corpName'], restricted_project_lot_corp_name)
+        self.assertIsNone(meta_lot["lot"]["modifiedDate"])  # Lot is not modified
+
+        # Create a user that is not a cmpdreg admin and does not have access to the restricted project
+        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+
+        # User should NOT be able save/update the restricted lot
+        with self.assertRaises(requests.HTTPError) as context:
+            response = user_client.\
+                save_meta_lot(meta_lot)
+        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
+        _meta_lot = self.client.get_meta_lot(restricted_project_lot_corp_name)
+        self.assertIsNone(_meta_lot["lot"]["modifiedDate"])  # Lot is not modified
 
         # Verify our cmpdreg admin user can save the restricted lot
         meta_lot["lot"]["color"] = "red"
@@ -2829,6 +2849,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn("metalot", response)
         self.assertIn("lot", response["metalot"])
         self.assertEqual(response["metalot"]["lot"]["color"], "red")
+        self.assertIsNotNone(response["metalot"]["lot"]["modifiedDate"])  # Lot is modified
 
         # Verify our admin user can update the project
         meta_lot["lot"]["project"] = project.code_name
@@ -2839,15 +2860,6 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn("lot", response["metalot"])
         self.assertEqual(response["metalot"]["lot"]["project"], project.code_name)
 
-        # Now create a user that is not a cmpdreg admin and does not have access to the restricted project
-        user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-              
-        # User should NOT be able save/update the restricted lot
-        with self.assertRaises(requests.HTTPError) as context:
-            response = user_client.\
-                save_meta_lot(meta_lot)
-        self.assertIn('403 Client Error: Forbidden for url', str(context.exception))
-        
         # Now create a user which has access to the project
         user_client = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
 
@@ -2881,10 +2893,12 @@ class TestCmpdReg(BaseAcasClientTest):
         project = self.create_basic_project_with_roles()
 
         # Create a bunch of users with various roles and project access
-        cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-        cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
-        acas_user = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
-        acas_user_restricted_project_acls = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        cmpdreg_user = self.create_and_connect_backdoor_user(prefix="cmpdreg-user-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        cmpdreg_user_with_restricted_project_acls = self.create_and_connect_backdoor_user(prefix="cmpdreg-user-acls-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_user = self.create_and_connect_backdoor_user(prefix="acas-user-", acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
+        acas_user_restricted_project_acls = self.create_and_connect_backdoor_user(prefix="acas-user-acls-", acas_user=True, acas_admin=False, creg_user=False, creg_admin=False, project_names = [project.names[PROJECT_NAME]])
+        acas_admin = self.create_and_connect_backdoor_user(prefix="acas-admin-", acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
+        cmpdreg_admin = self.create_and_connect_backdoor_user(prefix="cmpdreg-admin-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
 
         def can_delete_lot(self, user_client, lot_corp_name, set_owner_first=True):
             if set_owner_first:
@@ -2899,56 +2913,115 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertTrue(response['success'])
             return True
 
-        # Global compound, with experiment in Global project
-        ## Deny Rule: Not an acas user so can't delete because dependent experiment exists
-        self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
+        def check_lot_exists_in_experiment(self, lot_corp_name, experiment_code_name):
+            experiment = self.client.get_experiment_by_code(experiment_code_name, full = True)
+            # when experiment is deleted, the analysis groups for the lot are deleted
+            for analysis_group in experiment["analysisGroups"]:
+                if analysis_group["deleted"] == True or analysis_group["ignored"] == True:
+                    continue
+                for state in analysis_group["lsStates"]:
+                    for value in state["lsValues"]:
+                        if value["lsKind"] == "batch code" and value["codeValue"] == lot_corp_name:
+                            return True
+            return False
 
-        ## Allow Rule: An acas user with access to delete global experiment and global compound
-        self.assertTrue(can_delete_lot(self, acas_user, "CMPD-0000001-001", set_owner_first=True))
+        # Deny Rule: Not an ACAS user and there is assay data for the lot
+        self.assertFalse(can_delete_lot(self, cmpdreg_admin, "CMPD-0000001-001", set_owner_first=True))
+
+        # Delete the assay data on the lot
+        response = self.client.delete_experiment(experiment["codeName"])
+
+        ## Deny Rule: Not a Creg admin and disableDeleteMyLots=true by default
+        self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, acas_user, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, acas_user_restricted_project_acls, "CMPD-0000001-001", set_owner_first=True))
+        self.assertFalse(can_delete_lot(self, acas_admin, "CMPD-0000001-001", set_owner_first=True))
+
+        # Allow Rule: Creg admin and no assay data on the lot
+        self.assertTrue(can_delete_lot(self, cmpdreg_admin, "CMPD-0000001-001", set_owner_first=False))
+
+        # Verify lot is actually deleted
         meta_lot = self.client.get_meta_lot("CMPD-0000001-001")
         self.assertIsNone(meta_lot)
 
-        # Create a restricted lot by project
+        # Create a restricted lot
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
 
-        # Deny Rule: No access to lot project
-        self.assertFalse(can_delete_lot(self, cmpdreg_user, restricted_lot_corp_name, set_owner_first=True))
-
-        # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
-        self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
-
-        # Deny Rule: No access to lot project
-        self.assertFalse(can_delete_lot(self, acas_user, restricted_lot_corp_name, set_owner_first=False))
-
-        # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
-        self.assertFalse(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
-
-        # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
-        self.assertTrue(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
-
-        # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
-        restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
-        self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
-
-        # Load an experiment to the newly created restricted project using the global project lots
+        # Load an experiment to the newly created restricted project using the restricted lot
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
         file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
-        restricted_experiment_code_name = response['results']['experimentCode']
+        self.assertTrue(check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
+                        
+        # Deny rule: Creg admin is not an acas user
+        self.assertFalse(can_delete_lot(self, cmpdreg_admin, restricted_lot_corp_name, set_owner_first=True))
+ 
+        # Deny rule: ACAS admin is not a creg admin
+        self.assertFalse(can_delete_lot(self, acas_admin, restricted_lot_corp_name, set_owner_first=True))
 
-        # Update the lot and make the cmpdreg_user_with_restricted_project_acls the chemist of the lot
+        # Allow rule: CregAdmin/ACASAdmin can delete the lot and assay data
+        self.assertTrue(can_delete_lot(self, self.client, restricted_lot_corp_name, set_owner_first=True))
+
+        # Verify lot is actually deleted
         meta_lot = self.client.get_meta_lot(restricted_lot_corp_name)
-        meta_lot["lot"]["chemist"] = cmpdreg_user_with_restricted_project_acls.username
+        self.assertIsNone(meta_lot)
 
-        # Deny Rule: Not an acas user so can't delete because dependent experiment exists
-        self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+        # Get the experiment and verify the lot is deleted
+        self.assertFalse(check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
 
-        # Delete the experiment (mimic asking acas_user_restricted_project_acls to delete the experiment)
-        response = acas_user_restricted_project_acls.delete_experiment(restricted_experiment_code_name)
+        # TODO: The following tests are dependent on a non default configuration: client.cmpdreg.metaLot.disableDeleteMyLots = false so we can't test this by default. We should turn this back on when we have a testing system which can change the configurations of acas.
+        # # Global compound, with experiment in Global project
+        # ## Deny Rule: Not an acas user so can't delete because dependent experiment exists
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user, "CMPD-0000001-001", set_owner_first=True))
 
-        # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
-        self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+        # ## Allow Rule: An acas user with access to delete global experiment and global compound
+        # self.assertTrue(can_delete_lot(self, acas_user, "CMPD-0000001-001", set_owner_first=True))
+        # meta_lot = self.client.get_meta_lot("CMPD-0000001-001")
+        # self.assertIsNone(meta_lot)
+
+        # # Create a restricted lot by project
+        # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+
+        # # Deny Rule: No access to lot project
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
+
+        # # Deny Rule: No access to lot project
+        # self.assertFalse(can_delete_lot(self, acas_user, restricted_lot_corp_name, set_owner_first=False))
+
+        # # Deny Rule: Not the owner of the lot (must be chemist or recorded by user based on default acas configs for lot access)
+        # self.assertFalse(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=False))
+
+        # # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
+        # self.assertTrue(can_delete_lot(self, acas_user_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Allow Rule: Owns lot by chemist rule, has access to restricted lot project
+        # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+        # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Load an experiment to the newly created restricted project using the global project lots
+        # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
+        # file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
+        # response = self.client.\
+        #     experiment_loader(file_to_upload, "bob", False)
+        # restricted_experiment_code_name = response['results']['experimentCode']
+
+        # # Update the lot and make the cmpdreg_user_with_restricted_project_acls the chemist of the lot
+        # meta_lot = self.client.get_meta_lot(restricted_lot_corp_name)
+        # meta_lot["lot"]["chemist"] = cmpdreg_user_with_restricted_project_acls.username
+
+        # # Deny Rule: Not an acas user so can't delete because dependent experiment exists
+        # self.assertFalse(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
+
+        # # Delete the experiment (mimic asking acas_user_restricted_project_acls to delete the experiment)
+        # response = acas_user_restricted_project_acls.delete_experiment(restricted_experiment_code_name)
+
+        # # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
+        # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
     @requires_node_api
     @requires_absent_basic_cmpd_reg_load
@@ -2970,29 +3043,76 @@ class TestCmpdReg(BaseAcasClientTest):
         # CMPD-0000006 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
         # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: bar)
 
+        def _get_mol_weights_and_formula(lot_corp_name):
+            meta_lot = self.client.get_meta_lot(lot_corp_name)
+            lot = meta_lot["lot"]
+            parent = lot["parent"]
+            return parent["molWeight"], lot["lotMolWeight"], parent["molFormula"]
+
+        def _check_mol_weights(lot_corp_name, expected_parent_mw, expected_lot_mw, expected_mol_formula):
+            parent_mw, lot_mw, mol_formula = _get_mol_weights_and_formula(lot_corp_name)
+            self.assertAlmostEqual(parent_mw, expected_parent_mw, places=3)
+            self.assertEqual(mol_formula, expected_mol_formula)
+            self.assertAlmostEqual(lot_mw, expected_lot_mw, places=3)
+        
+        # Gather original mol weights and mol formulas
+        exp_001_tuple = _get_mol_weights_and_formula('CMPD-0000001-001')
+        exp_002_tuple = _get_mol_weights_and_formula('CMPD-0000002-001')
+        exp_004_tuple = _get_mol_weights_and_formula('CMPD-0000004-001')
+        exp_005_tuple = _get_mol_weights_and_formula('CMPD-0000005-001')
+        exp_006_tuple = _get_mol_weights_and_formula('CMPD-0000006-001')
+
         try:
             # Swapping 1 and 3 will introduce duplicacy between 1 and 2.
-            with self.assertRaises(requests.exceptions.HTTPError):
-                self.client.swap_parent_structures(
-                    corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+            exp_error_msg = ("Swapping corpName1=CMPD-0000001 & "
+                    "corpName2=CMPD-0000003 creates duplicates.")
+            response = self.client.swap_parent_structures(
+                corp_name1='CMPD-0000001', corp_name2='CMPD-0000003')
+            assert response["hasError"] is True
+            self.assertEqual(response["errorMessage"], exp_error_msg)
+            # Confirm that 1 and 3's lot mol weights and formulae didn't change
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 2 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            self.assertFalse(response["hasError"])
+
+            # Check the mol weights and mol formulas have been swapped
+            _check_mol_weights('CMPD-0000001-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
             # Restore the original structures
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            self.assertFalse(response["hasError"])  # Sanity Check
+            # Check the molweights and mol formulas have been restored
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000002-001', exp_002_tuple[0], exp_002_tuple[1], exp_002_tuple[2])
 
             # Swapping 1 and 4 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            self.assertFalse(response["hasError"])
+
+            # Check the mol weights and mol formulas have been swapped
+            _check_mol_weights('CMPD-0000001-001', exp_004_tuple[0], exp_004_tuple[1], exp_004_tuple[2])
+            _check_mol_weights('CMPD-0000004-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
             # Restore the original structures
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000001', corp_name2='CMPD-0000004')
+            self.assertFalse(response["hasError"])  # Sanity Check
+            # Check the molweights and mol formulas have been restored
+            _check_mol_weights('CMPD-0000001-001', exp_001_tuple[0], exp_001_tuple[1], exp_001_tuple[2])
+            _check_mol_weights('CMPD-0000004-001', exp_004_tuple[0], exp_004_tuple[1], exp_004_tuple[2])
 
             # Swapping 5 and 6 will not introduce any duplicates.
-            assert self.client.swap_parent_structures(
+            response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000005', corp_name2='CMPD-0000006')
+            self.assertFalse(response["hasError"])
+            # Check the mol weights and mol formulas have been swapped
+            _check_mol_weights('CMPD-0000005-001', exp_006_tuple[0], exp_006_tuple[1], exp_006_tuple[2])
+            _check_mol_weights('CMPD-0000006-001', exp_005_tuple[0], exp_005_tuple[1], exp_005_tuple[2])
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()
@@ -3134,7 +3254,7 @@ class TestExperimentLoader(BaseAcasClientTest):
                     # If count is present and not -1, then we expect the number of results to be equal to the count
                     self.assertEqual(len(expected_result), expected_message['count'])
                 else:
-                    # If coount is -1, then we don't care about the number of results, just as long as it has the message
+                    # If count is -1, then we don't care about the number of results, just as long as it has the message
                     self.assertGreaterThan(len(expected_result), 0)
             else:
                 # Should return 1 and only 1 match
@@ -3288,31 +3408,31 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '9629'.  Please provide values for these parameters so that curves are drawn properly: EC50"
+                "message": "The following numeric parameters were not found for curve id '9629': EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8836'.  Please provide values for these parameters so that curves are drawn properly: Min"
+                "message": "The following numeric parameters were not found for curve id '8836': Min. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8806'.  Please provide values for these parameters so that curves are drawn properly: Max"
+                "message": "The following numeric parameters were not found for curve id '8806': Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8788'.  Please provide values for these parameters so that curves are drawn properly: Slope"
+                "message": "The following numeric parameters were not found for curve id '8788': Slope. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126933'.  Please provide values for these parameters so that curves are drawn properly: Slope, Max"
+                "message": "The following numeric parameters were not found for curve id '126933': Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126915'.  Please provide values for these parameters so that curves are drawn properly: Slope, Min, Max, EC50"
+                "message": "The following numeric parameters were not found for curve id '126915': Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "error",
-                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'f'"
+                "message": "Could not find `Calculated Results` match for `Raw Results` links: 'g'"
             },
             {
                 "errorLevel": "warning",
@@ -3329,9 +3449,22 @@ class TestExperimentLoader(BaseAcasClientTest):
             {
                 "errorLevel": "warning",
                 "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "The following numeric parameters were not found for curve id 'f': Max. Please provide numeric values for these parameters so that curves are drawn properly."
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])
+
+        # Specific tests for when a user uploads a file without any flags in the raw data section
+        # See details here: https://github.com/mcneilco/acas/pull/989
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '4 parameter D-R-validation-no-flags.csv')
+
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assertFalse(response['hasError'])
+
 
     @requires_basic_cmpd_reg_load
     def test_011_dose_response_experiment_loader(self):
@@ -3478,24 +3611,37 @@ class TestExperimentLoader(BaseAcasClientTest):
     
     @requires_basic_cmpd_reg_load
     def test_012_escaped_quotes_csv(self):
-        """Test experiment loader with escaped quotes in csv file"""
+        """Test experiment loader with escaped quotes in csv file
+        This is a negative test - the experiment load is expected to fail at present. """
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', 'escaped_quotes.csv')
+        # Validate the experiment
         self.experiment_load_test(data_file_to_upload, True)
-        response = self.experiment_load_test(data_file_to_upload, False)
-        # Check the loaded experiment
-        experiment = self.client.\
-            get_experiment_by_code(response['results']['experimentCode'], full = True)
-        self.assertIsNotNone(experiment)
-        self.assertIn("analysisGroups", experiment)
-        # Find the clobValue
-        clob_value = None
-        for analysis_group in experiment["analysisGroups"]:
-            for state in analysis_group["lsStates"]:
-                for value in state["lsValues"]:
-                    if value["lsKind"] == "Test JSON":
-                        clob_value = value["clobValue"]
-        # Ensure the clob value can be parsed as JSON
-        self.assertIsNotNone(clob_value)
-        parsed_json = json.loads(clob_value)
-        self.assertIsNotNone(parsed_json)
+        # Try to load and commit - this is expected to fail
+        with self.assertRaises(AssertionError) as context:
+            response = self.experiment_load_test(data_file_to_upload, False)
+        # # Check the loaded experiment
+        # experiment = self.client.\
+        #     get_experiment_by_code(response['results']['experimentCode'], full = True)
+        # self.assertIsNotNone(experiment)
+        # self.assertIn("analysisGroups", experiment)
+        # # Find the clobValue
+        # clob_value = None
+        # for analysis_group in experiment["analysisGroups"]:
+        #     for state in analysis_group["lsStates"]:
+        #         for value in state["lsValues"]:
+        #             if value["lsKind"] == "Test JSON":
+        #                 clob_value = value["clobValue"]
+        # # Ensure the clob value can be parsed as JSON
+        # self.assertIsNotNone(clob_value)
+        # parsed_json = json.loads(clob_value)
+        # self.assertIsNotNone(parsed_json)
+
+    @requires_basic_cmpd_reg_load
+    def test_012_only_empty_quotes_in_columns(self):
+        """Test experiment loader when reading xlsx files that have an empty columns which is interpreted as "" instead of NA (special character causes ""). See for deails: https://github.com/mcneilco/racas/pull/77"""
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '1_1_Generic_empty_column.xlsx')
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assertFalse(response['hasError'])

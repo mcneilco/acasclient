@@ -179,7 +179,7 @@ CMPD-0000003
 3
 
 >  <Parent Stereo Category>
-Unknown
+Single stereoisomer - arbitrary assign
 
 >  <Parent Stereo Comment>
 
@@ -291,10 +291,10 @@ CMPD-0000006
 6
 
 >  <Parent Stereo Category>
-Single stereoisomer - partial assign
+Unknown
 
 >  <Parent Stereo Comment>
-
+bar
 
 >  <Parent Mol Weight>
 158.256
@@ -403,10 +403,10 @@ CMPD-0000005
 5
 
 >  <Parent Stereo Category>
-Single stereoisomer - arbitrary assign
+Unknown
 
 >  <Parent Stereo Comment>
-
+foo
 
 >  <Parent Mol Weight>
 158.256

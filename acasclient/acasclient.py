@@ -1678,11 +1678,12 @@ class client():
         resp.raise_for_status()
         return resp.json()
     
-    def create_salt(self, abbrev, name, mol_structure):
+    def create_salt(self, abbrev, name, mol_structure, dry_run=False):
         """
         Create a new salt
         """
-        resp = self.session.post("{}/cmpdreg/salts".format(self.url), json={'abbrev': abbrev, 'name': name, 'molStructure': mol_structure})
+        params = {'dryrun': str(dry_run).lower()}
+        resp = self.session.post("{}/cmpdreg/salts".format(self.url), params=params, json={'abbrev': abbrev, 'name': name, 'molStructure': mol_structure})
         resp.raise_for_status()
         return resp.json()
     

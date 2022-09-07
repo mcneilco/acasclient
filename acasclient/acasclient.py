@@ -1694,7 +1694,7 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def create_salt(self, dryrun, abbrev, name, mol_structure):
+    def create_salt(self, abbrev, name, mol_structure, dryrun="false"):
         """
         Create a new salt
         """

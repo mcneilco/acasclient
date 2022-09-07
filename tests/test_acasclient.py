@@ -2,11 +2,9 @@
 
 """Tests for `acasclient` package."""
 
-from ast import Assert
 from functools import wraps
 import unittest
 
-from attr import set_run_validators
 from acasclient import acasclient
 from pathlib import Path
 import tempfile
@@ -1951,7 +1949,7 @@ class TestAcasclient(BaseAcasClientTest):
         salts = self.client.get_salts()
         # Create Salt Abbrev
         if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt("false" , abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL, dryrun="false")
             self.assertIsNotNone(salt.get('id'))
         
         # Setup SDF registration with a file containing wrong-case lookups for above values
@@ -2221,7 +2219,7 @@ class TestAcasclient(BaseAcasClientTest):
         salts = self.client.get_salts()
         # Create Salt Abbrev
         if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt("false" ,abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
+            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL, dryrun="false")
             self.assertIsNotNone(salt.get('id'))
 
         response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",
@@ -2360,7 +2358,7 @@ class TestAcasclient(BaseAcasClientTest):
         abbrev = "BzCOOH"
         name = "Benzoic Acid"
         mol_structure = "\n  Ketcher 08172213212D 1   1.00000     0.00000     0\n\n  9  9  0     1  0            999 V2000\n    5.7250   -4.9750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5910   -5.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    6.5910   -6.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    5.7250   -6.9750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8590   -6.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    4.8590   -5.4750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    7.4570   -4.9750    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n    8.3231   -5.4750    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n    7.4570   -3.9750    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n  1  2  1  0     0  0\n  2  3  2  0     0  0\n  3  4  1  0     0  0\n  4  5  2  0     0  0\n  5  6  1  0     0  0\n  6  1  2  0     0  0\n  2  7  1  0     0  0\n  7  8  1  0     0  0\n  7  9  2  0     0  0\nM  END\n"
-        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        self.client.create_salt(abbrev, name, mol_structure, dryrun)
 
     def removeAllSalts(self):
         salts = self.client.get_salts()
@@ -2389,7 +2387,7 @@ class TestAcasclient(BaseAcasClientTest):
         abbrev = "I"
         name = "Iodine"
         mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
-        valid_salt = self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        valid_salt = self.client.create_salt(abbrev, name, mol_structure, dryrun)
         self.assertIn("Iodine", valid_salt['name'])
 
     def test_55_create_salt_register(self):
@@ -2397,7 +2395,7 @@ class TestAcasclient(BaseAcasClientTest):
         abbrev = "I"
         name = "Iodine"
         mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
-        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        self.client.create_salt(abbrev, name, mol_structure, dryrun)
         search_query = self.client.search_salts("Iodine")
         self.assertIn("Iodine", search_query[0]["name"])
         delete_response = self.client.delete_salt(search_query[0]["id"])
@@ -2476,7 +2474,7 @@ class TestAcasclient(BaseAcasClientTest):
         abbrev = "I"
         name = "Iodine"
         mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
-        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        self.client.create_salt(abbrev, name, mol_structure, dryrun)
         # Try to Change Benzoic Acid Abbreviation and Name to Iodine's Abbreviation and Name 
         search_result = self.client.search_salts("Benzoic Acid")
         id = search_result[0]["id"]
@@ -2505,7 +2503,7 @@ class TestAcasclient(BaseAcasClientTest):
         abbrev = "I"
         name = "Iodine"
         mol_structure = "\n  Ketcher 08172213312D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    7.4500   -7.1750    0.0000 I   0  0  0  0  0  0  0  0  0  0  0  0\nM  CHG  1   1  -1\nM  END\n"
-        self.client.create_salt(dryrun, abbrev, name, mol_structure)
+        self.client.create_salt(abbrev, name, mol_structure, dryrun)
         # Try to Change Benzoic Acids Structure to Iodine's Formula
         search_result = self.client.search_salts("Benzoic Acid")
         id = search_result[0]["id"]

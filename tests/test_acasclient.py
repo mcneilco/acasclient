@@ -2485,7 +2485,7 @@ class TestAcasclient(BaseAcasClientTest):
         dryrun = "true"
         edit_response = self.client.edit_salt(id, dryrun, updated_abbrev, updated_name, updated_struct)
         self.assertIn("Duplicate salt name. Another salt exists with the same name.", edit_response[3]["message"])
-        self.assertIn("Duplicate salt abbreviation. Another salt exist with the same abbreviation.", edit_response[4]["message"]) 
+        self.assertIn("Duplicate salt abbreviation. Another salt exists with the same abbreviation.", edit_response[4]["message"]) 
         # Remove The Salts Registered For This Test 
         delete_response = self.client.delete_salt(id)
         self.assertIn("There were no lot dependencies found for this salt.", delete_response)

@@ -3422,7 +3422,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         self.assertIsNotNone(parsed_json)
     
     @requires_basic_cmpd_reg_load
-    def test_012_escaped_quotes_csv(self):
+    def test_013_escaped_quotes_csv(self):
         """Test experiment loader with escaped quotes in csv file
         This is a negative test - the experiment load is expected to fail at present. """
         data_file_to_upload = Path(__file__).resolve()\
@@ -3450,10 +3450,26 @@ class TestExperimentLoader(BaseAcasClientTest):
         # self.assertIsNotNone(parsed_json)
 
     @requires_basic_cmpd_reg_load
-    def test_012_only_empty_quotes_in_columns(self):
+    def test_014_only_empty_quotes_in_columns(self):
         """Test experiment loader when reading xlsx files that have an empty columns which is interpreted as "" instead of NA (special character causes ""). See for deails: https://github.com/mcneilco/racas/pull/77"""
 
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic_empty_column.xlsx')
         response = self.experiment_load_test(data_file_to_upload, True)
         self.assertFalse(response['hasError'])
+
+    @requires_basic_cmpd_reg_load
+    def test_015_inf_as_numeric_error(self):
+        """Test for when Inf and -Inf are loaded as numeric values"""
+
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'infinite-numeric-values.csv')
+        response = self.experiment_load_test(data_file_to_upload, True)
+        self.assertTrue(response['hasError'])
+        expected_messages = [
+            {
+                "errorLevel": "error",
+                "message": "The following values are expected to be numbers but are: 'Inf', '-Inf'. Please represent large number values using operators. For example, > 10000 or < -10000."
+            }
+        ]
+        self.check_expected_messages(expected_messages, response['errorMessages'])

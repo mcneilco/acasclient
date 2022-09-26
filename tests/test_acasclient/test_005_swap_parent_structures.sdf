@@ -97,6 +97,8 @@ C5 H11 Cl
 
 >  <Parent Comment>
 
+>  <Parent Aliases>
+alias-2
 
 $$$$
 
@@ -198,6 +200,8 @@ C5 H11 Cl
 
 >  <Parent Comment>
 
+>  <Parent Aliases>
+alias-3
 
 $$$$
 
@@ -310,6 +314,8 @@ C10 H19 F
 
 >  <Parent Comment>
 
+>  <Parent Aliases>
+alias-6; alias-6a;
 
 $$$$
 
@@ -422,6 +428,8 @@ C10 H19 F
 
 >  <Parent Comment>
 
+ >  <Parent Aliases>
+alias-4
 
 $$$$
 
@@ -520,6 +528,8 @@ C4 H8
 
 >  <Parent Comment>
 
+>  <Parent Aliases>
+alias-4
 
 $$$$
 
@@ -621,5 +631,7 @@ C5 H11 Cl
 
 >  <Parent Comment>
 
+>  <Parent Aliases>
+alias-1
 
 $$$$

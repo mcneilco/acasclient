@@ -701,9 +701,9 @@ class BaseAcasClientTest(unittest.TestCase):
                 },
                 {
                     "dbProperty": "Parent Alias",
-                    "defaultVal": "unknown",
-                    "required": True,
-                    "sdfProperty": "Parent Alias"
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Aliases"
                 }
             ]
 
@@ -2847,13 +2847,12 @@ class TestCmpdReg(BaseAcasClientTest):
             'test_acasclient', 'test_005_swap_parent_structures.sdf')
         self.basic_cmpd_reg_load(file=file)
 
-        # CMPD-0000001 (structure: A, stereo category: Single stereoisomer)
-        # CMPD-0000002 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer)
-        # CMPD-0000003 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer - arbitrary assign)
-        # CMPD-0000004 (structure: B, stereo category: Single stereoisomer)
-        # CMPD-0000005 (structure: C, stereo category: Unknown, stereo comment: foo)
-        # CMPD-0000006 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
-        # CMPD-0000007 (structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: bar)
+        # CMPD-0000001 / alias-1 (structure: A, stereo category: Single stereoisomer)
+        # CMPD-0000002 / alias-2 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer)
+        # CMPD-0000003 / alias-3 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer - arbitrary assign)
+        # CMPD-0000004 / alias-4 (structure: B, stereo category: Single stereoisomer)
+        # CMPD-0000005 / alias-4(structure: C, stereo category: Unknown, stereo comment: foo)
+        # CMPD-0000006 / alias-6, alias-6a(structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
 
         def _get_mol_weights_and_formula(lot_corp_name):
             meta_lot = self.client.get_meta_lot(lot_corp_name)
@@ -2925,6 +2924,27 @@ class TestCmpdReg(BaseAcasClientTest):
             # Check the mol weights and mol formulas have been swapped
             _check_mol_weights('CMPD-0000005-001', exp_006_tuple[0], exp_006_tuple[1], exp_006_tuple[2])
             _check_mol_weights('CMPD-0000006-001', exp_005_tuple[0], exp_005_tuple[1], exp_005_tuple[2])
+
+            # Swap with a non-existant corporate name.
+            exp_error_msg = ("No parent or unique alias found for foo")
+            response = self.client.swap_parent_structures(
+                corp_name1="CMPD-0000001", corp_name2="foo"
+            )
+            self.assertTrue(response["hasError"])
+            self.assertEqual(response["errorMessage"], exp_error_msg)
+
+            # Swap unique aliases.
+            response = self.client.swap_parent_structures(
+                corp_name1='alias-1', corp_name2='alias-2')
+            self.assertFalse(response["hasError"])
+
+            # Swap a non-unique alias.
+            exp_error_msg = ("No parent or unique alias found for alias-4")
+            response = self.client.swap_parent_structures(
+                corp_name1='CMPD-0000006', corp_name2='alias-4'
+            )
+            self.assertTrue(response["hasError"])
+            self.assertEqual(response["errorMessage"], exp_error_msg)
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()

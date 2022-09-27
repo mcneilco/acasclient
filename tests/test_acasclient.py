@@ -2926,7 +2926,7 @@ class TestCmpdReg(BaseAcasClientTest):
             _check_mol_weights('CMPD-0000006-001', exp_005_tuple[0], exp_005_tuple[1], exp_005_tuple[2])
 
             # Swap with a non-existant corporate name.
-            exp_error_msg = ("No parent or unique alias found for foo")
+            exp_error_msg = ("'foo' was not found as a corporate id or as an alias")
             response = self.client.swap_parent_structures(
                 corp_name1="CMPD-0000001", corp_name2="foo"
             )
@@ -2939,7 +2939,7 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertFalse(response["hasError"])
 
             # Swap a non-unique alias.
-            exp_error_msg = ("No parent or unique alias found for alias-4")
+            exp_error_msg = ("Alias name 'alias-4' has multiple corporate id matches: CMPD-0000004, CMPD-0000005")
             response = self.client.swap_parent_structures(
                 corp_name1='CMPD-0000006', corp_name2='alias-4'
             )

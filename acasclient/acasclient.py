@@ -1285,7 +1285,7 @@ class client():
                                   first_itx_listings=[], second_itx_listings=[],
                                   codes_only=False,
                                   max_results=1000, combine_terms_with_and=False,
-                                  format='stub'):
+                                  format='stub', return_listings=None):
         """
         Query ACAS for deeply specified conditions
 
@@ -1303,6 +1303,7 @@ class client():
                 }
             combine_terms_with_and (bool): Whether to combine terms with 'and'
             format (str): ACAS format to fetch data in
+            return_listings (str): Return only the following listings in key value pair format.
         Returns:
             if codes_only:
                 list of code_name strings
@@ -1320,7 +1321,9 @@ class client():
                 'firstInteractions': first_itx_listings,
                 'secondInteractions': second_itx_listings,
                 'combineTermsWithAnd': combine_terms_with_and,
-            }
+            },
+            'returnDTO': return_listings
+
         }
         params = {}
         if codes_only:

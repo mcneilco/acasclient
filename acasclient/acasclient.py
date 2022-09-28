@@ -1303,7 +1303,50 @@ class client():
                 }
             combine_terms_with_and (bool): Whether to combine terms with 'and'
             format (str): ACAS format to fetch data in
-            return_listings (str): Return only the following listings in key value pair format.
+            return_listings (dict): Used when format = "flat". Return only the defined values or label listings and thing attributes in key value pair format. 
+                {
+                    "thingValues": [
+                        {
+                            # Code value return listing
+                            "key": return_status_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "codeValue",
+                            "valueKind": PROJECT_STATUS
+                        },
+                        {
+                            # String value return listing
+                            "key": return_description_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "stringValue",
+                            "valueKind": DESCRIPTION_KEY
+                        },
+                        {
+                            # Date value return listing
+                            "key": return_startdate_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "dateValue",
+                            "valueKind": START_DATE
+                        },
+                        {
+                            # Label return listing
+                            "key": return_name_key,
+                            "labelType": "name",
+                            "labelKind": PROJECT_NAME,
+                        },
+                        {
+                            # Numeric Value return listing
+                            "key": return_project_number_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "numericValue",
+                            "valueKind": PROJECT_NUMBER
+                        }
+                    ],
+                    "thingAttributes": ["codeName", "id", "modifiedDate"]
+                }
         Returns:
             if codes_only:
                 list of code_name strings

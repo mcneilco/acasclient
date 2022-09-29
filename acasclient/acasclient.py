@@ -379,6 +379,9 @@ class client():
                     dateTo="", searchType="substructure", percentSimilarity=90,
                     chemist="anyone", maxResults=100, molStructure=""
                     ):
+        if isinstance(corpNameList, list):
+            corpNameList = ",".join(corpNameList)
+        # Put all local variables into a dictionary
         search_request = dict(locals())
         del search_request['self']
 

@@ -1064,6 +1064,7 @@ class TestAcasclient(BaseAcasClientTest):
     def test_008_cmpd_search(self):
         """Test cmpd search request."""
 
+        # Search by structure
         molStructure = (
             "NSC 1390\n"
             "\n"
@@ -1094,6 +1095,11 @@ class TestAcasclient(BaseAcasClientTest):
         search_results = self.client.\
             cmpd_search(molStructure=molStructure)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
+        # Search by ID list
+        corp_name_list = ["CMPD-0000001"]
+        search_results = self.client.cmpd_search(corpNameList=corp_name_list)
+        self.assertGreater(len(search_results["foundCompounds"]), 0)
+
 
     @requires_basic_cmpd_reg_load
     def test_009_export_cmpd_search_results(self):
@@ -2166,6 +2172,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.client.delete_physical_state(physical_state['id'])
         self.client.delete_cmpdreg_vendor(vendor['id'])
   
+    @requires_absent_basic_cmpd_reg_load
     def test_047_load_sdf_with_salts(self):
         """
         Tests to Make Sure Salt Can Only Be Derived from Structure or SDF Properties; NOT BOTH! 

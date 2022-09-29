@@ -2835,7 +2835,6 @@ class TestCmpdReg(BaseAcasClientTest):
         # # Allow Rule: Owns lot by chemist rule, no longer has dependent experiment
         # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
-    @requires_node_api
     @requires_absent_basic_cmpd_reg_load
     def test_005_swap_parent_structures(self):
         """
@@ -3062,6 +3061,39 @@ class TestCmpdReg(BaseAcasClientTest):
         # Verify we have 2 lots per parent after the re-arranging we did
         self.assertEqual(parents["CMPD-0000002"], 2)
         self.assertEqual(parents["CMPD-0000001"], 2)
+    
+    @requires_absent_basic_cmpd_reg_load
+    def test_007_modify_parent_aliases(self):
+        """
+        Get, set, and add parent aliases
+        """
+
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_005_swap_parent_structures.sdf')
+        self.basic_cmpd_reg_load(file=file)
+
+        # Setup constants
+        corp_name = "CMPD-0000001"
+        alias_1 = "alias-1"
+        test_alias = "TEST-00001"
+
+        # Get aliases
+        aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 1)
+        self.assertEquals(aliases[0], alias_1)
+
+        # Add an alias
+        self.client.add_parent_alias(corp_name, test_alias)
+        aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 2)
+        self.assertIn(alias_1, aliases)
+        self.assertIn(test_alias, aliases)
+
+        # Set the aliases to only the test alias
+        self.client.set_parent_aliases(corp_name, [test_alias])
+        aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 1)
+        self.assertEquals(aliases[0], test_alias)
     
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

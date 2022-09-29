@@ -1862,7 +1862,7 @@ class client():
 
         data = {'corpName1': corp_name1, 'corpName2': corp_name2}
         resp = self.session.post(f'{self.url}/cmpdreg/swapParentStructures/', json=data)
-        if resp.status_code != 500:
+        if resp.status_code != 400:
             resp.raise_for_status()
         return resp.json()
         

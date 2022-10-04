@@ -11,7 +11,7 @@ import re
 import base64
 import hashlib
 from io import StringIO, IOBase
-from typing import Dict
+from typing import Dict, List
 
 
 logger = logging.getLogger(__name__)
@@ -1921,3 +1921,58 @@ class client():
             return None
         resp.raise_for_status()
         return resp.json()
+    
+    def _get_meta_lot_by_parent_corp_name(self, parent_corp_name):
+        """ Gets a MetaLot object for the first lot of the parent identified by the `parent_corp_name`
+        """
+        # Look up the compound to find a lot, so we can access a MetaLot
+        search_results = self.cmpd_search(corpNameList=parent_corp_name)
+        if len(search_results['foundCompounds']) == 0:
+            raise RuntimeError(f'Parent corp name {parent_corp_name} could not be found')
+        lot_corp_name = search_results['foundCompounds'][0]['lotIDs'][0]['corpName']
+        return self.get_meta_lot(lot_corp_name)
+    
+    def get_parent_aliases(self, parent_corp_name: str) -> List[str]:
+        """Get the current parent aliases by parent_corp_name
+        """
+        meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
+        # Find the parent aliases nested within the meta_lot
+        alias_objects = meta_lot['lot']['saltForm']['parent']['parentAliases']
+        # Flatten them to a list of strings
+        aliases = [x['aliasName'] for x in alias_objects if not x['ignored']]
+        return aliases
+    
+    def add_parent_alias(self, parent_corp_name: str, alias: str) -> None:
+        """Adds a new alias to the specified parent. Does not alter existing aliases.
+        """
+        meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
+        # Format the alias string into a basic object
+        alias_obj = {'aliasName': alias}
+        # Add it to the list of aliases
+        meta_lot['lot']['saltForm']['parent']['parentAliases'].append(alias_obj)
+        # Persist the change
+        self.save_meta_lot(meta_lot)
+
+    def set_parent_aliases(self, parent_corp_name: str, alias_list: List[str]) -> None:
+        """Sets the aliases of the specified parent to ONLY the provided list.
+        This will remove existing aliases if they are not in `alias_list`.
+        To add aliases without removing existing ones, use the `add_parent_alias` method.
+        """
+        meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
+        # Get the current aliases
+        aliases = meta_lot['lot']['saltForm']['parent']['parentAliases']
+        # Check existing aliasNames to see which we need to add
+        existing_aliases = [x['aliasName'] for x in aliases if not x['ignored']]
+        # ignore aliases not in the alias_list
+        for alias_obj in aliases:
+            if alias_obj['aliasName'] not in alias_list:
+                # Ignore aliases not in the new list
+                alias_obj['ignored'] = True
+        # Add new ones
+        for alias in alias_list:
+            if alias not in existing_aliases:
+                new_alias_obj = {'aliasName': alias}
+                aliases.append(new_alias_obj)
+        
+        # Persist the update
+        self.save_meta_lot(meta_lot)

@@ -828,11 +828,21 @@ class client():
 
     def register_sdf(self, file, userName, mappings, prefix=None, dry_run=False):
         files = self.upload_files([file])
+        if "files" not in files and len(files["files"]) != 1:
+            raise RuntimeError("Failed to upload file when trying to register SDF.")
+        else:
+            uploaded_file = files['files'][0]
+
         request = {
-            "fileName": files['files'][0]["name"],
+            "fileName": uploaded_file["name"],
             "userName": userName,
             "mappings": mappings,
         }
+
+        # If original name is returned from the fle upload service, pass it as part of the request so it is preserved by the server
+        if "originalName" in uploaded_file:
+            request["originalFileName"] = uploaded_file["originalName"]
+
         if prefix:
             request["labelPrefix"] = {
                 "name": prefix,

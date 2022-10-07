@@ -1366,9 +1366,10 @@ class TestAcasclient(BaseAcasClientTest):
         results = self.client.\
             purge_cmpdreg_bulk_load_file(-1)
         self.assertIsNone(results)
+        sd_filename = 'test_012_register_sdf.sdf'
 
         test_012_upload_file_file = Path(__file__).resolve().parent\
-            .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+            .joinpath('test_acasclient', sd_filename)
         mappings = [{
             "dbProperty": "Parent Stereo Category",
             "defaultVal": "Unknown",
@@ -1378,6 +1379,11 @@ class TestAcasclient(BaseAcasClientTest):
         registration_result = self.client.register_sdf(test_012_upload_file_file, "bob",
                                                        mappings)
         self.assertIn('New lots of existing compounds: 2', registration_result['summary'])
+        # Check that the originalFileName was preserved in the DB
+        bulk_load_files = self.client.get_cmpdreg_bulk_load_files()
+        this_blf = [blf for blf in bulk_load_files if blf["id"] == registration_result["id"]][0]
+        self.assertIn('originalFileName', this_blf)
+        self.assertEquals(this_blf['originalFileName'], sd_filename)
 
         # purge the bulk load file
         results = self.client.\
@@ -1386,6 +1392,8 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('Successfully purged file', results['summary'])
         self.assertIn('success', results)
         self.assertTrue(results['success'])
+        self.assertIn('originalFileName', results)
+        self.assertEquals(results['originalFileName'], sd_filename)
 
     @requires_basic_experiment_load
     def test_025_delete_experiment(self, experiment):

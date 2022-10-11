@@ -10,7 +10,7 @@ from pathlib import Path
 
 from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
-                                SimpleLsThing, get_lsKind_to_lsvalue)
+                                SimpleLsThing, get_lsKind_to_lsvalue, datetime_to_ts)
 from acasclient.validation import ValidationResult, get_validation_response
 from tests.test_acasclient import BaseAcasClientTest
 
@@ -21,9 +21,9 @@ logging.basicConfig(level=logging.INFO)
 # Constants
 from tests.project_thing import (
     PROJECT_METADATA, PROJECT, STATUS, PROJECT_STATUS,PROCEDURE_DOCUMENT,PDF_DOCUMENT, 
-    NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, DESCRIPTION_KEY, 
-    PDF_DOCUMENT_KEY, PROCEDURE_DOCUMENT_KEY, PARENT_PROJECT_KEY, ACTIVE, INACTIVE,
-    Project
+    NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, DESCRIPTION_KEY, PROJECT_NAME,
+    START_DATE, PDF_DOCUMENT_KEY, PROCEDURE_DOCUMENT_KEY, PARENT_PROJECT_KEY, ACTIVE, INACTIVE,
+    PROJECT_NUMBER_KEY, PROJECT_NUMBER, Project
 )
 
 FWD_ITX = 'relates to'
@@ -793,6 +793,164 @@ class TestLsThing(BaseAcasClientTest):
         with self.assertRaises(KeyError):
             _ = SimpleLsThing.get_by_code(code_name='baz', client=self.client,
             ls_type='foo', ls_kind='bar')
+
+
+    def test_009_advanced_search_flat_response(self):
+
+        # Create project 1
+        name = str(uuid.uuid4())
+        status_1 = str(uuid.uuid4())
+        desc_1 = str(uuid.uuid4())
+        start_date = datetime.now()
+        project_number = 1234
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: status_1,
+            START_DATE_KEY: start_date,
+            DESCRIPTION_KEY: desc_1,
+            PROJECT_NUMBER_KEY: project_number
+        }
+
+        proj_1 = Project(recorded_by=self.client.username, **meta_dict)
+        # skip CodeValue validation since this is not a valid status
+        proj_1.save(self.client, skip_validation=True)
+
+        # Run advanced search by searching by description which is unique
+        value_listings = [
+            {
+                "value": desc_1,
+                "stateType": "metadata",
+                "stateKind": "project metadata",
+                "valueType": "stringValue",
+                "valueKind": DESCRIPTION_KEY,
+                "operator": "="
+            }
+        ]
+
+        # Return listing values
+        return_status_key = "My Status"
+        return_description_key = "My Description"
+        return_startdate_key = "My Start Date"
+        return_name_key = "My Name"
+        return_project_number_key = "My Project Number"
+        return_listings = [
+            {
+                # Code value return listing
+                "key": return_status_key,
+                "stateType": "metadata",
+                "stateKind": "project metadata",
+                "valueType": "codeValue",
+                "valueKind": PROJECT_STATUS
+            },
+            {
+                # String value return listing
+                "key": return_description_key,
+                "stateType": "metadata",
+                "stateKind": "project metadata",
+                "valueType": "stringValue",
+                "valueKind": DESCRIPTION_KEY
+            },
+            {
+                # Date value return listing
+                "key": return_startdate_key,
+                "stateType": "metadata",
+                "stateKind": "project metadata",
+                "valueType": "dateValue",
+                "valueKind": START_DATE
+            },
+            {
+                # Label return listing
+                "key": return_name_key,
+                "labelType": "name",
+                "labelKind": PROJECT_NAME,
+            },
+            {
+                # Numeric Value return listing
+                "key": return_project_number_key,
+                "stateType": "metadata",
+                "stateKind": "project metadata",
+                "valueType": "numericValue",
+                "valueKind": PROJECT_NUMBER
+            }
+        ]
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       value_listings=value_listings,
+                                       format="flat",
+                                       max_results=1000,
+                                       combine_terms_with_and=True,
+                                       return_listings={"thingValues": return_listings})
+        assert len(results) == 1
+
+        # Verify code name returns
+        assert results[0]["codeName"] == proj_1.code_name
+
+        # Verify code value returns
+        assert return_status_key in results[0]
+        assert results[0][return_status_key] == status_1
+
+        # Verify string value returns
+        assert return_description_key in results[0]
+        assert results[0][return_description_key] == desc_1
+
+        # Verify date value returns
+        assert return_startdate_key in results[0]
+        assert results[0][return_startdate_key] == datetime_to_ts(start_date)
+
+        # Verify numeric value returns
+        assert return_project_number_key in results[0]
+        assert results[0][return_project_number_key] == project_number
+
+        # Verify label returns
+        assert return_name_key in results[0]
+        assert results[0][return_name_key] == name
+
+        # Without thing attributes listings, it should return all thing attributes
+        # assert that all thing attributes are returned
+        thingAttributes = {"id", "codeName", "lsType", "lsKind", "recordedBy", "recordedDate"}
+        for thingAttribute in thingAttributes:
+            assert thingAttribute in results[0]
+
+        # Verify that when we specify thing attributes listings, only those thing attributes are returned
+        return_thing_attributes = {"id", "codeName"}
+        results = self.client\
+            .advanced_search_ls_things('project', 'project', None,
+                                       value_listings=value_listings,
+                                       format="flat",
+                                       max_results=1000,
+                                       combine_terms_with_and=True,
+                                       return_listings={"thingAttributes": list(return_thing_attributes), "thingValues": return_listings})
+
+        shouldNotExistAttributes = thingAttributes.symmetric_difference(return_thing_attributes)
+        for thingAttribute in shouldNotExistAttributes:
+            assert thingAttribute not in results[0]
+        for thingAttribute in return_thing_attributes:
+            assert thingAttribute in results[0]
+ 
+        # Verify that adding a duplicate key gives an error by passing the same return listing twice in the same request
+        with self.assertRaises(ValueError) as context:
+            self.client\
+                .advanced_search_ls_things('project', 'project', None,
+                                        value_listings=value_listings,
+                                        format="flat",
+                                        max_results=1000,
+                                        combine_terms_with_and=True,
+                                        return_listings={"thingValues": return_listings + return_listings})
+        assert 'duplicate' in str(context.exception)
+
+        # Verify that reserved word "codeName" cannot be used as a return listing key
+        bad_request_code_name_reserved = return_listings
+        bad_request_code_name_reserved[0]["key"] = "codeName"
+        with self.assertRaises(ValueError) as context:
+            self.client\
+                .advanced_search_ls_things('project', 'project', None,
+                                        value_listings=value_listings,
+                                        format="flat",
+                                        max_results=1000,
+                                        combine_terms_with_and=True,
+                                        return_listings={"thingValues": bad_request_code_name_reserved})
+        assert 'returned as a thing attribute' in str(context.exception)
 
 
 class TestBlobValue(BaseAcasClientTest):

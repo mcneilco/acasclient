@@ -2349,7 +2349,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('Number of entries processed: 1000', response['summary'])
         self.assertIn('Number of entries with error: 1', response['summary'])
 
-    def test_50_delete_ls_thing(self):
+    def test_050_delete_ls_thing(self):
         code = str(uuid.uuid4())
         ls_thing = create_project_thing(code)
         saved_ls_thing = self.client.save_ls_thing(ls_thing)
@@ -2366,6 +2366,203 @@ class TestAcasclient(BaseAcasClientTest):
                                             "project",
                                             code, None)
         self.assertIn(True, [ls_thing['deleted']])
+
+    @requires_absent_basic_cmpd_reg_load
+    def test_051_bulk_load_update_parent_alias(self):
+        """Test Proper Updating of Aliases w/ Bulk Loader"""
+        test_051_upload_file_file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'test_051_register_parent_aliases.sdf')
+        files = self.client.upload_files([test_051_upload_file_file])
+        request = {
+            "fileName": files['files'][0]["name"],
+            "userName": "bob",
+            "mappings": [
+                {
+                    "dbProperty": "Parent Common Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Name"
+                },
+                {
+                    "dbProperty": "Parent Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Amount",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Amount Prepared"
+                },
+                {
+                    "dbProperty": "Lot Amount Units",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Amount Units"
+                },
+                {
+                    "dbProperty": "Lot Color",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Appearance"
+                },
+                {
+                    "dbProperty": "Lot Synthesis Date",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Date Prepared"
+                },
+                {
+                    "dbProperty": "Lot Notebook Page",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Notebook"
+                },
+                {
+                    "dbProperty": "Lot Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Number",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Number"
+                },
+                {
+                    "dbProperty": "Lot Purity",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Purity"
+                },
+                {
+                    "dbProperty": "Lot Comments",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Register Comment"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": "Lot Scientist"
+                },
+                {
+                    "dbProperty": "Lot Solution Amount",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Solution Amount"
+                },
+                {
+                    "dbProperty": "Lot Solution Amount Units",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Solution Amount Units"
+                },
+                {
+                    "dbProperty": "Lot Supplier",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Source"
+                },
+                {
+                    "dbProperty": "Lot Supplier ID",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Source ID"
+                },
+                {
+                    "dbProperty": "CAS Number",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "CAS"
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": self.global_project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Common Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": "Unknown",
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Parent Stereo Comment",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Structure Comment"
+                },
+                {
+                    "dbProperty": "Lot Is Virtual",
+                    "defaultVal": "False",
+                    "required": False,
+                    "sdfProperty": "Lot Is Virtual"
+                },
+                {
+                    "dbProperty": "Lot Supplier Lot",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Sample ID2"
+                },
+                {
+                    "dbProperty": "Parent Alias",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Alias"
+                }
+            ]
+        }
+        response = self.client.register_sdf_request(request)
+        self.assertIn('reportFiles', response[0])
+        self.assertIn('summary', response[0])
+        self.assertIn('Number of entries processed', response[0]['summary'])
+
+        # Setup constants
+        corp_name = "CMPD-0000051"
+        alias_one = "First Alias"
+        alias_two = "Second Alias"
+        alias_three = "Third Alias"
+        alias_four = "Fourth Alias"
+        alias_five = "Fifth Alias"
+
+        # Get aliases
+        aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 3)
+        aliases = str(aliases)
+        self.assertIn(alias_one, aliases)
+        self.assertIn(alias_two, aliases)
+        self.assertIn(alias_three, aliases) 
+
+        # Upload Same File But w/ Different Aliases
+        test_051_upload_file_file_two = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'test_051_register_parent_aliases_diff_aliases.sdf')
+        files = self.client.upload_files([test_051_upload_file_file_two])
+        request["fileName"] = files['files'][0]["name"]
+        response = self.client.register_sdf_request(request)
+        self.assertIn('reportFiles', response[0])
+        self.assertIn('summary', response[0])
+        self.assertIn('Number of entries processed', response[0]['summary'])
+
+        # Check All Aliases Are Present 
+        aliases = self.client.get_parent_aliases(corp_name)
+        aliases = str(aliases)
+        self.assertIn(alias_one, aliases)
+        self.assertIn(alias_two, aliases)
+        self.assertIn(alias_three, aliases) 
+        self.assertIn(alias_four, aliases) 
+        self.assertIn(alias_five, aliases) 
+
 
 
 def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None, file_name = None):

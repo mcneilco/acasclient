@@ -2576,6 +2576,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # Check All Aliases Are Present 
         aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 5)
         aliases = str(aliases)
         self.assertIn(alias_one, aliases)
         self.assertIn(alias_two, aliases)
@@ -2595,6 +2596,7 @@ class TestAcasclient(BaseAcasClientTest):
 
         # Check All Aliases Are Present (Including Overlap and New Ones)
         aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 7)
         aliases = str(aliases)
         self.assertIn(alias_one, aliases)
         self.assertIn(alias_two, aliases)

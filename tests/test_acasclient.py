@@ -2535,8 +2535,28 @@ class TestAcasclient(BaseAcasClientTest):
         alias_three = "Third Alias"
         alias_four = "Fourth Alias"
         alias_five = "Fifth Alias"
+        alias_six = "Sixth Alias"
+        alias_seven = "Seventh Alias"
 
         # Get aliases
+        aliases = self.client.get_parent_aliases(corp_name)
+        self.assertEqual(len(aliases), 3)
+        aliases = str(aliases)
+        self.assertIn(alias_one, aliases)
+        self.assertIn(alias_two, aliases)
+        self.assertIn(alias_three, aliases) 
+
+        # Redo the same file (copy) to see if the result is the same 
+        # and aliases aren't just being appended without comparison 
+        test_051_upload_file_file_one_copy = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'test_051_register_parent_aliases_copy.sdf')
+        files = self.client.upload_files([test_051_upload_file_file_one_copy])
+        request["fileName"] = files['files'][0]["name"]
+        response = self.client.register_sdf_request(request)
+        self.assertIn('reportFiles', response[0])
+        self.assertIn('summary', response[0])
+        self.assertIn('Number of entries processed', response[0]['summary'])
+
         aliases = self.client.get_parent_aliases(corp_name)
         self.assertEqual(len(aliases), 3)
         aliases = str(aliases)
@@ -2562,6 +2582,27 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn(alias_three, aliases) 
         self.assertIn(alias_four, aliases) 
         self.assertIn(alias_five, aliases) 
+
+        # Upload Same File But w/ Overlap In Aliases 
+        test_051_upload_file_file_three = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'test_051_register_parent_aliases_overlap_aliases.sdf')
+        files = self.client.upload_files([test_051_upload_file_file_three])
+        request["fileName"] = files['files'][0]["name"]
+        response = self.client.register_sdf_request(request)
+        self.assertIn('reportFiles', response[0])
+        self.assertIn('summary', response[0])
+        self.assertIn('Number of entries processed', response[0]['summary'])
+
+        # Check All Aliases Are Present (Including Overlap and New Ones)
+        aliases = self.client.get_parent_aliases(corp_name)
+        aliases = str(aliases)
+        self.assertIn(alias_one, aliases)
+        self.assertIn(alias_two, aliases)
+        self.assertIn(alias_three, aliases) 
+        self.assertIn(alias_four, aliases) 
+        self.assertIn(alias_five, aliases) 
+        self.assertIn(alias_six, aliases) 
+        self.assertIn(alias_seven, aliases) 
 
 
 

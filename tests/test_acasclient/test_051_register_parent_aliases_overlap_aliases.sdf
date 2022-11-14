@@ -1,0 +1,58 @@
+NSC 1390
+
+
+ 10 11  0  0  0  0  0  0  0  0999 V2000
+   -4.4591   -4.9405    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.1600   -2.6905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.1600   -7.1905    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.4344   -2.9770    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+    0.4473   -4.1905    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.8610   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.8610   -4.9405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -3.1600   -5.6905    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.4344   -5.4040    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -4.4591   -3.4405    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  8  1  0  0  0  0
+  1 10  1  0  0  0  0
+  2 10  2  0  0  0  0
+  2  6  1  0  0  0  0
+  3  8  2  0  0  0  0
+  4  5  1  0  0  0  0
+  4  6  1  0  0  0  0
+  5  9  2  0  0  0  0
+  6  7  2  0  0  0  0
+  7  8  1  0  0  0  0
+  7  9  1  0  0  0  0
+M  END
+>  <Parent Alias>
+Fourth Alias; Fifth Alias; Sixth Alias; Seventh Alias;
+
+>  <CAS Number>
+315-30-0
+
+>  <PubChem SID>
+6.82e+04
+
+>  <Molecular Formula>
+C5H4N4O
+
+>  <Molecular Weight>
+136
+
+>  <Chemical Names>
+Allopurinol;Lopurin;4-HPP;HPP;4-Hydroxypyrazolo[3,4-d]pyrimidine;4-Hydroxy-1H-pyrazolo[3,4-d]pyrimidine;1H-Pyrazolo[3,4-d]pyrimidin-4-ol;Uripurinol;4-Hydroxy-3,4-pyrazolopyrimidine;4-Hydroxypyrazolyl[3,4-d]pyrimidine;
+
+
+>  <Lot Barcode>
+S123007
+
+>  <Lot Amount>
+136
+
+>  <Lot Amount Units>
+mg
+
+>  <Parent Corp Name>
+CMPD-0000051
+
+$$$$

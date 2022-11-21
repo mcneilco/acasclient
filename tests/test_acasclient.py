@@ -293,8 +293,8 @@ def requires_absent_basic_cmpd_reg_load(func):
     """
     @wraps(func)
     def wrapper(self):
-        meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
-        if meta_lot is not None:
+        lots = self.client.get_all_lots()
+        if len(lots) > 0:
             self.delete_all_experiments()
             self.delete_all_cmpd_reg_bulk_load_files()
         return func(self)   

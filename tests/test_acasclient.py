@@ -3110,6 +3110,76 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(len(aliases), 1)
         self.assertEquals(aliases[0], test_alias)
     
+    @requires_absent_basic_cmpd_reg_load
+    def test_008_register_second_lots(self):
+        """
+        Register additional lots of registered compounds
+        """
+        # Register two lots
+        response = self.basic_cmpd_reg_load()
+        self.assertIn('Number of entries processed: 2', response['summary'])
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 2', response['summary'])
+        self.assertIn('New lots of existing compounds: 0', response['summary'])
+        
+        # Load the same file (but don't map in Lot Number and Lot Corp Name)
+        file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+
+        mappings = [
+                {
+                    "dbProperty": "Parent Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Corp Name"
+                },
+                {
+                    "dbProperty": "",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Corp Name"
+                },
+                {
+                    "dbProperty": "",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Number"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": "Lot Scientist"
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": self.global_project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": STEREO_CATEGORY,
+                    "required": True,
+                    "sdfProperty": "Parent Stereo Category"
+                },
+                {
+                    "dbProperty": "Parent Stereo Comment",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Stereo Comment"
+                }
+            ]
+
+        response = self.client.register_sdf(file, "bob",
+                                            mappings)
+        self.assertIn('Number of entries processed: 2', response['summary'])
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 0', response['summary'])
+        self.assertIn('New lots of existing compounds: 2', response['summary'])
+    
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

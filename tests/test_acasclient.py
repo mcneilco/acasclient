@@ -2667,6 +2667,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         response = self.experiment_load_test(data_file_to_upload, True)
 
         # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
+
         self.assertTrue(response['results']['htmlSummary'].find("bv_doseResponseSummaryTable") != -1)
 
         # Leaving this comment here on how this dict was generted in case there are expected changes we want to make to the expected results match the current results
@@ -2675,30 +2676,6 @@ class TestExperimentLoader(BaseAcasClientTest):
             {
                 "errorLevel": "error",
                 "message": "No 'Rendering Hint' was found for curve id '9629'. If a curve id is specified, it must be associated with a Rendering Hint."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '9629'.  Please provide values for these parameters so that curves are drawn properly: EC50"
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8836'.  Please provide values for these parameters so that curves are drawn properly: Min"
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8806'.  Please provide values for these parameters so that curves are drawn properly: Max"
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '8788'.  Please provide values for these parameters so that curves are drawn properly: Slope"
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126933'.  Please provide values for these parameters so that curves are drawn properly: Slope, Max"
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following parameters were not found for curve id '126915'.  Please provide values for these parameters so that curves are drawn properly: Slope, Min, Max, EC50"
             },
             {
                 "errorLevel": "error",
@@ -2710,25 +2687,39 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The following column headers have never been loaded in an Experiment before: 'Comment'. If you have loaded a similar Experiment before, please use the same headers that were used previously. If this is a new Protocol, you can proceed without worry."
+                "message": "The following column headers have never been loaded in an Experiment before: 'Comment', 'Key'. If you have loaded a similar Experiment before, please use the same headers that were used previously. If this is a new Protocol, you can proceed without worry."
             },
             {
                 "errorLevel": "warning",
-                "message": "The R&#178; for curve id 'a' is 0.215 which is < than the threshold value of 0.9."
+                "message": "For curve ids: '126915'. The following numeric parameters were not found: Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The R&#178; for curve id 'b' is 0.858 which is < than the threshold value of 0.9."
+                "message": "For curve ids: '126933','126934'. The following numeric parameters were not found: Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+                "message": "For curve ids: '8788'. The following numeric parameters were not found: Slope. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "Experiment '4 parameter D-R - 2018-05-08' already exists, so the loader will delete its current data and replace it with your new upload. If you do not intend to delete and reload data, enter a new Experiment Name."
+                "message": "For curve ids: '8806'. The following numeric parameters were not found: Max. Please provide numeric values for these parameters so that curves are drawn properly."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "For curve ids: '8836'. The following numeric parameters were not found: Min. Please provide numeric values for these parameters so that curves are drawn properly."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "For curve ids: '9629'. The following numeric parameters were not found: EC50. Please provide numeric values for these parameters so that curves are drawn properly."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "For curve ids: 'a','b','c'. The R&#178; is < than the threshold value of 0.9."
             }
         ]
+        # Pretty json
+        json.dumps(response['errorMessages'], sort_keys=True, indent=4)
         self.assertEqual(len(response['errorMessages']), len(expected_messages))
         self.check_expected_messages(expected_messages, response['errorMessages'])
 

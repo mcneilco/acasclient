@@ -11,6 +11,8 @@ import re
 import base64
 import hashlib
 from io import StringIO, IOBase
+from typing import Dict, List
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -377,6 +379,9 @@ class client():
                     dateTo="", searchType="substructure", percentSimilarity=90,
                     chemist="anyone", maxResults=100, molStructure=""
                     ):
+        if isinstance(corpNameList, list):
+            corpNameList = ",".join(corpNameList)
+        # Put all local variables into a dictionary
         search_request = dict(locals())
         del search_request['self']
 
@@ -823,11 +828,21 @@ class client():
 
     def register_sdf(self, file, userName, mappings, prefix=None, dry_run=False):
         files = self.upload_files([file])
+        if "files" not in files and len(files["files"]) != 1:
+            raise RuntimeError("Failed to upload file when trying to register SDF.")
+        else:
+            uploaded_file = files['files'][0]
+
         request = {
-            "fileName": files['files'][0]["name"],
+            "fileName": uploaded_file["name"],
             "userName": userName,
             "mappings": mappings,
         }
+
+        # If original name is returned from the fle upload service, pass it as part of the request so it is preserved by the server
+        if "originalName" in uploaded_file:
+            request["originalFileName"] = uploaded_file["originalName"]
+
         if prefix:
             request["labelPrefix"] = {
                 "name": prefix,
@@ -1283,7 +1298,7 @@ class client():
                                   first_itx_listings=[], second_itx_listings=[],
                                   codes_only=False,
                                   max_results=1000, combine_terms_with_and=False,
-                                  format='stub'):
+                                  format='stub', return_listings=None):
         """
         Query ACAS for deeply specified conditions
 
@@ -1301,6 +1316,50 @@ class client():
                 }
             combine_terms_with_and (bool): Whether to combine terms with 'and'
             format (str): ACAS format to fetch data in
+            return_listings (dict): Used when format = "flat". Return only the defined values or label listings and thing attributes in key value pair format. 
+                {
+                    "thingValues": [
+                        {
+                            # Code value return listing
+                            "key": return_status_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "codeValue",
+                            "valueKind": PROJECT_STATUS
+                        },
+                        {
+                            # String value return listing
+                            "key": return_description_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "stringValue",
+                            "valueKind": DESCRIPTION_KEY
+                        },
+                        {
+                            # Date value return listing
+                            "key": return_startdate_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "dateValue",
+                            "valueKind": START_DATE
+                        },
+                        {
+                            # Label return listing
+                            "key": return_name_key,
+                            "labelType": "name",
+                            "labelKind": PROJECT_NAME,
+                        },
+                        {
+                            # Numeric Value return listing
+                            "key": return_project_number_key,
+                            "stateType": "metadata",
+                            "stateKind": "project metadata",
+                            "valueType": "numericValue",
+                            "valueKind": PROJECT_NUMBER
+                        }
+                    ],
+                    "thingAttributes": ["codeName", "id", "modifiedDate"]
+                }
         Returns:
             if codes_only:
                 list of code_name strings
@@ -1318,7 +1377,9 @@ class client():
                 'firstInteractions': first_itx_listings,
                 'secondInteractions': second_itx_listings,
                 'combineTermsWithAnd': combine_terms_with_and,
-            }
+            },
+            'returnDTO': return_listings
+
         }
         params = {}
         if codes_only:
@@ -1762,3 +1823,212 @@ class client():
         resp = self.session.post("{}/api/setup/{}".format(self.url, item_type), json=items)
         resp.raise_for_status()
         return resp.json()
+
+    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True):
+        """Get lot dependencies for a lot by corp name
+
+        Args:
+            lot_corp_name (str): Corp name of lot to get dependencies for
+            include_linked_lots (bool): Whether to include linked lots in the response, default True.  Linked lots are purely informational as they are not a dependency preventing the lot from being deleted.
+
+        Returns:
+            A dict of the lot dependencies
+            For example:
+            {
+                "batchCodes": [
+                    "CMPD-0000001-001"
+                ],
+                "linkedDataExists": true,
+                "linkedExperiments": [
+                    {
+                        "acls": {
+                            "delete": true,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "EXPT-00000009",
+                        "comments": "CMPD-0000001-001",
+                        "description": "6 results",
+                        "ignored": false,
+                        "name": "BLAH"
+                    }
+                ],
+                "linkedLots": [
+                    {
+                        "acls": {
+                            "delete": false,
+                            "read": true,
+                            "write": true
+                        },
+                        "code": "CMPD-0000001-002",
+                        "ignored": false,
+                        "name": "CMPD-0000001-002"
+                    }
+                ],
+                "lot": {
+                    ...the lot info...
+                }
+            }
+        Raises:
+            HTTPError: If permission denied
+        """
+
+        params = {'includeLinkedLots': str(include_linked_lots).lower()}
+        resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}"
+                                .format(self.url, lot_corp_name),
+                                params=params)
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+    def delete_lot(self, lot_corp_name):
+        """Delete a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to delete
+
+        Returns:
+            A dict with "success": true if successful. For example
+            {
+                "success": true
+            }
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
+        """
+        resp = self.session.delete("{}/cmpdReg/metalots/corpName/{}"
+                                .format(self.url, lot_corp_name))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+    def swap_parent_structures(self, corp_name1: str, corp_name2: str) -> Dict[str, str]:
+        """Swap parent structures.
+
+        Args:
+            corp_name1 (str): Corporate ID of the first parent compound.
+            corp_name2 (str): Corporate ID of the second parent compound.
+
+        Returns:
+            A dict with "hasError" and "errorMessage" keys. For example
+            {
+                "hasError": True,
+                "errorMessage": "Swapping corpName1=CMPD-1 & corpName2=CMPD-2 creates duplicates."
+            }
+        """
+
+        data = {'corpName1': corp_name1, 'corpName2': corp_name2}
+        resp = self.session.post(f'{self.url}/cmpdreg/swapParentStructures/', json=data)
+        if resp.status_code != 400:
+            resp.raise_for_status()
+        return resp.json()
+        
+    def reparent_lot(self, lot_corp_name, new_parent_corp_name, dry_run=True):
+        """Reparent a lot
+
+        Args:
+            lot_corp_name (str): Corp name of lot to reparent
+            new_parent_corp_name (str): Corp name of new parent
+            dry_run (bool): Whether to perform a dry run, default True
+
+        Returns:
+            A dict with information about expected changes
+            {
+                "dependencies": {
+                    "linkedDataExists": true,
+                    ...other dependency data...
+                },
+                "modifiedBy": "bob",
+                "newLot": {
+                    "corpName": "CMPD-0000003-002",
+                    ...other lot info...
+                    "saltForm": {
+                        ...salt form info...
+                        "parent": {
+                            "corpName": "CMPD-0000003",
+                            ...other parent info...
+                    },
+                },
+                "originalLotCorpName": "CMPD-0000001-001",
+                "originalParentCorpName": "CMPD-0000001"
+                "originalParentDeleted": true
+            }
+
+            Or None if there was an error
+        Raises:
+            HTTPError: If permission denied
+        """
+        data = {
+            'lotCorpName': lot_corp_name,
+            'parentCorpName': new_parent_corp_name
+        }
+
+        # Set dry run url param
+        params = {'dryRun': str(dry_run).lower()}
+
+        resp = self.session.post("{}/api/cmpdRegAdmin/lotServices/reparent/lot"
+                                .format(self.url),
+                                 params=params,
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(data))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+    
+    def _get_meta_lot_by_parent_corp_name(self, parent_corp_name):
+        """ Gets a MetaLot object for the first lot of the parent identified by the `parent_corp_name`
+        """
+        # Look up the compound to find a lot, so we can access a MetaLot
+        search_results = self.cmpd_search(corpNameList=parent_corp_name)
+        if len(search_results['foundCompounds']) == 0:
+            raise RuntimeError(f'Parent corp name {parent_corp_name} could not be found')
+        lot_corp_name = search_results['foundCompounds'][0]['lotIDs'][0]['corpName']
+        return self.get_meta_lot(lot_corp_name)
+    
+    def get_parent_aliases(self, parent_corp_name: str) -> List[str]:
+        """Get the current parent aliases by parent_corp_name
+        """
+        meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
+        # Find the parent aliases nested within the meta_lot
+        alias_objects = meta_lot['lot']['saltForm']['parent']['parentAliases']
+        # Flatten them to a list of strings
+        aliases = [x['aliasName'] for x in alias_objects if not x['ignored']]
+        return aliases
+    
+    def add_parent_alias(self, parent_corp_name: str, alias: str) -> None:
+        """Adds a new alias to the specified parent. Does not alter existing aliases.
+        """
+        meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
+        # Format the alias string into a basic object
+        alias_obj = {'aliasName': alias}
+        # Add it to the list of aliases
+        meta_lot['lot']['saltForm']['parent']['parentAliases'].append(alias_obj)
+        # Persist the change
+        self.save_meta_lot(meta_lot)
+
+    def set_parent_aliases(self, parent_corp_name: str, alias_list: List[str]) -> None:
+        """Sets the aliases of the specified parent to ONLY the provided list.
+        This will remove existing aliases if they are not in `alias_list`.
+        To add aliases without removing existing ones, use the `add_parent_alias` method.
+        """
+        meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
+        # Get the current aliases
+        aliases = meta_lot['lot']['saltForm']['parent']['parentAliases']
+        # Check existing aliasNames to see which we need to add
+        existing_aliases = [x['aliasName'] for x in aliases if not x['ignored']]
+        # ignore aliases not in the alias_list
+        for alias_obj in aliases:
+            if alias_obj['aliasName'] not in alias_list:
+                # Ignore aliases not in the new list
+                alias_obj['ignored'] = True
+        # Add new ones
+        for alias in alias_list:
+            if alias not in existing_aliases:
+                new_alias_obj = {'aliasName': alias}
+                aliases.append(new_alias_obj)
+        
+        # Persist the update
+        self.save_meta_lot(meta_lot)

@@ -3606,10 +3606,6 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The following column headers have never been loaded in an Experiment before: 'Comment', 'Key'. If you have loaded a similar Experiment before, please use the same headers that were used previously. If this is a new Protocol, you can proceed without worry."
-            },
-            {
-                "errorLevel": "warning",
                 "message": "For curve ids: '126915'. The following numeric parameters were not found: Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {

@@ -3622,10 +3622,6 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "For curve ids: '8806'. The following numeric parameters were not found: Max. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
                 "message": "For curve ids: '8836'. The following numeric parameters were not found: Min. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
@@ -3638,12 +3634,11 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id 'f': Max. Please provide numeric values for these parameters so that curves are drawn properly."
+                "message": "For curve ids: 'f','8806'. The following numeric parameters were not found: Max. Please provide numeric values for these parameters so that curves are drawn properly."
             }
         ]
         # Pretty json to print messages above if needed for updating tests
         #json.dumps(response['errorMessages'], sort_keys=True, indent=4)
-        self.assertEqual(len(response['errorMessages']), len(expected_messages))
         self.check_expected_messages(expected_messages, response['errorMessages'])
 
         # Specific tests for when a user uploads a file without any flags in the raw data section

@@ -3350,6 +3350,76 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(len(aliases), 1)
         self.assertEquals(aliases[0], test_alias)
     
+    @requires_absent_basic_cmpd_reg_load
+    def test_008_register_second_lots(self):
+        """
+        Register additional lots of registered compounds
+        """
+        # Register two lots
+        response = self.basic_cmpd_reg_load()
+        self.assertIn('Number of entries processed: 2', response['summary'])
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 2', response['summary'])
+        self.assertIn('New lots of existing compounds: 0', response['summary'])
+        
+        # Load the same file (but don't map in Lot Number and Lot Corp Name)
+        file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+
+        mappings = [
+                {
+                    "dbProperty": "Parent Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Corp Name"
+                },
+                {
+                    "dbProperty": "",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Corp Name"
+                },
+                {
+                    "dbProperty": "",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Number"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": "Lot Scientist"
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": self.global_project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": STEREO_CATEGORY,
+                    "required": True,
+                    "sdfProperty": "Parent Stereo Category"
+                },
+                {
+                    "dbProperty": "Parent Stereo Comment",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Stereo Comment"
+                }
+            ]
+
+        response = self.client.register_sdf(file, "bob",
+                                            mappings)
+        self.assertIn('Number of entries processed: 2', response['summary'])
+        self.assertIn('Number of entries with error: 0', response['summary'])
+        self.assertIn('Number of warnings: 0', response['summary'])
+        self.assertIn('New compounds: 0', response['summary'])
+        self.assertIn('New lots of existing compounds: 2', response['summary'])
+    
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     
@@ -3516,6 +3586,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         response = self.experiment_load_test(data_file_to_upload, True)
 
         # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
+
         self.assertTrue(response['results']['htmlSummary'].find("bv_doseResponseSummaryTable") != -1)
 
         # Leaving this comment here on how this dict was generted in case there are expected changes we want to make to the expected results match the current results
@@ -3524,30 +3595,6 @@ class TestExperimentLoader(BaseAcasClientTest):
             {
                 "errorLevel": "error",
                 "message": "No 'Rendering Hint' was found for curve id '9629'. If a curve id is specified, it must be associated with a Rendering Hint."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id '9629': EC50. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id '8836': Min. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id '8806': Max. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id '8788': Slope. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id '126933': Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id '126915': Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "error",
@@ -3559,21 +3606,35 @@ class TestExperimentLoader(BaseAcasClientTest):
             },
             {
                 "errorLevel": "warning",
-                "message": "The R&#178; for curve id 'a' is 0.215 which is < than the threshold value of 0.9."
+                "message": "For curve ids: '126915'. The following numeric parameters were not found: Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The R&#178; for curve id 'b' is 0.858 which is < than the threshold value of 0.9."
+                "message": "For curve ids: '126933','126934'. The following numeric parameters were not found: Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The R&#178; for curve id 'c' is 0.0601 which is < than the threshold value of 0.9."
+                "message": "For curve ids: '8788'. The following numeric parameters were not found: Slope. Please provide numeric values for these parameters so that curves are drawn properly."
             },
             {
                 "errorLevel": "warning",
-                "message": "The following numeric parameters were not found for curve id 'f': Max. Please provide numeric values for these parameters so that curves are drawn properly."
+                "message": "For curve ids: '8836'. The following numeric parameters were not found: Min. Please provide numeric values for these parameters so that curves are drawn properly."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "For curve ids: '9629'. The following numeric parameters were not found: EC50. Please provide numeric values for these parameters so that curves are drawn properly."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "For curve ids: 'a','b','c'. The R&#178; is < than the threshold value of 0.9."
+            },
+            {
+                "errorLevel": "warning",
+                "message": "For curve ids: 'f','8806'. The following numeric parameters were not found: Max. Please provide numeric values for these parameters so that curves are drawn properly."
             }
         ]
+        # Pretty json to print messages above if needed for updating tests
+        #json.dumps(response['errorMessages'], sort_keys=True, indent=4)
         self.check_expected_messages(expected_messages, response['errorMessages'])
 
         # Specific tests for when a user uploads a file without any flags in the raw data section

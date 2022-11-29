@@ -3091,6 +3091,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
     @requires_absent_basic_cmpd_reg_load
+    @requires_node_api
     def test_005_swap_parent_structures(self):
         """
         Check `swap_parent_structures` can swap structures in case of parents with no duplicates or
@@ -3199,6 +3200,14 @@ class TestCmpdReg(BaseAcasClientTest):
             )
             self.assertTrue(response["hasError"])
             self.assertEqual(response["errorMessage"], exp_error_msg)
+
+            # Try making a valid swap as a non-admin and confirm it fails
+            # due to permissions
+            cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+            with self.assertRaises(requests.HTTPError) as context:
+                response = cmpdreg_user.swap_parent_structures(
+                    corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
+            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()

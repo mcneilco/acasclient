@@ -3420,6 +3420,57 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('New compounds: 0', response['summary'])
         self.assertIn('New lots of existing compounds: 2', response['summary'])
     
+    @requires_basic_cmpd_reg_load
+    @requires_node_api
+    def test_009_edit_parent(self):
+        try:
+            # Setup
+            cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+            stereo_cat_dict = {x['code']: x for x in self.client.get_stereo_categories()}
+            TEST_STEREO_COMMENT = 'test stereo comment'
+            TEST_STEREO_CAT_CODE = 'No stereochemistry'
+            # Get parent 1
+            meta_lot_1 = self.client.get_meta_lot('CMPD-0000001-001')
+            parent_1 = meta_lot_1['lot']['parent']
+            # TODO make change to structure
+            # Make changes to stereo category, stereo comment
+            parent_1['stereoComment'] = TEST_STEREO_COMMENT
+            parent_1['stereoCategory'] = stereo_cat_dict[TEST_STEREO_CAT_CODE]
+            # Validate
+            validation_resp = self.client.edit_parent(parent_1, dry_run=True)
+            print(validation_resp)
+            # Confirm validation response mentions the lot
+            self.assertEquals(len(validation_resp), 1)
+            self.assertEquals(validation_resp[0]['code'], 'CMPD-0000001-001')
+            self.assertEquals(validation_resp[0]['name'], 'CMPD-0000001-001')
+            # Commit the edit
+            self.client.edit_parent(parent_1, dry_run=False)
+            # Get the parent again and check out changes were made
+            updated_meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
+            updated_parent = updated_meta_lot['lot']['parent']
+            self.assertEquals(updated_parent['stereoComment'], TEST_STEREO_COMMENT)
+            self.assertEquals(updated_parent['stereoCategory']['code'], TEST_STEREO_CAT_CODE)
+            # Confirm a non-admin cannot attempt a dry run edit
+            with self.assertRaises(requests.HTTPError) as context:
+                response = cmpdreg_user.edit_parent(parent_1, dry_run=True)
+            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
+            # Confirm a non-admin cannot edit
+            with self.assertRaises(requests.HTTPError) as context:
+                response = cmpdreg_user.edit_parent(parent_1, dry_run=False)
+            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
+            
+            # TODO edit back to how it was before
+            # TODO save
+            # TODO edit structure to match parent 2
+            # TODO validate (should it fail?)
+            # TODO save (should fail)
+            # TODO test non-admin cannot make any edits
+            #TODO remove placeholder
+            self.assertFalse(True)
+        finally:
+            # Prevent interaction with other tests.
+            self.delete_all_cmpd_reg_bulk_load_files()
+    
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

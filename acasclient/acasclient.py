@@ -2032,3 +2032,17 @@ class client():
         
         # Persist the update
         self.save_meta_lot(meta_lot)
+    
+    def edit_parent(self, parent, dry_run=True) -> Dict:
+        """Makes changes to an existing parent.
+        Returns a dictionary of affected lots
+        """
+        if dry_run:
+            url = "{}/cmpdreg/validateParent".format(self.url)
+        else:
+            url = "{}/cmpdreg/updateParent".format(self.url)
+        resp = self.session.post(url,
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(parent))
+        resp.raise_for_status()
+        return resp.json()

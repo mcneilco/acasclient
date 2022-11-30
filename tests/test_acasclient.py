@@ -3429,11 +3429,13 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('New compounds: 0', response['summary'])
         self.assertIn('New lots of existing compounds: 2', response['summary'])
     
-    @requires_basic_cmpd_reg_load
+    @requires_absent_basic_cmpd_reg_load
     @requires_node_api
     def test_009_edit_parent(self):
         try:
             # Setup
+            # Load compounds
+            resp = self.basic_cmpd_reg_load()
             cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
             stereo_cat_dict = {x['code']: x for x in self.client.get_stereo_categories()}
             TEST_STEREO_COMMENT = 'test stereo comment'

@@ -11,7 +11,7 @@ import re
 import base64
 import hashlib
 from io import StringIO, IOBase
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 
 logger = logging.getLogger(__name__)
@@ -2032,31 +2032,3 @@ class client():
         
         # Persist the update
         self.save_meta_lot(meta_lot)
-    
-    def edit_parent(self, parent, dry_run=True) -> Tuple[bool, Dict]:
-        """Makes changes to an existing parent.
-        Returns (status, data) where `status` is a bool representing success (True) or failure (False)
-        `data` is a dict of supporting information. In case of failure it contains a list of duplicates
-        In case of success it contains a list of affected lots
-        """
-        # Validate
-        resp = self.session.post("{}/cmpdreg/validateParent".format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(parent))
-        resp.raise_for_status()
-        resp_data = resp.json()
-        success = True
-        # Check whether the response just has a list of affected lots or whether
-        # It has a list of dupeParents
-        if 'parentUnique' in resp_data and not resp_data['parentUnique']:
-            success = False
-        # If just doing validation, or if validation failed, return response
-        if dry_run or not success:
-            return success, resp.json()
-        # Otherwise continue to updateParent
-        resp = self.session.post("{}/cmpdreg/updateParent".format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(parent))
-        resp.raise_for_status()
-        resp_data = resp.json()
-        return success, resp_data

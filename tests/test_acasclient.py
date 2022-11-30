@@ -3091,7 +3091,6 @@ class TestCmpdReg(BaseAcasClientTest):
         # self.assertTrue(can_delete_lot(self, cmpdreg_user_with_restricted_project_acls, restricted_lot_corp_name, set_owner_first=True))
 
     @requires_absent_basic_cmpd_reg_load
-    @requires_node_api
     def test_005_swap_parent_structures(self):
         """
         Check `swap_parent_structures` can swap structures in case of parents with no duplicates or
@@ -3200,14 +3199,6 @@ class TestCmpdReg(BaseAcasClientTest):
             )
             self.assertTrue(response["hasError"])
             self.assertEqual(response["errorMessage"], exp_error_msg)
-
-            # Try making a valid swap as a non-admin and confirm it fails
-            # due to permissions
-            cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-            with self.assertRaises(requests.HTTPError) as context:
-                response = cmpdreg_user.swap_parent_structures(
-                    corp_name1='CMPD-0000001', corp_name2='CMPD-0000002')
-            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()
@@ -3428,84 +3419,6 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('Number of warnings: 0', response['summary'])
         self.assertIn('New compounds: 0', response['summary'])
         self.assertIn('New lots of existing compounds: 2', response['summary'])
-    
-    @requires_basic_cmpd_reg_load
-    @requires_node_api
-    def test_009_edit_parent(self):
-        try:
-            # Setup
-            cmpdreg_user = self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
-            stereo_cat_dict = {x['code']: x for x in self.client.get_stereo_categories()}
-            TEST_STEREO_COMMENT = 'test stereo comment'
-            TEST_STEREO_CAT_CODE = 'No stereochemistry'
-            # Get parent 1
-            meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
-            parent = meta_lot['lot']['parent']
-            ORIG_STEREO_COMMENT = parent['stereoComment']
-            ORIG_STEREO_CAT_CODE = parent['stereoCategory']['code']
-            # Get parent 2
-            meta_lot_2 = self.client.get_meta_lot('CMPD-0000002-001')
-            parent_2 = meta_lot_2['lot']['parent']
-            CMPD_2_STRUCTURE = parent_2['molStructure']
-            # TODO make change to structure
-            # Make changes to stereo category, stereo comment
-            parent['stereoComment'] = TEST_STEREO_COMMENT
-            parent['stereoCategory'] = stereo_cat_dict[TEST_STEREO_CAT_CODE]
-            # Validate
-            validation_status, validation_resp = self.client.edit_parent(parent, dry_run=True)
-            # Confirm validation response mentions the lot
-            self.assertTrue(validation_status)
-            self.assertEquals(len(validation_resp), 1)
-            self.assertEquals(validation_resp[0]['code'], 'CMPD-0000001-001')
-            self.assertEquals(validation_resp[0]['name'], 'CMPD-0000001-001')
-            # Commit the edit
-            edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
-            # Confirm edit response mentions the lot
-            self.assertTrue(edit_status)
-            self.assertEquals(len(edit_resp), 1)
-            self.assertEquals(edit_resp[0]['code'], 'CMPD-0000001-001')
-            self.assertEquals(edit_resp[0]['name'], 'CMPD-0000001-001')
-            # Get the parent again and check out changes were made
-            meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
-            parent = meta_lot['lot']['parent']
-            self.assertEquals(parent['stereoComment'], TEST_STEREO_COMMENT)
-            self.assertEquals(parent['stereoCategory']['code'], TEST_STEREO_CAT_CODE)
-            # Confirm a non-admin cannot attempt a dry run edit
-            with self.assertRaises(requests.HTTPError) as context:
-                cmpdreg_user.edit_parent(parent, dry_run=True)
-            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
-            # Confirm a non-admin cannot edit
-            with self.assertRaises(requests.HTTPError) as context:
-                cmpdreg_user.edit_parent(parent, dry_run=False)
-            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
-            # Edit back to how it was before and save
-            parent['stereoComment'] = ORIG_STEREO_COMMENT
-            parent['stereoCategory'] = stereo_cat_dict[ORIG_STEREO_CAT_CODE]
-            self.client.edit_parent(parent, dry_run=False)
-            # Confirm attributes are back to as they were before
-            meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
-            parent = meta_lot['lot']['parent']
-            self.assertEquals(parent['stereoComment'], ORIG_STEREO_COMMENT)
-            self.assertEquals(parent['stereoCategory']['code'], ORIG_STEREO_CAT_CODE)
-            # Edit structure to match parent 2
-            # This should result in a duplicate, and thus be blocked
-            parent['molStructure'] = CMPD_2_STRUCTURE
-            # Validate (should fail)
-            validation_status, validation_resp = self.client.edit_parent(parent, dry_run=True)
-            self.assertFalse(validation_status)
-            self.assertFalse(validation_resp['parentUnique'])
-            self.assertEquals(len(validation_resp['dupeParents']), 1)
-            self.assertEquals(validation_resp['dupeParents'][0]['corpName'], 'CMPD-0000002')
-            # Attempt non-dryrun (should fail)
-            edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
-            self.assertFalse(edit_status)
-            self.assertFalse(edit_status)
-            self.assertFalse(edit_resp['parentUnique'])
-            self.assertEquals(len(edit_resp['dupeParents']), 1)
-            self.assertEquals(edit_resp['dupeParents'][0]['corpName'], 'CMPD-0000002')
-        finally:
-            # Prevent interaction with other tests.
-            self.delete_all_cmpd_reg_bulk_load_files()
     
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

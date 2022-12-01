@@ -417,7 +417,7 @@ class BaseAcasClientTest(unittest.TestCase):
         return user_client
 
     # Helper for testing an experiment upload was successful
-    def experiment_load_test(self, data_file_to_upload, dry_run_mode):
+    def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False):
         response = self.client.\
             experiment_loader(data_file_to_upload, "bob", dry_run_mode)
         self.assertIn('results', response)
@@ -426,6 +426,8 @@ class BaseAcasClientTest(unittest.TestCase):
         self.assertIn('hasError', response)
         self.assertIn('hasWarning', response)
         self.assertIn('transactionId', response)
+        if response['hasError'] and not expect_failure:
+            raise ValueError(f"Experiment load failed unexpectedly with errorMessages: {response['errorMessages']}")
         if dry_run_mode:
             self.assertIsNone(response['transactionId'])
         else:
@@ -3560,7 +3562,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         """Test experiment loader 1995 xls format fails."""
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '1_1_Generic-XLS_50_1995_Fail.xls')
-        response = self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, True, expect_failure=True)
         expected_messages = [
             {
                 "errorLevel": "error",
@@ -3645,10 +3647,10 @@ class TestExperimentLoader(BaseAcasClientTest):
 
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', 'malformatted-single-quote.csv')
-        response = self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, True, expect_failure=True)
         self.assert_malformed_single_quote_file(response)
         txt_file = csv_to_txt(data_file_to_upload, self.tempdir)
-        response = self.experiment_load_test(txt_file, True)
+        response = self.experiment_load_test(txt_file, True, expect_failure=True)
         self.assert_malformed_single_quote_file(response)
 
     @requires_basic_cmpd_reg_load
@@ -3672,7 +3674,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', '4 parameter D-R-validation.csv')
 
-        response = self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, True, expect_failure=True)
 
         # When loading Dose Resposne format but not having ACAS fit the curves, we shold get a dose response summary table
 
@@ -3885,10 +3887,10 @@ class TestExperimentLoader(BaseAcasClientTest):
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', 'escaped_quotes.csv')
         # Validate the experiment
-        self.experiment_load_test(data_file_to_upload, True)
+        self.experiment_load_test(data_file_to_upload, True, expect_failure=True)
         # Try to load and commit - this is expected to fail
         with self.assertRaises(AssertionError) as context:
-            response = self.experiment_load_test(data_file_to_upload, False)
+            response = self.experiment_load_test(data_file_to_upload, False, expect_failure=True)
         # # Check the loaded experiment
         # experiment = self.client.\
         #     get_experiment_by_code(response['results']['experimentCode'], full = True)
@@ -3921,7 +3923,7 @@ class TestExperimentLoader(BaseAcasClientTest):
 
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', 'infinite-numeric-values.csv')
-        response = self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, True, expect_failure=True)
         self.assertTrue(response['hasError'])
         expected_messages = [
             {

@@ -3445,7 +3445,6 @@ class TestCmpdReg(BaseAcasClientTest):
             # Get parent 1
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
-            print(f"DEBUG: parent version: {parent['version']}")
             ORIG_STEREO_COMMENT = parent['stereoComment']
             ORIG_STEREO_CAT_CODE = parent['stereoCategory']['code']
             # Get parent 2
@@ -3473,7 +3472,6 @@ class TestCmpdReg(BaseAcasClientTest):
             # Get the parent again and check out changes were made
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
-            print(f"DEBUG: parent version: {parent['version']}")
             self.assertEquals(parent['stereoComment'], TEST_STEREO_COMMENT)
             self.assertEquals(parent['stereoCategory']['code'], TEST_STEREO_CAT_CODE)
             # Confirm a non-admin cannot attempt a dry run edit
@@ -3494,7 +3492,6 @@ class TestCmpdReg(BaseAcasClientTest):
             # Confirm attributes are back to as they were before
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
-            print(f"DEBUG: parent version: {parent['version']}")
             self.assertEquals(parent['stereoComment'], ORIG_STEREO_COMMENT)
             self.assertEquals(parent['stereoCategory']['code'], ORIG_STEREO_CAT_CODE)
             # Edit structure to match parent 2

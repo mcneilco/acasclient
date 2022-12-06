@@ -3,6 +3,7 @@
 """Tests for `acasclient` package."""
 
 from functools import wraps
+from time import sleep
 import unittest
 from acasclient import acasclient
 from pathlib import Path
@@ -3486,6 +3487,8 @@ class TestCmpdReg(BaseAcasClientTest):
             parent['stereoComment'] = ORIG_STEREO_COMMENT
             parent['stereoCategory'] = stereo_cat_dict[ORIG_STEREO_CAT_CODE]
             self.client.edit_parent(parent, dry_run=False)
+            # Sleep for 50 ms to make sure change to the parent has been committed
+            sleep(0.05)
             # Confirm attributes are back to as they were before
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']

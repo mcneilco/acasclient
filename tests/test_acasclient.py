@@ -3485,7 +3485,10 @@ class TestCmpdReg(BaseAcasClientTest):
             # Edit back to how it was before and save
             parent['stereoComment'] = ORIG_STEREO_COMMENT
             parent['stereoCategory'] = stereo_cat_dict[ORIG_STEREO_CAT_CODE]
-            self.client.edit_parent(parent, dry_run=False)
+            edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
+            if not edit_status:
+                print(f"ERROR: Something went wrong editing the parent: {edit_resp}")
+            self.assertTrue(edit_status)
             # Confirm attributes are back to as they were before
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']

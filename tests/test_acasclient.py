@@ -283,7 +283,11 @@ def requires_basic_cmpd_reg_load(func):
     @wraps(func)
     def wrapper(self):
         if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
-            self.basic_cmpd_reg_load()
+            response = self.basic_cmpd_reg_load()
+            # Verify they were loaded
+            self.assertIn('New compounds: 2', response['summary'])
+            if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
+                raise AssertionError(f"Expected compound lots were not found after basic_cmpd_reg_load. Something has gone seriously wrong! Bulk load response: {response}")
         return func(self)
     return wrapper
 

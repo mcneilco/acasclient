@@ -3519,6 +3519,72 @@ class TestCmpdReg(BaseAcasClientTest):
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()
     
+    @requires_absent_basic_cmpd_reg_load
+    def test_010_validate_sdf_with_empty_aliases(self):
+        # Test loading a file that has some blank parent aliases
+        # Confirm they don't create empty-string aliases
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'text_010_partial_parent_aliases.sdf')
+        project_code = self.global_project_code
+
+        mappings = [
+                {
+                    "dbProperty": "Parent Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": STEREO_CATEGORY,
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Parent Alias",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Alias"
+                }
+            ]
+        # Confirm this dryruns successfully
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
+        self.assertIn('New compounds: 3', response['summary'])
+        # Confirm this loads successfully
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn('New compounds: 3', response['summary'])
+        # Check out three parents
+        # CMPD-0000010 should have one alias
+        meta_lot = self.client.get_meta_lot('CMPD-0000010-001')
+        parent = meta_lot["lot"]["saltForm"]["parent"]
+        self.assertEquals(1, len(parent['parentAliases']))
+        # CMPD-0000011 and CMPD-0000012 should have zero aliases
+        meta_lot = self.client.get_meta_lot('CMPD-0000011-001')
+        parent = meta_lot["lot"]["saltForm"]["parent"]
+        self.assertEquals(0, len(parent['parentAliases']))
+        meta_lot = self.client.get_meta_lot('CMPD-0000012-001')
+        parent = meta_lot["lot"]["saltForm"]["parent"]
+        self.assertEquals(0, len(parent['parentAliases']))
+
+    
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

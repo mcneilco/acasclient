@@ -3843,3 +3843,33 @@ class TestExperimentLoader(BaseAcasClientTest):
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])
+
+    @requires_basic_cmpd_reg_load
+    def test_016_new_line_character_in_string(self):
+        # Test for non-uniform comma format file
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'quoted-with-new-line-character-in-string.csv')
+        self.experiment_load_test(data_file_to_upload, True)
+        response = self.experiment_load_test(data_file_to_upload, False)
+
+        # Get Experiment results
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+
+        accepted_results_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', "test_new_line_character_in_string_experiment_loader_accepted_results.json")
+
+        # Leaving this here to show how to update the accepted results file
+        # with open(accepted_results_file_path, 'w') as f:
+        #     json.dump(experiment, f, indent=2)
+        experiment = anonymize_experiment_dict(experiment)
+        
+        accepted_results_experiment  = json.loads(accepted_results_file_path.read_text())
+        accepted_results_analysis_groups = anonymize_experiment_dict(accepted_results_experiment)["analysisGroups"]
+        new_results_analysis_groups = experiment["analysisGroups"]
+
+        # Verify that the analysis groups are the same as the accepted results analysis groups
+        # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
+        for i in range(len(accepted_results_analysis_groups)):
+            self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])

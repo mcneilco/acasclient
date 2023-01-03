@@ -3798,26 +3798,25 @@ class TestExperimentLoader(BaseAcasClientTest):
         data_file_to_upload = Path(__file__).resolve()\
             .parent.joinpath('test_acasclient', 'escaped_quotes.csv')
         # Validate the experiment
-        self.experiment_load_test(data_file_to_upload, True, expect_failure=True)
-        # Try to load and commit - this is expected to fail
-        with self.assertRaises(AssertionError) as context:
-            response = self.experiment_load_test(data_file_to_upload, False, expect_failure=True)
-        # # Check the loaded experiment
-        # experiment = self.client.\
-        #     get_experiment_by_code(response['results']['experimentCode'], full = True)
-        # self.assertIsNotNone(experiment)
-        # self.assertIn("analysisGroups", experiment)
-        # # Find the clobValue
-        # clob_value = None
-        # for analysis_group in experiment["analysisGroups"]:
-        #     for state in analysis_group["lsStates"]:
-        #         for value in state["lsValues"]:
-        #             if value["lsKind"] == "Test JSON":
-        #                 clob_value = value["clobValue"]
-        # # Ensure the clob value can be parsed as JSON
-        # self.assertIsNotNone(clob_value)
-        # parsed_json = json.loads(clob_value)
-        # self.assertIsNotNone(parsed_json)
+        self.experiment_load_test(data_file_to_upload, True, expect_failure=False)
+        # Load and commit - this is now expected to succeed
+        response = self.experiment_load_test(data_file_to_upload, False, expect_failure=False)
+        # Check the loaded experiment
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)
+        # Find the clobValue
+        clob_value = None
+        for analysis_group in experiment["analysisGroups"]:
+            for state in analysis_group["lsStates"]:
+                for value in state["lsValues"]:
+                    if value["lsKind"] == "Test JSON":
+                        clob_value = value["clobValue"]
+        # Ensure the clob value can be parsed as JSON
+        self.assertIsNotNone(clob_value)
+        parsed_json = json.loads(clob_value)
+        self.assertIsNotNone(parsed_json)
 
     @requires_basic_cmpd_reg_load
     def test_014_only_empty_quotes_in_columns(self):

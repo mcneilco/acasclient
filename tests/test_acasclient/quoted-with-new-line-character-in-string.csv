@@ -1,0 +1,22 @@
+Experiment Meta Data,,,
+Format,Generic,,
+Protocol Name,BLAH,,
+Experiment Name,BLAH,,
+Scientist,bob,,
+Notebook,BLAH,,
+Page,,,
+Assay Date,2022-03-30,,
+Project,Global,,
+,,,
+,,,
+Calculated Results,,,
+Datatype,String,String
+Corporate Batch ID,A value,B Value
+"CMPD-0000001-001","one answer here
+keeps
+going
+for
+a
+while and even has ,, in
+it","another answer in a string with 
+new line character"

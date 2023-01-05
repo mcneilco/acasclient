@@ -1324,6 +1324,22 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertGreater(len(results), 0)
         self.assertIn('codeName', results[0])
 
+        # Verify that filtering by project code works
+        project_code_value = acasclient.get_entity_value_by_state_type_kind_value_type_kind(
+            experiment,
+            "metadata",
+            "experiment metadata",
+            "codeValue",
+            "project")
+        results = self.client.\
+            experiment_search(experiment["codeName"], project_codes=[project_code_value["codeValue"]])
+        self.assertEqual(len(results), 1)
+        
+        # Verify that searching by non existant project returns no results
+        results = self.client.\
+            experiment_search(experiment["codeName"], project_codes=["FAKEPROJECT"])
+        self.assertEqual(len(results), 0)
+
     @requires_basic_cmpd_reg_load
     def test_022_get_cmpdreg_bulk_load_files(self):
         """Test get cmpdreg bulk load files."""

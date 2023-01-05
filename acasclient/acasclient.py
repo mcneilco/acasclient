@@ -1006,22 +1006,22 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def experiment_search(self, query, projectCodes=None):
+    def experiment_search(self, query, project_codes=None):
         """Search for experiments by search term
 
         Get an array of experiments given an experiment search term string and optional project code(s) filter
 
         Args:
             query (str): An experiment search term
-            projectCodes (str list): A list of project codes to filter by
+            project_codes (str list): A list of project codes to filter by
 
 en array of protocols
         """
 
         params = {}
-        if projectCodes is not None:
+        if project_codes is not None:
             # Convert to a comma separated string and url encode
-            params['projectCodes'] = ','.join(projectCodes)
+            params['projectCodes'] = ','.join(project_codes)
 
         resp = self.session.get("{}/api/experiments/genericSearch/{}/"
                                 .format(self.url, query),

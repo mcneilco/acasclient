@@ -154,6 +154,33 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         break
     return value
 
+
+def get_entity_label_by_label_type_kind(entity, label_type,
+                                                label_kind):
+    """Get a label from an acas entity dict object.
+
+    Gets a specific label from an acas entity dict object.
+
+    Args:
+        entity: Any ACAS entity (protocol, experiment, analysis_group,
+        treatment_group, container...etc.)
+        label_type: String. The label type of the value.
+        label_kind: String. The label kind of the value.
+
+    Returns:
+        A dict object representing the label if it exits. Otherwise it
+        returns None
+
+    """
+    label = None
+    if len(entity["lsLabels"]) > 0:
+        for l in entity["lsLabels"]:
+            if (not l["deleted"] and not l["ignored"] and
+                    l["lsType"] == label_type and l["lsKind"] == label_kind):
+                label = l
+                break
+    return label
+
 def sdf_iterator(iteratable):
     data = []
     for line in iteratable:
@@ -1006,9 +1033,28 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def experiment_search(self, query):
+    def experiment_search(self, query, projectCodes=None):
+        """Search for experiments by search term
+
+        Get an array of experiments given an experiment search term string and optional project code(s) filter
+
+        Args:
+            query (str): An experiment search term
+            projectCodes (str list): A list of project codes to filter by
+
+en array of protocols
+        """
+
+        params = {}
+        if projectCodes is not None:
+            # Convert to a comma separated string and url encode
+            params['projectCodes'] = ','.join(projectCodes)
+
         resp = self.session.get("{}/api/experiments/genericSearch/{}/"
-                                .format(self.url, query))
+                                .format(self.url, query),
+                                params=params)
+
+        resp.raise_for_status()
         return resp.json()
 
     def get_cmpdreg_bulk_load_files(self):

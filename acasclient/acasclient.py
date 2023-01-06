@@ -1006,9 +1006,28 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def experiment_search(self, query):
+    def experiment_search(self, query, project_codes=None):
+        """Search for experiments by search term
+
+        Get an array of experiments given an experiment search term string and optional project code(s) filter
+
+        Args:
+            query (str): An experiment search term
+            project_codes (str list): A list of project codes to filter by
+
+en array of protocols
+        """
+
+        params = {}
+        if project_codes is not None:
+            # Convert to a comma separated string and url encode
+            params['projectCodes'] = ','.join(project_codes)
+
         resp = self.session.get("{}/api/experiments/genericSearch/{}/"
-                                .format(self.url, query))
+                                .format(self.url, query),
+                                params=params)
+
+        resp.raise_for_status()
         return resp.json()
 
     def get_cmpdreg_bulk_load_files(self):

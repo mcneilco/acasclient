@@ -377,7 +377,7 @@ class client():
     def cmpd_search(self, corpNameList="", corpNameFrom="", corpNameTo="",
                     aliasContSelect="contains", alias="", dateFrom="",
                     dateTo="", searchType="substructure", percentSimilarity=90,
-                    chemist="anyone", maxResults=100, molStructure=""
+                    chemist="anyone", maxResults=100, molStructure="", projectCodes=None
                     ):
         if isinstance(corpNameList, list):
             corpNameList = ",".join(corpNameList)
@@ -447,6 +447,8 @@ class client():
             search_request["chemist"] = "anyone"
         if("maxResults" not in search_request):
             search_request["maxResults"] = 100
+        if("projectCodes" in search_request and search_request["projectCodes"] is None):
+            del search_request["projectCodes"]
 
         resp = self.session.post("{}/cmpdreg/search/cmpds".
                                  format(self.url),

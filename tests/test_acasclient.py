@@ -997,6 +997,7 @@ class TestAcasclient(BaseAcasClientTest):
             "percentSimilarity": 90,
             "chemist": "anyone",
             "maxResults": 100,
+            "projectCodes": None,
             "molStructure": (
                 "NSC 1390\n"
                 "\n"
@@ -1101,6 +1102,14 @@ class TestAcasclient(BaseAcasClientTest):
         corp_name_list = ["CMPD-0000001"]
         search_results = self.client.cmpd_search(corpNameList=corp_name_list)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
+        # Filter results by project code
+        search_results = self.client.cmpd_search(
+            corpNameList=corp_name_list, projectCodes=[self.global_project_code])
+        self.assertGreater(len(search_results["foundCompounds"]), 0)
+        # Filter results by project code using fake project code to verify no results
+        search_results = self.client.cmpd_search(
+            corpNameList=corp_name_list, projectCodes=["FAKEPROJECT"])
+        self.assertEqual(len(search_results["foundCompounds"]), 0)
 
 
     @requires_basic_cmpd_reg_load

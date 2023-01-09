@@ -1,5 +1,6 @@
 """Main module."""
 
+from concurrent.futures import ThreadPoolExecutor
 import requests
 import logging
 import os
@@ -427,6 +428,44 @@ class client():
             lots = [lot for lot in lots if lot["project"] in project_codes]
         return lots
 
+
+    def get_all_meta_lots(self, project_codes=None):
+        """Get all meta lots
+
+        Get all meta lots the currently logged in user is allowed to access
+
+        Args:
+            project_codes (list): A list of project codes to filter by
+
+        Returns: Returns an array of dict objects respresenting meta lots
+        """
+        
+        # Get all lots
+        lots = self.get_all_lots(project_codes=project_codes)
+
+        # Get meta lots
+        meta_lots = self.get_meta_lots_by_lot_corp_names([lot["lotCorpName"] for lot in lots])
+
+        return meta_lots
+        
+    def get_meta_lots_by_lot_corp_names(self, lot_corp_names, max_workers=10):
+        """Get meta lots by lot corp names
+
+        Get meta lots by lot corp names
+
+        Args:
+            lot_corp_names (list): A list of lot corp names
+
+        Returns: Returns an array of dict objects respresenting meta lots
+        """
+        meta_lots = []
+
+        # Call get_meta_lot for each lot corp name
+        # Run max_workers requests in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for meta_lot in executor.map(self.get_meta_lot, lot_corp_names):
+                meta_lots.append(meta_lot)
+        return meta_lots
 
     def cmpd_search_request(self, search_request):
         search_request["loggedInUser"] = self.username

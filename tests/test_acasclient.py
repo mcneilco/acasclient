@@ -1701,6 +1701,7 @@ class TestAcasclient(BaseAcasClientTest):
     def test_033_get_all_lots(self):
         """Test get all lots request."""
 
+        # Basic tests of all lots
         all_lots = self.client.get_all_lots()
         self.assertGreater(len(all_lots), 0)
         self.assertIn('id', all_lots[0])
@@ -1709,6 +1710,16 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('parentCorpName', all_lots[0])
         self.assertIn('registrationDate', all_lots[0])
         self.assertIn('project', all_lots[0])
+
+        # Test filter for a specific project
+        # Should return more than 0 lots
+        all_lots_for_project = self.client.get_all_lots([all_lots[0]['project']])
+        self.assertGreater(len(all_lots_for_project), 0)
+        self.assertEquals(all_lots_for_project[0]['project'], all_lots[0]['project'])
+
+        # Should return 0 lots
+        all_lots_for_project = self.client.get_all_lots(['FAKEPROJECT'])
+        self.assertEqual(len(all_lots_for_project), 0)
 
     def test_034_get_ls_things_by_type_and_kind(self):
         codes = []

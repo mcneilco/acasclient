@@ -401,10 +401,13 @@ class client():
                              % VALID_STRUCTURE_SEARCH_TYPES)
         return self.cmpd_structure_search_request(search_request)
 
-    def get_all_lots(self):
+    def get_all_lots(self, project_codes=None):
         """Get all lots
 
         Get all lots the currently logged in user is allowed to access
+
+        Args:
+            project_codes (list): A list of project codes to filter by
 
         Returns: Returns an array of dict objects
             id (id): the lot corp name
@@ -417,7 +420,13 @@ class client():
         resp = self.session.get("{}/cmpdReg/parentLot/getAllAuthorizedLots"
                                 .format(self.url))
         resp.raise_for_status()
-        return resp.json()
+
+        lots = resp.json()
+
+        if project_codes is not None:
+            lots = [lot for lot in lots if lot["project"] in project_codes]
+        return lots
+
 
     def cmpd_search_request(self, search_request):
         search_request["loggedInUser"] = self.username

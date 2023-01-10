@@ -2644,6 +2644,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn(alias_six, aliases) 
         self.assertIn(alias_seven, aliases) 
 
+    @requires_absent_basic_cmpd_reg_load
     @requires_basic_cmpd_reg_load
     def test_052_get_meta_lots_by_lot_corp_names(self):
         """Test get all lot metalots request."""

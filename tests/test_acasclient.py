@@ -1701,6 +1701,7 @@ class TestAcasclient(BaseAcasClientTest):
     def test_033_get_all_lots(self):
         """Test get all lots request."""
 
+        # Basic tests of all lots
         all_lots = self.client.get_all_lots()
         self.assertGreater(len(all_lots), 0)
         self.assertIn('id', all_lots[0])
@@ -1709,6 +1710,16 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('parentCorpName', all_lots[0])
         self.assertIn('registrationDate', all_lots[0])
         self.assertIn('project', all_lots[0])
+
+        # Test filter for a specific project
+        # Should return more than 0 lots
+        all_lots_for_project = self.client.get_all_lots([all_lots[0]['project']])
+        self.assertGreater(len(all_lots_for_project), 0)
+        self.assertEquals(all_lots_for_project[0]['project'], all_lots[0]['project'])
+
+        # Should return 0 lots
+        all_lots_for_project = self.client.get_all_lots(['FAKEPROJECT'])
+        self.assertEqual(len(all_lots_for_project), 0)
 
     def test_034_get_ls_things_by_type_and_kind(self):
         codes = []
@@ -2633,6 +2644,35 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn(alias_six, aliases) 
         self.assertIn(alias_seven, aliases) 
 
+    @requires_absent_basic_cmpd_reg_load
+    @requires_basic_cmpd_reg_load
+    def test_052_get_meta_lots_by_lot_corp_names(self):
+        """Test get all lot metalots request."""
+
+        meta_lots = self.client.get_meta_lots_by_lot_corp_names(['CMPD-0000001-001'])
+        self.assertGreater(len(meta_lots), 0)
+        self.assertIn('fileList', meta_lots[0])
+        self.assertIn('isosalts', meta_lots[0])
+        self.assertIn('lot', meta_lots[0])
+
+    @requires_basic_cmpd_reg_load
+    def test_053_get_all_meta_lots(self):
+        """Test get all lot metalots request."""
+
+        all_meta_lots = self.client.get_all_meta_lots()
+        self.assertGreater(len(all_meta_lots), 0)
+        self.assertIn('fileList', all_meta_lots[0])
+        self.assertIn('isosalts', all_meta_lots[0])
+        self.assertIn('lot', all_meta_lots[0])
+
+        # Check that filtering by project code works
+        all_meta_lots = self.client.get_all_meta_lots(project_codes=all_meta_lots[0]['lot']['project'])
+        self.assertGreater(len(all_meta_lots), 0)
+        self.assertEqual(all_meta_lots[0]['lot']['project'], all_meta_lots[0]['lot']['project'])
+
+        # Check that filtering by a fake project returns nothing
+        all_meta_lots = self.client.get_all_meta_lots(project_codes=["FAKEPROJECT"])
+        self.assertEqual(len(all_meta_lots), 0)
 
 
 def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None, file_name = None):

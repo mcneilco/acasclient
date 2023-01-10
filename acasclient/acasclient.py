@@ -1142,6 +1142,23 @@ en array of protocols
             return None
         return resp.json()
 
+    def get_sdf_by_bulk_load_file(self, id):
+        """Get an SDF file from a bulk load file id
+
+        Args:
+            id (int): A bulk load file id
+
+        Returns: (str) representaiton of the SDF file
+
+        """
+        resp = self.session.get("{}/api/cmpdRegBulkLoader/getSDFFromBulkLoadFileId/{}".
+                                format(self.url,
+                                       id))
+        resp.raise_for_status()
+        if resp.text == '"Error"':
+            return None
+        return resp.text
+
     def purge_cmpdreg_bulk_load_file(self, id):
         """Purge a cmpdreg bulk load file
 

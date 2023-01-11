@@ -1,0 +1,47 @@
+Experiment Meta Data,,,,
+Format,Generic,,,
+Protocol Name,PK_Mouse_LM,,,
+Experiment Name,Metabolic Stability data summary for Metallica,,,
+Scientist,Metallica,,,
+Notebook,PK_Mouse_LM 2020-04-30,,,
+Page,PK_Mouse_LM 2020-04-30,,,
+Assay Date,4/30/20,,,
+Project,Project1,,,
+,,,,
+,,,,
+Calculated Results,,,,
+Datatype,Text,Text,Text,Number
+Corporate Batch ID,AAA Assay Date,Orig. Experiment Name,AAA Orig. Scientist,Clint (mL/min/kg)
+MR-0008181-001,11/30/19 0:00,Metabolic Stability data summary for Morphic - 026_2019-12-09.xls-PK_Mouse_Plasma_Stability-2019-11-30,ChemPartner,35.92235975
+MR-0008052-001,11/30/19 0:00,Metabolic Stability data summary for Morphic - 026_2019-12-09.xls-PK_Mouse_Plasma_Stability-2019-11-30,ChemPartner,9.038850019
+MR-0008182-001,11/30/19 0:00,Metabolic Stability data summary for Morphic - 026_2019-12-09.xls-PK_Mouse_Plasma_Stability-2019-11-30,ChemPartner,0
+MR-0008344-001,1/15/20 0:00,Metabolic Stability data summary for Morphic - 034_2020-01-16.xls-PK_Mouse_Plasma_Stability-2020-01-15,ChemPartner,6.061014171
+MR-0008404-001,4/4/20 0:00,Metabolic Stability data summary for Morphic - 041_2020-04-05.xls,ChemPartner,9.522113301
+MR-0008349-001,12/21/19 0:00,Metabolic Stability data summary for Morphic -028_2019-12-23.xls-PK_Mouse_Plasma_Stability-2019-12-21,ChemPartner,10.12952339
+MR-0008350-001,12/21/19 0:00,Metabolic Stability data summary for Morphic -028_2019-12-23.xls-PK_Mouse_Plasma_Stability-2019-12-21,ChemPartner,100.0494597
+MR-0008411-001,12/29/19 0:00,Metabolic Stability data summary for Morphic - 030_2019-12-30.xls-PK_Mouse_Plasma_Stability-2019-12-29,ChemPartner,265.5668051
+MR-0008412-001,12/29/19 0:00,Metabolic Stability data summary for Morphic - 030_2019-12-30.xls-PK_Mouse_Plasma_Stability-2019-12-29,ChemPartner,109.2542
+MR-0008414-001,12/29/19 0:00,Metabolic Stability data summary for Morphic - 030_2019-12-30.xls-PK_Mouse_Plasma_Stability-2019-12-29,ChemPartner,101.5314782
+MR-0008409-001,12/29/19 0:00,Metabolic Stability data summary for Morphic - 030_2019-12-30.xls-PK_Mouse_Plasma_Stability-2019-12-29,ChemPartner,40.01244052
+MR-0007693-001,10/30/19 0:00,Metabolic Stability data summary for Morphic - 021_2019-11-01.xls-PK_Mouse_Plasma_Stability-2019-10-30,ChemPartner,2.145894009
+MR-0007656-001,10/30/19 0:00,Metabolic Stability data summary for Morphic - 021_2019-11-01.xls-PK_Mouse_Plasma_Stability-2019-10-30,ChemPartner,12.96950848
+MR-0007204-001,10/30/19 0:00,Metabolic Stability data summary for Morphic - 021_2019-11-01.xls-PK_Mouse_Plasma_Stability-2019-10-30,ChemPartner,4.993666577
+MR-0007012-001,10/30/19 0:00,Metabolic Stability data summary for Morphic - 021_2019-11-01.xls-PK_Mouse_Plasma_Stability-2019-10-30,ChemPartner,7.019424634
+MR-0007011-001,10/30/19 0:00,Metabolic Stability data summary for Morphic - 021_2019-11-01.xls-PK_Mouse_Plasma_Stability-2019-10-30,ChemPartner,2.563961085
+MR-0007461-001,10/30/19 0:00,Metabolic Stability data summary for Morphic - 021_2019-11-01.xls-PK_Mouse_Plasma_Stability-2019-10-30,ChemPartner,24.88906829
+MR-0007923-001,11/9/19 0:00,Metabolic Stability data summary for Morphic - 022_2019-11-11.xls-PK_Mouse_Plasma_Stability-2019-11-09,ChemPartner,1.676017763
+MR-0007921-001,11/9/19 0:00,Metabolic Stability data summary for Morphic - 022_2019-11-11.xls-PK_Mouse_Plasma_Stability-2019-11-09,ChemPartner,0
+MR-0008053-001,12/2/19 0:00,Metabolic Stability data summary for Morphic - 024_Mouse_2019-12-02.xls,ChemPartner,5.15
+MR-0008058-001,12/2/19 0:00,Metabolic Stability data summary for Morphic - 024_Mouse_2019-12-02.xls,ChemPartner,0
+MR-0008055-001,12/2/19 0:00,Metabolic Stability data summary for Morphic - 024_Mouse_2019-12-02.xls,ChemPartner,92.39
+MR-0008054-001,12/2/19 0:00,Metabolic Stability data summary for Morphic - 024_Mouse_2019-12-02.xls,ChemPartner,19.97
+MR-0008059-001,12/2/19 0:00,Metabolic Stability data summary for Morphic - 024_Mouse_2019-12-02.xls,ChemPartner,0
+MR-0008045-001,11/24/19 0:00,Metabolic Stability data summary for Morphic - 023_Mouse_2019-11-25.xls,ChemPartner,0
+MR-0008050-001,11/24/19 0:00,Metabolic Stability data summary for Morphic - 023_Mouse_2019-11-25.xls,ChemPartner,40.52
+MR-0008420-001,1/3/20 0:00,Metabolic Stability data summary for Morphic - 031_2020-01-06.xls-PK_Mouse_Plasma_Stability-2020-01-03,ChemPartner,75.88133281
+MR-0008614-001,1/10/20 0:00,Metabolic Stability data summary for Morphic - 033_2020-01-13.xls-PK_Mouse_Plasma_Stability-2020-01-10,ChemPartner,56.0806497
+MR-0008615-001,1/10/20 0:00,Metabolic Stability data summary for Morphic - 033_2020-01-13.xls-PK_Mouse_Plasma_Stability-2020-01-10,ChemPartner,48.17194894
+MR-0008617-001,1/10/20 0:00,Metabolic Stability data summary for Morphic - 033_2020-01-13.xls-PK_Mouse_Plasma_Stability-2020-01-10,ChemPartner,188.0399112
+MR-0008619-001,1/10/20 0:00,Metabolic Stability data summary for Morphic - 033_2020-01-13.xls-PK_Mouse_Plasma_Stability-2020-01-10,ChemPartner,240.010118
+MR-0008222-001,12/15/19 0:00,Metabolic Stability data summary for Morphic -027_2019-12-15-Mouse.xls,ChemPartner,6.13
+MR-0008214-001,12/15/19 0:00,Metabolic Stability data summary for Morphic -027_2019-12-15-Mouse.xls,ChemPartner,0

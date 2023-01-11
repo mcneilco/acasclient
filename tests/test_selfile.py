@@ -1,6 +1,6 @@
 import acasclient.selfile as acas_file
 from collections import OrderedDict
-from tests.test_acasclient import BaseAcasClientTest
+import unittest
 from pathlib import Path
 
 
@@ -36,7 +36,7 @@ dr_ref_fname = get_path('selfile/DoseResponse_Fit_Pre-Fit.csv')
 ###############################################################################
 
 
-class SimpleExperimentLoaderFileTests(BaseAcasClientTest):
+class SimpleExperimentLoaderFileTests(unittest.TestCase):
     def test_get_file_type(self):
         assert acas_file.get_file_type(gen_csv_in_fname) == acas_file.CSV
         assert acas_file.get_file_type(gen_xls_in_fname) == acas_file.XLS

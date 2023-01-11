@@ -2674,6 +2674,32 @@ class TestAcasclient(BaseAcasClientTest):
         all_meta_lots = self.client.get_all_meta_lots(project_codes=["FAKEPROJECT"])
         self.assertEqual(len(all_meta_lots), 0)
 
+    @requires_basic_cmpd_reg_load
+    def test_054_get_lot_corp_names_by_bulk_load_file(self):
+        """Test get lot corp names by bulk load file."""
+
+        files = self.client.\
+            get_cmpdreg_bulk_load_files()
+        lot_corp_names = self.client.\
+            get_lot_corp_names_by_bulk_load_file(files[0]["id"])
+        
+        self.assertGreater(len(lot_corp_names), 0)
+        self.assertIn('CMPD-0000001-001', lot_corp_names)
+        self.assertIn('CMPD-0000002-001', lot_corp_names)
+
+    @requires_basic_cmpd_reg_load
+    def test_055_get_sdf_by_bulk_load_file(self):
+        """Test get sdf by bulk load file."""
+
+        files = self.client.\
+            get_cmpdreg_bulk_load_files()
+        sdf_string = self.client.\
+            get_sdf_by_bulk_load_file(files[0]["id"])
+        
+        self.assertIn('<Parent Stereo Category>', sdf_string)
+        self.assertIn('CMPD-0000001-001', sdf_string)
+        self.assertIn('$$$$', sdf_string)
+
 
 def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None, file_name = None):
     if file_name is None:

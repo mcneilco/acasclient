@@ -2,7 +2,7 @@ import logging
 
 from .acasclient import (get_entity_label_by_label_type_kind,
                          get_entity_value_by_state_type_kind_value_type_kind)
-from .simpleexperimentloader import get_file_type, load_from_str
+from .selfile import get_file_type, load_from_str
 
 ################################################################################
 # Logging
@@ -16,7 +16,7 @@ ORIGINAL_PROJECT_KEY = "Original Project"
 ORIGINAL_EXPT_CODE_KEY = "Original Experiment Code"
 ORIGINAL_SERVER_KEY = "Original Server"
 SOURCE_FILE_KEY = "source file"
-
+DELETED_STATUS = "deleted"
 ################################################################################
 # Classes
 ################################################################################
@@ -42,6 +42,20 @@ class Experiment(dict):
     @property
     def id(self):
         return self['id']
+
+    @property
+    def status(self):
+        data = get_entity_value_by_state_type_kind_value_type_kind(
+                entity=self,
+                state_type="metadata",
+                state_kind="experiment metadata",
+                value_type="codeValue",
+                value_kind="experiment status")
+        return data["codeValue"]
+
+    @property
+    def deleted(self):
+        return self.status == DELETED_STATUS
 
     @property
     def protocol_name(self):

@@ -75,6 +75,7 @@ def meta_lot_to_dict(meta_lot):
     return_dict = {
         'mol': meta_lot["lot"]['asDrawnStruct'] if meta_lot["lot"]['asDrawnStruct'] is not None else meta_lot["lot"]["parent"]["molStructure"],
         "id": meta_lot["lot"]["id"],
+        "name": meta_lot["lot"]["corpName"],
         "parent_common_name": '; '.join(parent_common_names) if len(parent_common_names) > 0 else None,
         "parent_corp_name": meta_lot["lot"]["parent"]["corpName"],
         "lot_amount":  meta_lot["lot"]["amount"],

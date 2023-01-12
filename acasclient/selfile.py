@@ -4,8 +4,6 @@ Loader' files.
 Common formats are supported for both input and output: csv, and
 excel
 """
-# Contributors:  Shawn Watts
-
 
 ################################################################################
 # Packages

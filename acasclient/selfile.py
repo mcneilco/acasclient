@@ -318,8 +318,6 @@ class AbstractExperiment():
     def experiment_name(self, value):
         self.meta_has_changed = (value != self._experiment_name)
         self._experiment_name = value
-    # Alias
-    name = experiment_name
 
 
     @property

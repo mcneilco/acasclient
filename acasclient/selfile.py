@@ -433,7 +433,7 @@ class Generic(AbstractExperiment):
     and excel
     API examples:
     # Read an existing file, change the 'Project' metadata and save.
-    import datateam.fileio.acas as acas
+    import acasclient.selfile as acas
     expt = acas.Generic('35250_FG_acas.csv')
     expt.project = 'Test Project'
     expt.saveAs('35250_FG_modified.xlsx')
@@ -451,7 +451,7 @@ class Generic(AbstractExperiment):
     expt.page = 'page 19'
     expt.assay_date = '2020-05-20'
     expt.project = 'Star89'
-    # Dummy data, but this could come from a ctfile.sd_to_df, or
+    # Dummy data, but this could come from
     # rdkit.PandasTools, or whatever.
     expt.calculated_results_df = pd.DataFrame(
         {

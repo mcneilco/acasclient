@@ -529,15 +529,31 @@ class Generic(AbstractExperiment):
         """
         :param file_name: Path to output file to save record.
         :type file_name: str
+        :note: file_name or file_type argument but not both.  If using file_type, an io.BytesIO object or io.StringIO object is returned.
+        :raise: ValueError if the file extension is not recognized.
         """
 
         # Must provide either a file_name or a file_type but not both.
-        if file_name and file_type:
-            raise ValueError('Must provide either a file_name or a file_type but not both.')
+        if file_name is None and file_type is None:
+            raise ValueError('Must provide either a file_name or a file_type')
+        if file_name is not None and file_type is not None:
+            raise ValueError("Cannot provide both file_name and file_type")
 
-        # If file_name is provided, use it.
-        if file_name:
+        # If file_name is provided, use it to infer the file_type
+        if file_name is not None:
             file_type = get_file_type(file_name)
+
+        # Validate the file_type
+        if file_type is not None:
+            if file_type not in [CSV, XLS, XLSX]:
+                raise ValueError(f'Unknown file type {file_type}')
+
+        # If file_name is None at this point, then set it to bytes or str object
+        if file_name is None:
+            if file_type == CSV:
+                file_name = io.BytesIO()
+            else:
+                file_name = io.StringIO()
 
         # Placeholder for better validation.
         self.validate()
@@ -574,8 +590,6 @@ class Generic(AbstractExperiment):
             output = df_out.to_csv(file_name, header=None, index=False)
         elif file_type in [XLS, XLSX]:
             output = df_out.to_excel(file_name, header=None, index=False)
-        else:
-            raise ValueError(f'Unknown file type {file_type}')
         return output
 
     def validate(self):

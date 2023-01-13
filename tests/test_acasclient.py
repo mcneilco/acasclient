@@ -3512,7 +3512,148 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('Number of warnings: 0', response['summary'])
         self.assertIn('New compounds: 0', response['summary'])
         self.assertIn('New lots of existing compounds: 2', response['summary'])
-    
+
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_009_upload_cmpdreg_files(self):
+        """Test post meta lot."""
+        # Get all lots
+        all_lots = self.client.get_all_lots()
+
+        # Sort lots by id and get the latest corp id
+        # This is because we dont' get the corp id in the response from the bulkload
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        lot_corp_name = all_lots[-1]['lotCorpName']
+        
+        # The default user is 'bob' and bob has cmpdreg admin role
+        # The basic cmpdreg load has a lot registered that is unrestricted (Global project)
+        meta_lot = self.client.\
+            get_meta_lot(lot_corp_name)
+
+        # File to save
+        file_name1 = 'dummy.pdf'
+        file_test_path1 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name1)
+        file_name2 = 'dummy2.pdf'
+        file_test_path2 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name2)
+        # Save the file
+        file_type1 = "HPLC"
+        file_type2 = "LCMS"
+        writeup1="My writeup on the file1"
+        writeup2="My writeup on the file2"
+
+        # Test single upload
+        file_response = self.client._upload_cmpd_reg_file(lot_corp_name, file=file_test_path1, file_type=file_type1, writeup=writeup1)
+        self.assertEqual(file_response['name'], file_name1)
+        self.assertEqual(file_response['description'], file_type1)
+        self.assertEqual(file_response['writeup'], writeup1)
+        self.assertEqual(file_response['subdir'], lot_corp_name)
+        self.assertEqual(file_response['uploaded'], True)
+
+        # Verify that uploading with no writeup works
+        file_response = self.client._upload_cmpd_reg_file(lot_corp_name, file=file_test_path1, file_type=file_type1, writeup=None)
+        self.assertEqual(file_response['name'], file_name1)
+        self.assertEqual(file_response['description'], file_type1)
+        self.assertEqual(file_response['writeup'], "")
+
+        # Setup multiple upload
+        files = [
+            {
+                "file": file_test_path1,
+                "file_type": file_type1,
+                "writeup": writeup1
+            },
+            {
+                "file": file_test_path2,
+                "file_type": file_type2,
+                "writeup": writeup2
+            }
+        ]
+        response =  self.client._upload_cmpdreg_files(lot_corp_name, files=files)
+        self.assertEqual(len(response), 2)
+        self.assertEqual(response[0]['name'], file_name1)
+        self.assertEqual(response[0]['description'], file_type1)
+        self.assertEqual(response[0]['writeup'], writeup1)
+        self.assertEqual(response[0]['subdir'], lot_corp_name)
+        self.assertEqual(response[0]['uploaded'], True)
+        self.assertEqual(response[1]['name'], file_name2)
+        self.assertEqual(response[1]['description'], file_type2)
+        self.assertEqual(response[1]['writeup'], writeup2)
+        self.assertEqual(response[1]['subdir'], lot_corp_name)
+        self.assertEqual(response[1]['uploaded'], True)
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_009_upload_lot_files(self):
+        """ Test saving file to lot"""
+
+        all_lots = self.client.get_all_lots()
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        lot_corp_name1 = all_lots[-1]['lotCorpName']
+
+        # Create files to upload
+        file_name1 = 'dummy.pdf'
+        file_test_path1 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name1)
+        file_type1 = "HPLC"
+        writeup1="My writeup on the file1"
+
+        file_name2 = 'dummy2.pdf'
+        file_test_path2 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name2)
+        file_type2 = "LCMS"
+        writeup2="My writeup on the file2"
+
+        # Test single upload
+        meta_lot_save_response = self.client.add_file_to_lot(lot_corp_name1, file=file_test_path1, file_type=file_type1, writeup=writeup1)
+        self.assertEqual(len(meta_lot_save_response["errors"]), 0)
+        self.assertIn("metalot", meta_lot_save_response)
+        self.assertIn("fileList", meta_lot_save_response["metalot"])
+        
+        # Verify that the fileList has the file we just uploaded by checking the name
+        has_file = False
+        for file in meta_lot_save_response["metalot"]["fileList"]:
+            if file["name"] == file_name1:
+                has_file = True
+                break
+        self.assertTrue(has_file)
+
+        # Test multiple upload
+        files = [
+            {
+                "file": file_test_path1,
+                "file_type": file_type1,
+                "writeup": writeup1
+            },
+            {
+                "file": file_test_path2,
+                "file_type": file_type2,
+                "writeup": writeup2
+            }
+        ]
+        meta_lot_save_response = self.client.add_files_to_lot(lot_corp_name1, files=files)
+        self.assertEqual(len(meta_lot_save_response["errors"]), 0)
+        self.assertIn("metalot", meta_lot_save_response)
+        self.assertIn("fileList", meta_lot_save_response["metalot"])
+
+        # Verify that the fileList has the files we just uploaded by checking the names
+        has_file1 = False
+        has_file2 = False
+        for file in meta_lot_save_response["metalot"]["fileList"]:
+            if file["name"] == file_name1:
+                has_file1 = True
+            if file["name"] == file_name2:
+                has_file2 = True
+        self.assertTrue(has_file1)
+        self.assertTrue(has_file2)
+        
+        
+
+
+
+       
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

@@ -361,6 +361,141 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
+    def add_files_to_lot(self, lot_corp_name, files):
+        """Attach files to a lot.
+
+        Attach files to a lot by passing a list of files and the lot's corp name.
+
+        Args:
+            lot_corp_name: The corp name of the lot to attach the files to.
+            files: An array of dicts with the following keys
+                "file" (Path): The file path to upload
+                "type" (str): The type of file to upload
+                "writeup" (str): The writeup for the file
+        
+        Returns: A dict with errors array and metalot dict object with the files attached to the lot
+
+        """
+        
+        # Get the meta lot to make sure it exists
+        meta_lot = self.get_meta_lot(lot_corp_name)
+
+        # Upload the files to cmpd reg
+        uploaded_files = self._upload_cmpdreg_files(lot_corp_name, files)
+
+        # Attach the files to the lot
+        for uploaded_file in uploaded_files:
+            meta_lot['fileList'].append(uploaded_file)
+
+        # Update the meta lot
+        meta_lot_save_response = self.save_meta_lot(meta_lot)
+
+        return meta_lot_save_response
+
+    def add_file_to_lot(self, lot_corp_name, file, file_type, writeup=None):
+        """Add a file to a lot
+
+        Uploads and attaches a file to a lot
+
+        Args:
+            lot_corp_name (str): The corp name of the lot to attach the files to.
+            file (Path): The file path to upload
+            type (str): The type of file to upload
+            writeup (str): The writeup for the file
+
+        Returns: A dict with errors array and metalot dict object with the files attached to the lot
+
+        """
+        return self.add_files_to_lot(lot_corp_name, [{"file": file, "file_type": file_type, "writeup": writeup}])
+
+    def _upload_cmpdreg_files(self, lot_corp_name, files):
+        """Upload a list of files to CmpdReg.
+
+        Pass an array of files to ACAS and upload them to the creg server
+
+        Args:
+            lot_corp_name (str): The lot corp name to upload the file to
+            files: An array of dicts with the following keys
+                "file" (Path): The file path to upload
+                "type" (str): The type of file to upload
+                "writeup" (str): The writeup for the file
+
+        Returns:
+            An object of responses from ACAS in the form:
+
+        .. code-block:: python
+
+            [
+                {
+                    "description": "HPLC",
+                    "ie": true,
+                    "name": "dummy.pdf",
+                    "size": 13264,
+                    "subdir": "CMPD-0000002-001",
+                    "type": "application/pdf",
+                    "uploaded": true,
+                    "url": "getFile?file
+                }
+            ]
+        """
+        filesToUpload = ()
+        for file_dict in files:
+            filesToUpload = filesToUpload + (('file[]', (file_dict["file"].name, file_dict["file"].open('rb'), 'application/octet-stream')),)
+            filesToUpload = filesToUpload + (('description[]', (None, file_dict["file_type"])),)
+            # If there is no writeup, or if we set the writeup to empty quotes "" the multipart form service in acas will fail
+            # Setting a single space character sets the writeup to "" in the database
+            if "writeup" not in file_dict or file_dict["writeup"] is None:
+                writeup = " "
+            else:
+                writeup = file_dict["writeup"]
+            filesToUpload = filesToUpload + (('writeup[]', (None, writeup)),)
+
+        filesToUpload = filesToUpload + (('subdir', (None, lot_corp_name)),)
+        filesToUpload = filesToUpload + (('ie', (None, 'true')),)
+
+        headers = {
+            'Accept': 'application/json'
+        }
+        resp = self.session.post("{}/cmpdreg/filesave".format(self.url),
+                                 headers=headers,
+                                 files=filesToUpload)
+
+        resp.raise_for_status()
+        return resp.json()
+
+    def _upload_cmpd_reg_file(self, lot_corp_name, file, file_type, writeup=None):
+        """Upload a file to CmpdReg.
+
+        Upload a file to a specific lot corp name folder in cmpdreg
+        Note: This does not attach the file to the specific lot it just uploads the file to that folder
+
+        Args:
+            lot_corp_name (str): The lot corp name to upload the file to
+            file (Path): The file path to upload
+            type (str): The type of file to upload
+            writeup (str): The writeup for the file
+
+        Returns:
+            An object of responses from ACAS in the form:
+        .. code-block:: python
+
+            [
+                {
+                    "description": "HPLC",
+                    "ie": true,
+                    "name": "dummy.pdf",
+                    "size": 13264,
+                    "subdir": "CMPD-0000002-001",
+                    "type": "application/pdf",
+                    "uploaded": true,
+                    "url": "getFile?fileUrl=%2Fhome%2Frunner%2Fbuild%2FprivateUploads%2Fcmpdreg%2FnoteBookFiles%2FnoteBook%2FCMPD-0000002-001%2Fdummy.pdf",
+                    "writeup": "Nothing"
+                }
+            ]
+        """
+        response = self._upload_cmpdreg_files(lot_corp_name, [{"file": file, "file_type": file_type, "writeup": writeup}])
+        return response[0]
+
     def get_meta_lot(self, lot_corp_name):
         """Get metalot by lot corp name
          Granted read permission on a lot if one of these is true:

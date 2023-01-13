@@ -3513,7 +3513,6 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('New compounds: 0', response['summary'])
         self.assertIn('New lots of existing compounds: 2', response['summary'])
 
-
     @requires_node_api
     @requires_basic_cmpd_reg_load
     def test_009_upload_cmpdreg_files(self):
@@ -3649,11 +3648,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertTrue(has_file1)
         self.assertTrue(has_file2)
         
-        
 
-
-
-       
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

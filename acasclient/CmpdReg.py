@@ -6,10 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
 class AdditionalScientistType(Enum):
     """Enum for additional scientist types."""
     COMPOUND = ACASDDict('compound', 'scientist')
     ASSAY = ACASDDict('assay', 'scientist')
+
 
 class AdditionalScientist():
     """Additional Scientist class."""
@@ -37,11 +39,13 @@ class AdditionalScientist():
             'type': self.type.name
         }
 
+
 class AdditionalCompoundScientist(AdditionalScientist):
     """Additional Compound Scientist class."""
 
     def __init__(self, id=None, code=None, name=None, ignored=None):
         super().__init__(AdditionalScientistType.COMPOUND, id, code, name, ignored)
+
 
 class AdditionalAssayScientist(AdditionalScientist):
     """Additional Assay Scientist class."""
@@ -50,10 +54,9 @@ class AdditionalAssayScientist(AdditionalScientist):
         super().__init__(AdditionalScientistType.ASSAY, id, code, name, ignored)
 
 
-
 def meta_lots_to_dict_array(meta_lots):
-
     return [meta_lot_to_dict(meta_lot) for meta_lot in meta_lots]
+
 
 def meta_lot_to_dict(meta_lot):
     parent_common_names = [parent_alias["aliasName"] for parent_alias in meta_lot["lot"]["saltForm"]["parent"]["parentAliases"] if parent_alias["lsKind"] == "Common Name"]
@@ -104,9 +107,10 @@ def meta_lot_to_dict(meta_lot):
     }
     return return_dict
 
+
 def convert_dict_to_type(dict, type_name):
     """Converts a dictionary to a type."""
-    
+
     # Add a _fields attribute with the keys of the dictionary
     dict['_fields'] = list(dict.keys())
     def as_dict(self):
@@ -125,40 +129,41 @@ def convert_dict_to_type(dict, type_name):
     new_type.as_dict = types.MethodType( as_dict, new_type )
     return new_type
 
+
 def convert_object_to_sdf(object):
     """Converts an object to an SDF."""
 
-    #Convert object to dictionary
+    # Convert object to dictionary
     object_dict = object.as_dict()
 
-    #Get the molfile
+    # Get the molfile
     molfile = object_dict['mol']
 
-    #Remove the molfile from the dictionary
+    # Remove the molfile from the dictionary
     del object_dict['mol']
 
-    #Change the dict keys from snake case to space case
+    # Change the dict keys from snake case to space case
     object_dict = {key.replace('_', ' ').title(): value for key, value in object_dict.items()}
 
-    #Strip any '$'s and newlines from the end of the molfile
+    # Strip any '$'s and newlines from the end of the molfile
     molfile = molfile.rstrip().rstrip('$').rstrip()
 
-    #Format of SDF is:
-    #{molfile}
-    #>  <{key}>
-    #{value}
+    # Format of SDF is:
+    # {molfile}
+    # >  <{key}>
+    # {value}
     #
-    #>  <{key}>
-    #{value}
+    # >  <{key}>
+    # {value}
     #
-    #$$$$
-    #So we need to add the >  <{key}> to the beginning of each value
+    # $$$$
+    # So we need to add the >  <{key}> to the beginning of each value
     object_dict = {f'>  <{key}>': value for key, value in object_dict.items()}
 
-    #Join the object keys and values like the format above
+    # Join the object keys and values like the format above
     sdf = '\n'.join([f'{key}\n{value}\n' for key, value in object_dict.items() if value is not None and value != ''])
     
-    #Add the molfile to the beginning of the sdf and add the $$$$ at the end
+    # Add the molfile to the beginning of the sdf and add the $$$$ at the end
     sdf = f'{molfile}\n{sdf}\n$$$$'
 
     return sdf
@@ -166,19 +171,19 @@ def convert_object_to_sdf(object):
 
 def create_cmpd_reg_mapping_from_object(object):
     """Creates a compound registration mapping from an object."""
-    #Convert object to dictionary
+    # Convert object to dictionary
     object_dict = object.as_dict()
 
-    #For each of the keys in the object, reate an object of the form:
-        # "dbProperty": "Lot Amount Units",
-        # "defaultVal": null,
-        # "required": false,
-        # "sdfProperty": "Lot Amount Units"
+    # For each of the keys in the object, reate an object of the form:
+    # "dbProperty": "Lot Amount Units",
+    # "defaultVal": null,
+    # "required": false,
+    # "sdfProperty": "Lot Amount Units"
 
-    #Get the keys of the object
+    # Get the keys of the object
     keys = object_dict.keys()
 
-    #Create the mapping
+    # Create the mapping
     mapping = []
     for key in keys:
         mapping.append({

@@ -3675,9 +3675,8 @@ class TestCmpdReg(BaseAcasClientTest):
         parent = meta_lot["lot"]["saltForm"]["parent"]
         self.assertEquals(0, len(parent['parentAliases']))
 
-    
-
     @requires_node_api
+    @requires_absent_basic_cmpd_reg_load
     @requires_basic_cmpd_reg_load
     def test_011_upload_cmpdreg_files(self):
         """Test post meta lot."""

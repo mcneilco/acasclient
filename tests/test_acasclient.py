@@ -13,6 +13,8 @@ import json
 import operator
 import signal
 import requests
+from typing import List, Dict, Any, Optional
+from csv import DictReader
 
 # Import project ls thing
 from datetime import datetime
@@ -332,6 +334,17 @@ def requires_basic_experiment_load(func):
                     break
         return func(self, current_experiment)
     return wrapper
+
+def read_registered_csv(bulk_loader_response: dict) -> List[dict]:
+    """
+    Reads the registered.csv file from the bulk loader response and returns a list of dicts
+    """
+    report_files = bulk_loader_response['report_files']
+    for report_file in report_files:
+        if report_file['name'].endswith('registered.csv'):
+            reader = DictReader(report_file['content'].decode('utf-8').splitlines())
+            return list(reader)
+    return []
 
 class BaseAcasClientTest(unittest.TestCase):
     """ Base class for ACAS Client tests """
@@ -3674,6 +3687,80 @@ class TestCmpdReg(BaseAcasClientTest):
         meta_lot = self.client.get_meta_lot('CMPD-0000012-001')
         parent = meta_lot["lot"]["saltForm"]["parent"]
         self.assertEquals(0, len(parent['parentAliases']))
+    
+    @requires_absent_basic_cmpd_reg_load
+    def test_011_max_auto_lot_number(self):
+        # Load a file with a high lot number above the max auto lot number
+        file_a = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'ibuprofen_big_lot_number.sdf')
+        project_code = self.global_project_code
+        mappings = [
+                {
+                    "dbProperty": "Lot Number",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Number"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": STEREO_CATEGORY,
+                    "required": True,
+                    "sdfProperty": None
+                }
+            ]
+        response = self.client.register_sdf(file_a, "bob", mappings, dry_run=False)
+        self.assertIn('New compounds: 1', response['summary'])
+        # Confirm it got lot 4000, and extract the parent number
+        registered = read_registered_csv(response)
+        lot_4000_corp_name = registered[0]['Corp Name in DB']
+        self.assertIn('-4000', lot_4000_corp_name)
+        parent_a_corp_name = lot_4000_corp_name.replace('-4000', '')
+
+        # Register a second parent with different structure
+        file_b = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'ibuprofen_methyl_ester.sdf')
+        response = self.client.register_sdf(file_b, "bob", mappings[1:], dry_run=False)
+        registered = read_registered_csv(response)
+        # Confirm it gets lot 1
+        lot_b_corp_name = registered[0]['Corp Name in DB']
+        print(f"lot_b_corp_name: {lot_b_corp_name}")
+        self.assertIn('-001', lot_b_corp_name)
+
+        # Reparent Lot Test 1:
+        # Where the destination parent has only a large lot number
+        # Try transferring the second parent onto the first
+        reparent_resp = self.client.reparent_lot(lot_b_corp_name, parent_a_corp_name, dry_run=True)
+        # Confirm we get lot 1
+        proposed_lot_corp_name = reparent_resp['newLot']['corpName']
+        self.assertIn('-001', proposed_lot_corp_name)
+
+        # Reparent Lot Test 2:
+        # Where the destination parent has both a large lot number and a small lot number
+        # Load structure A with no lot number set
+        response = self.client.register_sdf(file_a, "bob", mappings[1:], dry_run=False)
+        registered = read_registered_csv(response)
+        lot_a1_corp_name  = registered[0]['Corp Name in DB']
+        # Confirm it gets lot 1
+        # This also tests maxAutoLotNumber with bulk loader
+        self.assertIn('-001', lot_a1_corp_name)
+        # Reparent second onto first
+        reparent_resp = self.client.reparent_lot(lot_b_corp_name, parent_a_corp_name, dry_run=True)
+        # Confirm we get lot 2
+        proposed_lot_corp_name = reparent_resp['newLot']['corpName']
+        self.assertIn('-002', proposed_lot_corp_name)
+        
 
     @requires_node_api
     @requires_absent_basic_cmpd_reg_load

@@ -138,7 +138,7 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
         value_kind: String. The value type of the value.
 
     Returns:
-        A dict object representing the value if it exits. Ot.herwise it
+        A dict object representing the value if it exits. Otherwise it
         returns None
 
     """
@@ -154,6 +154,31 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         value = v
                         break
     return value
+
+
+def get_entity_label_by_label_type_kind(entity: dict, label_type: str, label_kind: str) -> str:
+    """Get a label from an acas entity dict object.
+
+    Gets a specific label from an acas entity dict object.
+
+    Args:
+        entity: Any ACAS entity (protocol, experiment, analysis_group,
+        treatment_group, container...etc.)
+        label_type: String. The label type of the value.
+        label_kind: String. The label kind of the value.
+
+    Returns:
+        A dict object representing the label if it exits. Otherwise it
+        returns None
+
+    """
+    label = None
+    for l in entity["lsLabels"]:
+        if (not l["deleted"] and not l["ignored"] and
+                l["lsType"] == label_type and l["lsKind"] == label_kind):
+            label = l
+            break
+    return label
 
 def sdf_iterator(iteratable):
     data = []

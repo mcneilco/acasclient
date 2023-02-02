@@ -1,9 +1,10 @@
 import logging
+from typing import Optional
 
 from .acasclient import (get_entity_label_by_label_type_kind,
                          get_entity_value_by_state_type_kind_value_type_kind)
 from .selfile import get_file_type, load_from_str
-
+from acasclient import Client, SimpleExperiment
 ################################################################################
 # Logging
 ################################################################################
@@ -20,11 +21,12 @@ DELETED_STATUS = "deleted"
 ################################################################################
 # Classes
 ################################################################################
+
+
 class Experiment(dict):
+    """Simple class which adds some convenience methods to an experiment dict to fetch common values and data from the experiment.
     """
-    class to make acas experiment object more versatile
-    """
-    def __init__(self, expt_dict, client=None):
+    def __init__(self, expt_dict: dict, client: Optional[Client] = None) -> None:
         dict.__init__(self, expt_dict)
         # set after source file is written
         self.exported_path = None
@@ -36,15 +38,15 @@ class Experiment(dict):
         return
     
     @property
-    def code(self):
+    def code(self) -> str:
         return self['codeName']
 
     @property
-    def id(self):
+    def id(self) -> str:
         return self['id']
 
     @property
-    def status(self):
+    def status(self) -> str:
         data = get_entity_value_by_state_type_kind_value_type_kind(
                 entity=self,
                 state_type="metadata",
@@ -54,11 +56,11 @@ class Experiment(dict):
         return data["codeValue"]
 
     @property
-    def deleted(self):
+    def deleted(self) -> bool:
         return self.status == DELETED_STATUS
 
     @property
-    def protocol_name(self):
+    def protocol_name(self) -> str:
         protocol_name = get_entity_label_by_label_type_kind(
                 entity=self["protocol"],
                 label_type="name",
@@ -66,7 +68,7 @@ class Experiment(dict):
         return protocol_name["labelText"]
 
     @property
-    def project(self):
+    def project(self) -> None:
         prj = get_entity_value_by_state_type_kind_value_type_kind(
                 entity=self,
                 state_type="metadata",
@@ -76,7 +78,7 @@ class Experiment(dict):
         return prj["codeValue"]
 
     @property
-    def name(self):
+    def name(self) -> str:
         experiment_name = get_entity_label_by_label_type_kind(
                 entity=self,
                 label_type="name",
@@ -84,7 +86,7 @@ class Experiment(dict):
         return experiment_name["labelText"]
 
     @property
-    def source_file(self):
+    def source_file(self) -> str:
         data = get_entity_value_by_state_type_kind_value_type_kind(
             entity=self, 
             state_type="metadata", 
@@ -93,7 +95,7 @@ class Experiment(dict):
             value_kind=SOURCE_FILE_KEY)
         return data.get('fileValue') if data else None
 
-    def get_source_file(self, client=None):
+    def get_source_file(self, client: Client = None) -> dict:
         file = None
         source_file = self.source_file
         if source_file is not None:
@@ -101,7 +103,7 @@ class Experiment(dict):
                         .format(source_file))
         return file
 
-    def get_simple_experiment(self, client=None):
+    def get_simple_experiment(self, client=None) -> SimpleExperiment:
         """
         get a simple experiment from the server
         """
@@ -113,7 +115,7 @@ class Experiment(dict):
         return simple_experiment
     
     @property
-    def original_experiment_code(self):
+    def original_experiment_code(self) -> str:
         data = get_entity_value_by_state_type_kind_value_type_kind(
             entity=self, 
             state_type="metadata", 
@@ -123,7 +125,7 @@ class Experiment(dict):
         return data.get('stringValue') if data else None
     
     @property
-    def original_project(self):
+    def original_project(self) -> str:
         data = get_entity_value_by_state_type_kind_value_type_kind(
             entity=self,
             state_type="metadata",
@@ -133,7 +135,7 @@ class Experiment(dict):
         return data.get('stringValue') if data else None
     
     @property
-    def original_server(self):
+    def original_server(self) -> str:
         data = get_entity_value_by_state_type_kind_value_type_kind(
             entity=self,
             state_type="metadata",

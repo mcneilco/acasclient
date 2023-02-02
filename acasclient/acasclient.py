@@ -155,8 +155,8 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         break
     return value
 
-def get_entity_label_by_label_type_kind(entity, label_type,
-                                                        label_kind):
+
+def get_entity_label_by_label_type_kind(entity: dict, label_type: str, label_kind: str) -> str:
     """Get a label from an acas entity dict object.
 
     Gets a specific label from an acas entity dict object.

@@ -1,7 +1,9 @@
+from __future__ import annotations
 from acasclient.ddict import ACASDDict
 from enum import Enum
 import types
 import logging
+from acasclient import Client
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -15,22 +17,23 @@ class AdditionalScientistType(Enum):
 
 class AdditionalScientist():
     """Additional Scientist class."""
-    def __init__(self, type: AdditionalScientistType, id=None, code=None, name=None, ignored=None):
+    def __init__(self, type: AdditionalScientistType, id: int = None, code: str = None, name: str = None, ignored: bool = None):
         self.id = id
         self.ignored = ignored
         self.code = code
         self.name = name
         self.type = type
-        
-    def save(self, client):
+
+    def save(self, client: Client) -> AdditionalScientist:
+        """Save the scientist to the server."""
         if self.type == AdditionalScientistType.COMPOUND:
-            resp =client.create_cmpdreg_scientist(self.code, self.name)
+            resp = client.create_cmpdreg_scientist(self.code, self.name)
         elif self.type == AdditionalScientistType.ASSAY:
             resp = client.create_assay_scientist(self.code, self.name)
         self.id = resp['id']
         return self
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
         return {
             'id': self.id,
             'code': self.code,
@@ -43,27 +46,29 @@ class AdditionalScientist():
 class AdditionalCompoundScientist(AdditionalScientist):
     """Additional Compound Scientist class."""
 
-    def __init__(self, id=None, code=None, name=None, ignored=None):
+    def __init__(self, id: int = None, code: str = None, name: str = None, ignored: bool = None):
         super().__init__(AdditionalScientistType.COMPOUND, id, code, name, ignored)
 
 
 class AdditionalAssayScientist(AdditionalScientist):
     """Additional Assay Scientist class."""
 
-    def __init__(self, id=None, code=None, name=None, ignored=None):
+    def __init__(self, id: int = None, code: str = None, name: str = None, ignored: bool = None):
         super().__init__(AdditionalScientistType.ASSAY, id, code, name, ignored)
 
 
-def meta_lots_to_dict_array(meta_lots):
+def meta_lots_to_dict_array(meta_lots: list[dict]) -> list[dict]:
+    """Converts a list of meta lots to a list of flattened dictionaries which specific fields which are suitable for upload via CmpdReg BulkLoader."""
     return [meta_lot_to_dict(meta_lot) for meta_lot in meta_lots]
 
 
-def meta_lot_to_dict(meta_lot):
+def meta_lot_to_dict(meta_lot: dict) -> dict:
+    """Converts a meta lot to a dictionary into a flat dictionary of specific fields."""
     parent_common_names = [parent_alias["aliasName"] for parent_alias in meta_lot["lot"]["saltForm"]["parent"]["parentAliases"] if parent_alias["lsKind"] == "Common Name"]
 
     # Check for salts
-    salt_abrevs = [iso_salt['salt']["abbrev"] for iso_salt in  meta_lot["isosalts"]]
-    salt_equivs = [str(iso_salt["equivalents"]) for iso_salt in  meta_lot["isosalts"]]
+    salt_abrevs = [iso_salt['salt']["abbrev"] for iso_salt in meta_lot["isosalts"]]
+    salt_equivs = [str(iso_salt["equivalents"]) for iso_salt in meta_lot["isosalts"]]
 
     # Synthesis date is in the format MM/DD/YYYY
     # However Creg isn't good at converting the date back to the correct format
@@ -108,12 +113,19 @@ def meta_lot_to_dict(meta_lot):
     return return_dict
 
 
-def convert_dict_to_type(dict, type_name):
-    """Converts a dictionary to a type."""
+def convert_dict_to_type(dict: dict, type_name: str) -> object:
+    """Converts a dictionary to a dynamic python type and instaniates a new object of that type.
+    
+    :param dict: The dictionary to convert
+    :param type_name: The name of the new type
+    :return: A new type with the keys of the dictionary as attributes
+    """
 
     # Add a _fields attribute with the keys of the dictionary
     dict['_fields'] = list(dict.keys())
-    def as_dict(self):
+
+    # A method added to the dynamic type which can be used to conver the type back to a dictionary
+    def as_dict(self) -> dict:
         """
         Return a map of attribute name and attribute values stored on the
         instance.
@@ -123,15 +135,22 @@ def convert_dict_to_type(dict, type_name):
             field: getattr(self, field, None)
             for field in self._fields
         }
+
+    # Create a new type with the dictionary as the attributes
+    # and instantiates a new object of that type
     new_type = type(type_name, (object,), dict)()
 
     # Add the as_dict method to the new type
-    new_type.as_dict = types.MethodType( as_dict, new_type )
+    new_type.as_dict = types.MethodType(as_dict, new_type)
     return new_type
 
 
-def convert_object_to_sdf(object):
-    """Converts an object to an SDF."""
+def convert_object_to_sdf(object) -> str:
+    """Converts an object to an SDF with each of the keys and values as mol properties.
+    
+    :param object: The object to convert which must have an as_dict method and a mol attribute
+    :return: The object as an SDF
+    """
 
     # Convert object to dictionary
     object_dict = object.as_dict()
@@ -162,15 +181,67 @@ def convert_object_to_sdf(object):
 
     # Join the object keys and values like the format above
     sdf = '\n'.join([f'{key}\n{value}\n' for key, value in object_dict.items() if value is not None and value != ''])
-    
+
     # Add the molfile to the beginning of the sdf and add the $$$$ at the end
     sdf = f'{molfile}\n{sdf}\n$$$$'
 
     return sdf
 
 
-def create_cmpd_reg_mapping_from_object(object):
-    """Creates a compound registration mapping from an object."""
+def create_cmpd_reg_mapping_from_object(object) -> list[dict]:
+    """Creates a compound registration mapping array of dictionaries from an object.
+    
+    Example input:
+        {
+            "lot_color": "Blue",
+            "lot_corp_name": "Test Corp",
+            "lot_number": "1",
+            "parent_stereo_category": "R",
+            "parent_stereo_comment": ,
+            "lot_chemist": "Test Chemist"
+        }
+    Example output:
+        [
+            {
+                "dbProperty": "Lot Color",
+                "defaultVal": null,
+                "required": false,
+                "sdfProperty": "Lot Color"
+            },
+            {
+                "dbProperty": "Lot Corp Name",
+                "defaultVal": null,
+                "required": false,
+                "sdfProperty": "Lot Corp Name"
+            },
+            {
+                "dbProperty": "Lot Number",
+                "defaultVal": null,
+                "required": false,
+                "sdfProperty": "Lot Number"
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": null,
+                "required": false,
+                "sdfProperty": "Parent Stereo Category"
+            },
+            {
+                "dbProperty": "Parent Stereo Comment",
+                "defaultVal": null,
+                "required": false,
+                "sdfProperty": "Parent Stereo Comment"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": null,
+                "required": false,
+                "sdfProperty": "Lot Chemist"
+            }
+        ]
+    :param object: The object to convert which must have an as_dict method
+    :return: The mapping array of dictionaries which creates a compound registration mapping
+    """
     # Convert object to dictionary
     object_dict = object.as_dict()
 

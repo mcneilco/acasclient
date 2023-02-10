@@ -1,9 +1,9 @@
 from __future__ import annotations
-from acasclient.ddict import ACASDDict
+from .ddict import ACASDDict
 from enum import Enum
 import types
 import logging
-from acasclient import Client
+from .acasclient import client
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +24,7 @@ class AdditionalScientist():
         self.name = name
         self.type = type
 
-    def save(self, client: Client) -> AdditionalScientist:
+    def save(self, client: client) -> AdditionalScientist:
         """Save the scientist to the server."""
         if self.type == AdditionalScientistType.COMPOUND:
             resp = client.create_cmpdreg_scientist(self.code, self.name)

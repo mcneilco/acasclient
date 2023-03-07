@@ -2113,7 +2113,24 @@ en array of protocols
                         "comments": "CMPD-0000001-001",
                         "description": "6 results",
                         "ignored": false,
-                        "name": "BLAH"
+                        "name": "BLAH",
+                        "analysisGroups": [
+                            {
+                                "code": "AG-00000001",
+                                "values": [
+                                    {
+                                        "id": 1,
+                                        "lsKind": "key",
+                                        "lsType": "numericValue",
+                                        "value": 6
+                                    }
+                                ]
+                            }
+                        ],
+                        "protocol": {
+                            "code": "PROT-00000001",
+                            "name": "Test Protocol"
+                        }
                     }
                 ],
                 "linkedLots": [

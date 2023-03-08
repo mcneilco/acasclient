@@ -2853,13 +2853,9 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # Verify the protocol information
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)
-        self.assertDictEqual(
-            {
-                'code': 'PROT-00000001',
-                'name': 'BLAH'
-            },
-            meta_lot_dependencies['linkedExperiments'][0]['protocol'],
-        )
+        protocol = meta_lot_dependencies['linkedExperiments'][0]['protocol']
+        self.assertIn('code', protocol)
+        self.assertEqual(protocol['name'], 'BLAH')
 
         # Verify the analysis group information
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)

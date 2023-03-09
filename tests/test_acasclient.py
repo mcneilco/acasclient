@@ -13,6 +13,8 @@ import json
 import operator
 import signal
 import requests
+from typing import List, Dict, Any, Optional
+from csv import DictReader
 
 # Import project ls thing
 from datetime import datetime
@@ -332,6 +334,17 @@ def requires_basic_experiment_load(func):
                     break
         return func(self, current_experiment)
     return wrapper
+
+def read_registered_csv(bulk_loader_response: dict) -> List[dict]:
+    """
+    Reads the registered.csv file from the bulk loader response and returns a list of dicts
+    """
+    report_files = bulk_loader_response['report_files']
+    for report_file in report_files:
+        if report_file['name'].endswith('registered.csv'):
+            reader = DictReader(report_file['content'].decode('utf-8').splitlines())
+            return list(reader)
+    return []
 
 class BaseAcasClientTest(unittest.TestCase):
     """ Base class for ACAS Client tests """
@@ -3674,8 +3687,218 @@ class TestCmpdReg(BaseAcasClientTest):
         meta_lot = self.client.get_meta_lot('CMPD-0000012-001')
         parent = meta_lot["lot"]["saltForm"]["parent"]
         self.assertEquals(0, len(parent['parentAliases']))
-
     
+    @requires_absent_basic_cmpd_reg_load
+    def test_011_max_auto_lot_number(self):
+        # Load a file with a high lot number above the max auto lot number
+        file_a = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'ibuprofen_big_lot_number.sdf')
+        project_code = self.global_project_code
+        mappings = [
+                {
+                    "dbProperty": "Lot Number",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Number"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": STEREO_CATEGORY,
+                    "required": True,
+                    "sdfProperty": None
+                }
+            ]
+        response = self.client.register_sdf(file_a, "bob", mappings, dry_run=False)
+        self.assertIn('New compounds: 1', response['summary'])
+        # Confirm it got lot 4000, and extract the parent number
+        registered = read_registered_csv(response)
+        lot_4000_corp_name = registered[0]['Corp Name in DB']
+        self.assertIn('-4000', lot_4000_corp_name)
+        parent_a_corp_name = lot_4000_corp_name.replace('-4000', '')
+
+        # Register a second parent with different structure
+        file_b = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'ibuprofen_methyl_ester.sdf')
+        response = self.client.register_sdf(file_b, "bob", mappings[1:], dry_run=False)
+        registered = read_registered_csv(response)
+        # Confirm it gets lot 1
+        lot_b_corp_name = registered[0]['Corp Name in DB']
+        print(f"lot_b_corp_name: {lot_b_corp_name}")
+        self.assertIn('-001', lot_b_corp_name)
+
+        # Reparent Lot Test 1:
+        # Where the destination parent has only a large lot number
+        # Try transferring the second parent onto the first
+        reparent_resp = self.client.reparent_lot(lot_b_corp_name, parent_a_corp_name, dry_run=True)
+        # Confirm we get lot 1
+        proposed_lot_corp_name = reparent_resp['newLot']['corpName']
+        self.assertIn('-001', proposed_lot_corp_name)
+
+        # Reparent Lot Test 2:
+        # Where the destination parent has both a large lot number and a small lot number
+        # Load structure A with no lot number set
+        response = self.client.register_sdf(file_a, "bob", mappings[1:], dry_run=False)
+        registered = read_registered_csv(response)
+        lot_a1_corp_name  = registered[0]['Corp Name in DB']
+        # Confirm it gets lot 1
+        # This also tests maxAutoLotNumber with bulk loader
+        self.assertIn('-001', lot_a1_corp_name)
+        # Reparent second onto first
+        reparent_resp = self.client.reparent_lot(lot_b_corp_name, parent_a_corp_name, dry_run=True)
+        # Confirm we get lot 2
+        proposed_lot_corp_name = reparent_resp['newLot']['corpName']
+        self.assertIn('-002', proposed_lot_corp_name)
+        
+
+    @requires_node_api
+    @requires_absent_basic_cmpd_reg_load
+    @requires_basic_cmpd_reg_load
+    def test_011_upload_cmpdreg_files(self):
+        """Test post meta lot."""
+        # Get all lots
+        all_lots = self.client.get_all_lots()
+
+        # Sort lots by id and get the latest corp id
+        # This is because we dont' get the corp id in the response from the bulkload
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        lot_corp_name = all_lots[-1]['lotCorpName']
+        
+        # The default user is 'bob' and bob has cmpdreg admin role
+        # The basic cmpdreg load has a lot registered that is unrestricted (Global project)
+        meta_lot = self.client.\
+            get_meta_lot(lot_corp_name)
+
+        # File to save
+        file_name1 = 'dummy.pdf'
+        file_test_path1 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name1)
+        file_name2 = 'dummy2.pdf'
+        file_test_path2 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name2)
+        # Save the file
+        file_type1 = "HPLC"
+        file_type2 = "LCMS"
+        writeup1="My writeup on the file1"
+        writeup2="My writeup on the file2"
+
+        # Test single upload
+        file_response = self.client._upload_cmpd_reg_file(lot_corp_name, file=file_test_path1, file_type=file_type1, writeup=writeup1)
+        self.assertEqual(file_response['name'], file_name1)
+        self.assertEqual(file_response['description'], file_type1)
+        self.assertEqual(file_response['writeup'], writeup1)
+        self.assertEqual(file_response['subdir'], lot_corp_name)
+        self.assertEqual(file_response['uploaded'], True)
+
+        # Verify that uploading with no writeup works
+        file_response = self.client._upload_cmpd_reg_file(lot_corp_name, file=file_test_path1, file_type=file_type1, writeup=None)
+        self.assertEqual(file_response['name'], file_name1)
+        self.assertEqual(file_response['description'], file_type1)
+        self.assertEqual(file_response['writeup'], "")
+
+        # Setup multiple upload
+        files = [
+            {
+                "file": file_test_path1,
+                "file_type": file_type1,
+                "writeup": writeup1
+            },
+            {
+                "file": file_test_path2,
+                "file_type": file_type2,
+                "writeup": writeup2
+            }
+        ]
+        response =  self.client._upload_cmpdreg_files(lot_corp_name, files=files)
+        self.assertEqual(len(response), 2)
+        self.assertEqual(response[0]['name'], file_name1)
+        self.assertEqual(response[0]['description'], file_type1)
+        self.assertEqual(response[0]['writeup'], writeup1)
+        self.assertEqual(response[0]['subdir'], lot_corp_name)
+        self.assertEqual(response[0]['uploaded'], True)
+        self.assertEqual(response[1]['name'], file_name2)
+        self.assertEqual(response[1]['description'], file_type2)
+        self.assertEqual(response[1]['writeup'], writeup2)
+        self.assertEqual(response[1]['subdir'], lot_corp_name)
+        self.assertEqual(response[1]['uploaded'], True)
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_012_upload_lot_files(self):
+        """ Test saving file to lot"""
+
+        all_lots = self.client.get_all_lots()
+        all_lots = sorted(all_lots, key=lambda lot: lot['id'])
+        lot_corp_name1 = all_lots[-1]['lotCorpName']
+
+        # Create files to upload
+        file_name1 = 'dummy.pdf'
+        file_test_path1 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name1)
+        file_type1 = "HPLC"
+        writeup1="My writeup on the file1"
+
+        file_name2 = 'dummy2.pdf'
+        file_test_path2 = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', file_name2)
+        file_type2 = "LCMS"
+        writeup2="My writeup on the file2"
+
+        # Test single upload
+        meta_lot_save_response = self.client.add_file_to_lot(lot_corp_name1, file=file_test_path1, file_type=file_type1, writeup=writeup1)
+        self.assertEqual(len(meta_lot_save_response["errors"]), 0)
+        self.assertIn("metalot", meta_lot_save_response)
+        self.assertIn("fileList", meta_lot_save_response["metalot"])
+        
+        # Verify that the fileList has the file we just uploaded by checking the name
+        has_file = False
+        for file in meta_lot_save_response["metalot"]["fileList"]:
+            if file["name"] == file_name1:
+                has_file = True
+                break
+        self.assertTrue(has_file)
+
+        # Test multiple upload
+        files = [
+            {
+                "file": file_test_path1,
+                "file_type": file_type1,
+                "writeup": writeup1
+            },
+            {
+                "file": file_test_path2,
+                "file_type": file_type2,
+                "writeup": writeup2
+            }
+        ]
+        meta_lot_save_response = self.client.add_files_to_lot(lot_corp_name1, files=files)
+        self.assertEqual(len(meta_lot_save_response["errors"]), 0)
+        self.assertIn("metalot", meta_lot_save_response)
+        self.assertIn("fileList", meta_lot_save_response["metalot"])
+
+        # Verify that the fileList has the files we just uploaded by checking the names
+        has_file1 = False
+        has_file2 = False
+        for file in meta_lot_save_response["metalot"]["fileList"]:
+            if file["name"] == file_name1:
+                has_file1 = True
+            if file["name"] == file_name2:
+                has_file2 = True
+        self.assertTrue(has_file1)
+        self.assertTrue(has_file2)
+        
+
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

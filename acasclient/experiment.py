@@ -1,10 +1,11 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 from .acasclient import (get_entity_label_by_label_type_kind,
                          get_entity_value_by_state_type_kind_value_type_kind)
 from .selfile import get_file_type, load_from_str
-from acasclient import Client, SimpleExperiment
+from .acasclient import client
+from .selfile import DoseResponse, Generic
 ################################################################################
 # Logging
 ################################################################################
@@ -26,7 +27,7 @@ DELETED_STATUS = "deleted"
 class Experiment(dict):
     """Simple class which adds some convenience methods to an experiment dict to fetch common values and data from the experiment.
     """
-    def __init__(self, expt_dict: dict, client: Optional[Client] = None) -> None:
+    def __init__(self, expt_dict: dict, client: Optional[client] = None) -> None:
         dict.__init__(self, expt_dict)
         # set after source file is written
         self.exported_path = None
@@ -95,7 +96,7 @@ class Experiment(dict):
             value_kind=SOURCE_FILE_KEY)
         return data.get('fileValue') if data else None
 
-    def get_source_file(self, client: Client = None) -> dict:
+    def get_source_file(self, client: client = None) -> dict:
         file = None
         source_file = self.source_file
         if source_file is not None:
@@ -103,7 +104,7 @@ class Experiment(dict):
                         .format(source_file))
         return file
 
-    def get_simple_experiment(self, client=None) -> SimpleExperiment:
+    def get_simple_experiment(self, client=None) -> Union[Generic, DoseResponse]:
         """
         get a simple experiment from the server
         """

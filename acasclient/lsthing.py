@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from typing import Any, Dict
 
-from acasclient.ddict import ACASDDict, ACASLsThingDDict, DDict
+from .ddict import ACASDDict, ACASLsThingDDict, DDict
 from .interactions import INTERACTION_VERBS_DICT, opposite
 from .validation import validation_result, ValidationResult
 

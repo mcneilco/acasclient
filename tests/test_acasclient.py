@@ -2851,6 +2851,19 @@ class TestCmpdReg(BaseAcasClientTest):
         # Verify that the experiment code name is in the linkedExperiments list
         self.assertIn(experiment['codeName'], [e['code'] for e in meta_lot_dependencies['linkedExperiments']])
 
+        # Verify the protocol information
+        self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)
+        protocol = meta_lot_dependencies['linkedExperiments'][0]['protocol']
+        self.assertIn('code', protocol)
+        self.assertEqual(protocol['name'], 'BLAH')
+
+        # Verify the analysis group information
+        self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)
+        item = meta_lot_dependencies['linkedExperiments'][0]['analysisGroups'][0]
+        self.assertIn('code', item)
+        self.assertIn('values', item)
+        self.assertEqual(len(item['values']), 3)
+
         # Delete the experiment and then check the meta lot dependencies again, this time the experiment should be removed from the linkedExperiments list
         self.client.delete_experiment(experiment['id'])
         meta_lot_dependencies = self.client.get_lot_dependencies("CMPD-0000001-001")

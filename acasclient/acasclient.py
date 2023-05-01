@@ -1066,9 +1066,7 @@ class client():
             response = self.register_sdf_request(request)
         report_files = []
         for file in response[0]['reportFiles']:
-            filePath = "/dataFiles/cmpdreg_bulkload/{}".format(
-                PurePath(Path(file)).name)
-            report_files.append(self.get_file(filePath))
+            report_files.append(self.get_file(f"/dataFiles/{file}"))
         return {"id": response[0]['id'],
                 "summary": response[0]['summary'],
                 "results": response[0]['results'],

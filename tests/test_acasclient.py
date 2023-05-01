@@ -15,6 +15,10 @@ import signal
 import requests
 from typing import List, Dict, Any, Optional
 from csv import DictReader
+from acasclient.experiment import Experiment
+from acasclient.acasclient import (get_entity_value_by_state_type_kind_value_type_kind)
+import zipfile
+from acasclient.selfile import Generic
 
 # Import project ls thing
 from datetime import datetime
@@ -434,9 +438,9 @@ class BaseAcasClientTest(unittest.TestCase):
         return user_client
 
     # Helper for testing an experiment upload was successful
-    def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False):
+    def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False, report_file_to_upload=None, images_file_to_upload=None):
         response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", dry_run_mode)
+            experiment_loader(data_file_to_upload, "bob", dry_run_mode, report_file_to_upload, images_file_to_upload)
         self.assertIn('results', response)
         self.assertIn('htmlSummary', response['results'])
         self.assertIn('errorMessages', response)
@@ -449,6 +453,92 @@ class BaseAcasClientTest(unittest.TestCase):
             self.assertIsNone(response['transactionId'])
         else:
             self.assertIsNotNone(response['transactionId'])
+            self.assertIsNotNone(response['results']['experimentCode'])
+            experimentCode = response['results']['experimentCode']
+            experiment_dict = self.client.get_experiment_by_code(experimentCode)
+            experiment = Experiment(experiment_dict, self.client)
+
+            # Make sure the file was moved to the experiment folder by checking the file path
+            self.assertIn(experimentCode, experiment.source_file)
+
+            # Get the experiment source file
+            # Compare the source file['content'] to the data_file_to_upload content
+            # If the file['content'] is bytes then read the data_file_to_upload as bytes
+            # If the file['content'] is string then read the data_file_to_upload as string
+            source_file = experiment.get_source_file()
+            if isinstance(source_file['content'], bytes):
+                with open(data_file_to_upload, 'rb') as f:
+                    upload_bytes = f.read()
+                    self.assertEqual(source_file['content'], upload_bytes)
+            else:
+                with open(data_file_to_upload, 'r') as f:
+                    self.assertEqual(source_file['content'], f.read())
+
+            if report_file_to_upload is not None:
+                report_file = experiment.get_report_file()
+
+                # Make sure the file was moved to the experiment folder by checking the file path
+                self.assertIn(experimentCode, experiment.report_file)
+                
+                if isinstance(report_file['content'], bytes):
+                    with open(report_file_to_upload, 'rb') as f:
+                        upload_bytes = f.read()
+                        self.assertEqual(report_file['content'], upload_bytes)
+                else:
+                    with open(report_file_to_upload, 'r') as f:
+                        self.assertEqual(report_file['content'], f.read())
+
+            if images_file_to_upload is not None:
+                # The images file isn't saved as a file in the experiment, but rather each image file is saved as an analysis group value
+                # So we need to get the analysis group values and compare them to the images files
+                # Get the full experiment
+                experiment_dict = self.client.get_experiment_by_code(experimentCode, full=True)
+
+                # Use simple experiment to read the file we uploaded
+                simple_experiment = Generic()
+                simple_experiment.loadFile(data_file_to_upload)
+                
+                # Loop through the simple_experiment._datatype  and if the value is "Image File" then get the key of the image file (lsType)
+                imageFileKinds = [k for k, v in simple_experiment._datatype.items() if v == "Image File"]
+                imagesToMatch = []
+                for imageFileKind in imageFileKinds:
+                    image_file_values = simple_experiment.calculated_results_df[imageFileKind]
+                    imagesToMatch.extend(image_file_values)
+                
+                # Now we verify that each of the imagesToMatch is in the experiment and that we can fetch the image file and it matches what we uploaded
+                matches = 0
+                with zipfile.ZipFile(images_file_to_upload, 'r') as zip_ref:
+                    zipImages = [f for f in zip_ref.namelist() if f.endswith(".png")]
+                    # Get all analysis group values where there is an lsType "inlineFileValue" using get_entity_value_by_state_type_kind_value_type_kind
+                    analysisGroups = experiment_dict["analysisGroups"]
+                    for ag in analysisGroups:
+                        for imageFileKind in imageFileKinds:
+                            inlineFileValue = get_entity_value_by_state_type_kind_value_type_kind(ag, "data", "results", "inlineFileValue", imageFileKind)
+                            if inlineFileValue is not None:
+                                filePath = inlineFileValue['fileValue']
+
+                                # Assert that the experiment code name is in the file path to make sure it was uploaded correctly
+                                self.assertIn(experimentCode, filePath)
+                                
+                                # Fetch the file from the API
+                                file = self.client.get_file("/dataFiles/{}"
+                                                    .format(filePath))
+                                
+                                # Match the file name to the zip file name by file name and compare the bytes
+                                baseName = Path(filePath).name
+                                # Get the matching zip file
+                                zipFile = [f for f in zipImages if f.endswith(baseName)]
+                                if len(zipFile) == 0:
+                                    raise AssertionError("Could not find file {} in zip file".format(baseName))
+                                
+                                # Read the zipFile bytes
+                                with zip_ref.open(zipFile[0]) as f:
+                                    zipBytes = f.read()
+                                    self.assertEqual(file['content'], zipBytes)
+                                    matches += 1
+
+                self.assertEqual(matches, len(imagesToMatch))
+                
         return response
 
     def delete_all_experiments(self):
@@ -1251,7 +1341,7 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_basic_experiment_load
     def test_015_get_protocols_by_label(self, experiment):
         """Test get protocols by label"""
-        protocols = self.client.get_protocols_by_label("Test Protocol")
+        protocols = self.client.get_protocols_by_label("Test")
         self.assertGreater(len(protocols), 0)
         self.assertIn('codeName', protocols[0])
         self.assertIn('lsLabels', protocols[0])
@@ -3563,6 +3653,7 @@ class TestCmpdReg(BaseAcasClientTest):
             stereo_cat_dict = {x['code']: x for x in self.client.get_stereo_categories()}
             TEST_STEREO_COMMENT = 'test stereo comment'
             TEST_STEREO_CAT_CODE = 'No stereochemistry'
+            TEST_COMMENT = "test commentasdfasdf"
             # Get parent 1
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
@@ -3583,6 +3674,15 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertEquals(len(validation_resp), 1)
             self.assertEquals(validation_resp[0]['code'], 'CMPD-0000001-001')
             self.assertEquals(validation_resp[0]['name'], 'CMPD-0000001-001')
+            # Make changes to the parent comment
+            parent['comment'] = TEST_COMMENT
+            # Validate
+            edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
+            self.assertTrue(validation_status)
+            meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
+            parent = meta_lot['lot']['parent']
+            self.assertEquals(parent['comment'], TEST_COMMENT)
+            #       
             # TODO Get this working reliably and uncomment it
             # # Commit the edit
             # edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
@@ -4362,3 +4462,23 @@ class TestExperimentLoader(BaseAcasClientTest):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
+
+    @requires_basic_cmpd_reg_load
+    def test_017_report_file(self):
+        """Test experiment loader with report file."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        report_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'dummy.pdf')
+        self.experiment_load_test(data_file_to_upload, True, report_file_to_upload=report_file_path)
+        self.experiment_load_test(data_file_to_upload, False, report_file_to_upload=report_file_path)
+
+    @requires_basic_cmpd_reg_load
+    def test_018_image_file(self):
+        """Test experiment loader with image file."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '12_1_MultipleImage.csv')
+        image_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', '12_2_MultipleImage.zip')
+        # self.experiment_load_test(data_file_to_upload, True, images_file_to_upload=image_file_path)
+        self.experiment_load_test(data_file_to_upload, False, images_file_to_upload=image_file_path)

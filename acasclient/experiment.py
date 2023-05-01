@@ -18,6 +18,7 @@ ORIGINAL_PROJECT_KEY = "Original Project"
 ORIGINAL_EXPT_CODE_KEY = "Original Experiment Code"
 ORIGINAL_SERVER_KEY = "Original Server"
 SOURCE_FILE_KEY = "source file"
+REPORT_FILE_KEY = "annotation file"
 DELETED_STATUS = "deleted"
 ################################################################################
 # Classes
@@ -88,21 +89,40 @@ class Experiment(dict):
 
     @property
     def source_file(self) -> str:
-        data = get_entity_value_by_state_type_kind_value_type_kind(
-            entity=self, 
-            state_type="metadata", 
-            state_kind="experiment metadata", 
-            value_type="fileValue", 
-            value_kind=SOURCE_FILE_KEY)
-        return data.get('fileValue') if data else None
+        return self.get_experiment_metadata_file(SOURCE_FILE_KEY)
 
     def get_source_file(self, client: client = None) -> dict:
         file = None
         source_file = self.source_file
         if source_file is not None:
+            if client is None:
+                client = self.client
             file = client.get_file("/dataFiles/{}"
                         .format(source_file))
         return file
+    
+    @property
+    def report_file(self) -> str:
+        return self.get_experiment_metadata_file(REPORT_FILE_KEY)
+    
+    def get_report_file(self, client: client = None) -> dict:
+        file = None
+        report_file = self.report_file
+        if report_file is not None:
+            if client is None:
+                client = self.client
+            file = client.get_file("/dataFiles/{}"
+                        .format(report_file))
+        return file
+    
+    def get_experiment_metadata_file(self, value_kind) -> dict:
+        data = get_entity_value_by_state_type_kind_value_type_kind(
+            entity=self, 
+            state_type="metadata", 
+            state_kind="experiment metadata", 
+            value_type="fileValue", 
+            value_kind=value_kind)
+        return data.get('fileValue') if data else None
 
     def get_simple_experiment(self, client=None) -> Union[Generic, DoseResponse]:
         """

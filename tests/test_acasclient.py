@@ -4005,11 +4005,24 @@ class TestCmpdReg(BaseAcasClientTest):
         has_file2 = False
         for file in meta_lot_save_response["metalot"]["fileList"]:
             if file["name"] == file_name1:
+                self.assertTrue(file["writeup"] == writeup1)
+                self.assertTrue(file["description"] == file_type1)
+                # Verify that that when we get the file from the service it returns the same file exactly
+                self.assertIn("file", file)
+                self.assertEqual(int(file["file"]['content-length']), file_test_path1.stat().st_size)
+                self.assertEqual(file_test_path1.read_bytes(), file["file"]["content"])
                 has_file1 = True
             if file["name"] == file_name2:
+                self.assertTrue(file["writeup"] == writeup2)
+                self.assertTrue(file["description"] == file_type2)
+                # Verify that that when we get the file from the service it returns the same file exactly
+                self.assertIn("file", file)
+                self.assertEqual(int(file["file"]['content-length']), file_test_path2.stat().st_size)
+                self.assertEqual(file_test_path2.read_bytes(), file["file"]["content"])
                 has_file2 = True
         self.assertTrue(has_file1)
         self.assertTrue(has_file2)
+        
         
 
 class TestExperimentLoader(BaseAcasClientTest):

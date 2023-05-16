@@ -388,7 +388,7 @@ class client():
             meta_lot['fileList'].append(uploaded_file)
 
         # Update the meta lot
-        meta_lot_save_response = self.save_meta_lot(meta_lot)
+        meta_lot_save_response = self.save_meta_lot(meta_lot, include_file_content_in_response=True)
 
         return meta_lot_save_response
 
@@ -488,7 +488,7 @@ class client():
                     "subdir": "CMPD-0000002-001",
                     "type": "application/pdf",
                     "uploaded": true,
-                    "url": "getFile?fileUrl=%2Fhome%2Frunner%2Fbuild%2FprivateUploads%2Fcmpdreg%2FnoteBookFiles%2FnoteBook%2FCMPD-0000002-001%2Fdummy.pdf",
+                    "url": ",
                     "writeup": "Nothing"
                 }
             ]
@@ -496,7 +496,22 @@ class client():
         response = self._upload_cmpdreg_files(lot_corp_name, [{"file": file, "file_type": file_type, "writeup": writeup}])
         return response[0]
 
-    def get_meta_lot(self, lot_corp_name):
+    def _get_meta_lot_files(self, meta_lot):
+        """Mixin the file content for each file in the metalot
+
+        Args:
+            meta_lot (dict): A meta lot object
+
+        Returns: A dict with the metalot files attached to the fileList key
+        """
+        base_path = "/dataFiles/cmpdreg/noteBookFiles/noteBook/"
+        for file in meta_lot['fileList']:
+            file_path = f"{base_path}{file['subdir']}/{file['name']}"
+            acas_file = self.get_file(file_path)
+            file['file'] = acas_file
+        return meta_lot
+
+    def get_meta_lot(self, lot_corp_name, include_file_content_in_response=False):
         """Get metalot by lot corp name
          Granted read permission on a lot if one of these is true:
             1. The user is the owner of the lot (chemist or recorded by)
@@ -505,6 +520,7 @@ class client():
 
         Args:
             lot_corp_name (str): A lot corp name
+            include_file_content_in_response (bool): If true, the response will include the file content for each file saved with the lot
 
         Returns: Returns a dict meta lot object
         """
@@ -513,9 +529,11 @@ class client():
         if resp.status_code == 500:
             return None
         resp.raise_for_status()
+        if include_file_content_in_response:
+            return self._get_meta_lot_files(resp.json())
         return resp.json()
 
-    def save_meta_lot(self, meta_lot):
+    def save_meta_lot(self, meta_lot, include_file_content_in_response=False):
         """Save a meta lot to the server
          If updating a saved lot permissions are granted if one of these is true:
             1. Edit my lots is configured to true on the system and..
@@ -525,6 +543,7 @@ class client():
 
         Args:
             meta_lot (dict): A meta lot
+            include_file_content_in_response (bool): If true, the response will include the file content for each file saved with the lot
 
         Returns: Returns a dict meta lot object
         """
@@ -533,7 +552,11 @@ class client():
                                  headers={'Content-Type': "application/json"},
                                  data=json.dumps(meta_lot))
         resp.raise_for_status()
-        return resp.json()
+        json_resp = resp.json()
+        if include_file_content_in_response:
+            if 'metalot' in json_resp:
+                json_resp['metalot'] = self._get_meta_lot_files(json_resp['metalot'])
+        return json_resp
 
     def cmpd_search(self, corpNameList="", corpNameFrom="", corpNameTo="",
                     aliasContSelect="contains", alias="", dateFrom="",

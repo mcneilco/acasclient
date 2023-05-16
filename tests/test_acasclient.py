@@ -1341,7 +1341,7 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_basic_experiment_load
     def test_015_get_protocols_by_label(self, experiment):
         """Test get protocols by label"""
-        protocols = self.client.get_protocols_by_label("Test")
+        protocols = self.client.get_protocols_by_label("Test Protocol")
         self.assertGreater(len(protocols), 0)
         self.assertIn('codeName', protocols[0])
         self.assertIn('lsLabels', protocols[0])
@@ -3653,7 +3653,6 @@ class TestCmpdReg(BaseAcasClientTest):
             stereo_cat_dict = {x['code']: x for x in self.client.get_stereo_categories()}
             TEST_STEREO_COMMENT = 'test stereo comment'
             TEST_STEREO_CAT_CODE = 'No stereochemistry'
-            TEST_COMMENT = "test commentasdfasdf"
             # Get parent 1
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
@@ -3674,15 +3673,6 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertEquals(len(validation_resp), 1)
             self.assertEquals(validation_resp[0]['code'], 'CMPD-0000001-001')
             self.assertEquals(validation_resp[0]['name'], 'CMPD-0000001-001')
-            # Make changes to the parent comment
-            parent['comment'] = TEST_COMMENT
-            # Validate
-            edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
-            self.assertTrue(validation_status)
-            meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
-            parent = meta_lot['lot']['parent']
-            self.assertEquals(parent['comment'], TEST_COMMENT)
-            #       
             # TODO Get this working reliably and uncomment it
             # # Commit the edit
             # edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)

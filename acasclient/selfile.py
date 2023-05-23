@@ -49,8 +49,8 @@ LOT_SALT_ABBREV = 'Lot Salt Abbrev'
 LOT_SALT_EQ = 'Lot Salt Equivalents'
 REG_LOT_CORP_NAME = 'Registered Lot Corp Name'
 REG_PARENT_CORP_NAME = 'Registered Parent Corp Name'
-REG_LOT_AMOUNT =  'Registered Lot Amount'
-REG_LOT_AMOUNT_UNITS =  'Registered Lot Amount Units'
+REG_LOT_AMOUNT = 'Registered Lot Amount'
+REG_LOT_AMOUNT_UNITS = 'Registered Lot Amount Units'
 REG_PARENT_ALIASES = 'Registered Parent Aliases'
 REG_LEVEL = 'Registration Level'
 
@@ -764,11 +764,19 @@ class DoseResponse(AbstractExperiment):
         )
         return raw_results
 
-    def saveAs(self, file_name):
+    def saveAs(self, file_name=None, file_type=None):
         """
         :param file_name: Path to output file to save record.
         :type file_name: str
         """
+
+        # Must provide either a file_name or a file_type but not both.
+        if file_name and file_type:
+            raise ValueError('Must provide either a file_name or a file_type but not both.')
+
+        # If file_name is provided, use it.
+        if file_name:
+            file_type = get_file_type(file_name)
 
         # Placeholder for better validation.
         self.validate()
@@ -820,13 +828,13 @@ class DoseResponse(AbstractExperiment):
         )
         df_out = df_out.append(df_raw_results.T, ignore_index=True, sort=True)
         df_out = df_out.append(df_raw_expt, ignore_index=True, sort=True)
-        file_type = get_file_type(file_name)
         if file_type == CSV:
-            df_out.to_csv(file_name, header=None, index=False)
+            output = df_out.to_csv(file_name, header=None, index=False)
         elif file_type in [XLS, XLSX]:
-            df_out.to_excel(file_name, header=None, index=False)
+            output = df_out.to_excel(file_name, header=None, index=False)
         else:
-            raise ValueError(f'Unknown file type {file_name}')
+            raise ValueError(f'Unknown file type {file_type}')
+        return output
 
     def validate(self):
         """

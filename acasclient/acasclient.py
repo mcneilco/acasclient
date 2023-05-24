@@ -2278,16 +2278,28 @@ en array of protocols
         aliases = [x['aliasName'] for x in alias_objects if not x['ignored']]
         return aliases
     
-    def add_parent_alias(self, parent_corp_name: str, alias: str) -> None:
+    def add_parent_alias(self, parent_corp_name: str, alias: str, ls_type: str = None, ls_kind: str = None) -> None:
         """Adds a new alias to the specified parent. Does not alter existing aliases.
+
+        Args:
+            parent_corp_name (str): The parent compound to add the alias to
+            alias (str): The alias to add
+            ls_type (str): The LS type of the alias, default None
+            ls_kind (str): The LS kind of the alias, default None
+
+        Returns:
+            The updated MetaLot object
         """
         meta_lot = self._get_meta_lot_by_parent_corp_name(parent_corp_name)
         # Format the alias string into a basic object
-        alias_obj = {'aliasName': alias}
+        alias_obj = {'aliasName': alias, 'lsType': ls_type, 'lsKind': ls_kind, 'ignored': False}
         # Add it to the list of aliases
         meta_lot['lot']['saltForm']['parent']['parentAliases'].append(alias_obj)
         # Persist the change
-        self.save_meta_lot(meta_lot)
+        response = self.save_meta_lot(meta_lot)
+        if len(response['errors']) != 0:
+            raise RuntimeError(f'Failed to add alias {alias} to parent {parent_corp_name}: {response["errors"]}')
+        return response['metalot']
 
     def set_parent_aliases(self, parent_corp_name: str, alias_list: List[str]) -> None:
         """Sets the aliases of the specified parent to ONLY the provided list.

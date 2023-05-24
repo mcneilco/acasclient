@@ -2268,6 +2268,13 @@ en array of protocols
         lot_corp_name = search_results['foundCompounds'][0]['lotIDs'][0]['corpName']
         return self.get_meta_lot(lot_corp_name)
     
+    def get_parent_alias_kinds(self) -> List[Dict]:
+        """Get the list of parent alias kinds
+        """
+        resp = self.session.get("{}/cmpdreg/aliases/parentAliasKinds/".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+    
     def get_parent_aliases(self, parent_corp_name: str) -> List[str]:
         """Get the current parent aliases by parent_corp_name
         """

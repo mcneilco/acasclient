@@ -1930,6 +1930,32 @@ en array of protocols
         resp.raise_for_status()
         return resp.json()
     
+    def get_assay_scientists(self):
+        """
+        Fetch the list of possible assay scientists for  assay loading
+        """
+        resp = self.session.get("{}/api/authors?additionalCodeType=assay&additionalCodeKind=scientist&roleName=ROLE_ACAS-USERS".format(self.url))
+        resp.raise_for_status()
+        return resp.json()
+
+    def create_assay_scientist(self, code, name):
+        """
+        Create a new scientist for assay loading
+        """
+        url_base = "{}/api/codeTablesAdmin/assay/scientist".format(self.url)
+        body = {'code': code, 'name': name}
+        return self._validate_then_save_codetable(url_base, body)
+    
+    def update_assay_scientist(self, scientist: dict):
+        """
+        Update a scientist for  assay loading
+        """
+        if 'id' not in scientist:
+            raise ValueError("id attribute of scientist dict is required")
+        resp = self.session.put("{}/api/codeTablesAdmin/assay/scientist/{}".format(self.url, scientist['id']), json=scientist)
+        resp.raise_for_status()
+        return resp.json()
+    
     def get_cmpdreg_scientists(self):
         """
         Fetch the list of possible lot chemists for CmpdReg

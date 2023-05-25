@@ -15,6 +15,7 @@ import signal
 import requests
 from typing import List, Dict, Any, Optional
 from csv import DictReader
+from acasclient.experiment import Experiment
 
 # Import project ls thing
 from datetime import datetime
@@ -2717,8 +2718,45 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('CMPD-0000001-001', sdf_string)
         self.assertIn('$$$$', sdf_string)
 
+    @requires_basic_cmpd_reg_load
+    def test_056_additional_assay_scientists(self):
+        """Testing additional assay scientists."""
 
-def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name = None, file_name = None):
+        # Test getting the current assay scientists
+        assay_scientists = self.client.get_assay_scientists()
+
+        # Verify bob is in the list
+        self.assertEqual(1, len([x for x in assay_scientists if x['code'] == 'bob']))
+
+        # Create a new assay scientist code and name using uuid
+        new_assay_scientist_code = str(uuid.uuid4())
+        new_assay_scientist_name = str(uuid.uuid4())
+
+        # Test create new scientist
+        resp = self.client.create_assay_scientist(new_assay_scientist_code, new_assay_scientist_name)
+        self.assertEqual(resp['code'], new_assay_scientist_code)
+        self.assertEqual(resp['name'], new_assay_scientist_name)
+
+        # Verify that the new assay scientist is in the list
+        assay_scientists = self.client.get_assay_scientists()
+        self.assertEqual(1, len([x for x in assay_scientists if x['code'] == new_assay_scientist_code]))
+
+        # Verify we can load an experiment file with the new assay scientist
+        data_file_to_upload = get_basic_experiment_load_file(self.tempdir, scientist=new_assay_scientist_code)
+
+        # This uploads the experiment and verifies the upload was successful
+        result = self.experiment_load_test(data_file_to_upload, False)
+        
+        # Fetch the experiment
+        experiment_code = result['results']['experimentCode']
+        experiment_dict = self.client.get_experiment_by_code(experiment_code)
+
+        # Verify the scientist is the same as we specified
+        experiment = Experiment(experiment_dict)
+        self.assertEqual(experiment.scientist, new_assay_scientist_code)
+
+
+def get_basic_experiment_load_file(tempdir, project_code=None, corp_name=None, file_name=None, scientist=None):
     if file_name is None:
         file_name = 'uniform-commas-with-quoted-text.csv'
     data_file_to_upload = Path(__file__).resolve()\
@@ -2728,14 +2766,19 @@ def get_basic_experiment_load_file_with_project(project_code, tempdir, corp_name
         data_file_contents = f.read()
 
     # Replace the project code
-    data_file_contents = data_file_contents.replace('Global', project_code)
+    if project_code is not None:
+        data_file_contents = data_file_contents.replace('Global', project_code)
 
     # If corp name is specified, replace the corp name
     if corp_name is not None:
         data_file_contents = data_file_contents.replace('CMPD-0000001-001', corp_name)
 
+    # If scientist is specified, replace the scientist
+    if scientist is not None:
+        data_file_contents = data_file_contents.replace('bob', scientist)
+
     # Write the data file to the temp dir
-    file_name = f'basic-experiment-with-project-{project_code}.csv'
+    file_name = f'basic-experiment-{ str(uuid.uuid4())}.csv'
     data_file_to_upload = Path(tempdir).joinpath(file_name)
     with open(data_file_to_upload, 'w') as f:
         f.write(data_file_contents)
@@ -2878,7 +2921,7 @@ class TestCmpdReg(BaseAcasClientTest):
         all_lots = self.client.get_all_lots()
 
         # Load an experiment to the newly created restricted project using the global project lots
-        file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir)
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, project.names[PROJECT_NAME])
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
         restricted_experiment_code_name = response['results']['experimentCode']
@@ -3140,7 +3183,7 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # Load an experiment to the newly created restricted project using the restricted lot
         restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
-        file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, project.names[PROJECT_NAME], restricted_lot_corp_name, file_name='4 parameter D-R.csv')
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
         self.assertTrue(check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
@@ -3195,7 +3238,7 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # # Load an experiment to the newly created restricted project using the global project lots
         # restricted_lot_corp_name = self.create_restricted_lot(project.code_name)
-        # file_to_upload = get_basic_experiment_load_file_with_project(project.names[PROJECT_NAME], self.tempdir, restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
+        # file_to_upload = get_basic_experiment_load_file(self.tempdir, project.names[PROJECT_NAME], restricted_lot_corp_name, file_name = '4 parameter D-R.csv')
         # response = self.client.\
         #     experiment_loader(file_to_upload, "bob", False)
         # restricted_experiment_code_name = response['results']['experimentCode']

@@ -144,3 +144,13 @@ class Experiment(dict):
             value_type="stringValue",
             value_kind=ORIGINAL_SERVER_KEY)
         return data.get('stringValue') if data else None
+    
+    @property
+    def scientist(self) -> str:
+        data = get_entity_value_by_state_type_kind_value_type_kind(
+            entity=self,
+            state_type="metadata",
+            state_kind="experiment metadata",
+            value_type="codeValue",
+            value_kind="scientist")
+        return data.get('codeValue') if data else None

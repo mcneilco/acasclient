@@ -3505,19 +3505,33 @@ class TestCmpdReg(BaseAcasClientTest):
         # Setup constants
         corp_name = "CMPD-0000001"
         alias_1 = "alias-1"
-        test_alias = "TEST-00001"
+        test_alias = str(uuid.uuid4())
 
         # Get aliases
         aliases = self.client.get_parent_aliases(corp_name)
         self.assertEqual(len(aliases), 1)
         self.assertEquals(aliases[0], alias_1)
 
+        # Get parent alias kinds
+        parent_alias_kinds = self.client.get_parent_alias_kinds()
+        self.assertGreater(len(parent_alias_kinds), 0)
+        alias_type = parent_alias_kinds[0]["kindName"]
+        alias_kind = parent_alias_kinds[0]["lsType"]['typeName']
+
         # Add an alias
-        self.client.add_parent_alias(corp_name, test_alias)
+        meta_lot = self.client.add_parent_alias(corp_name, test_alias, alias_type, alias_kind)
         aliases = self.client.get_parent_aliases(corp_name)
         self.assertEqual(len(aliases), 2)
         self.assertIn(alias_1, aliases)
         self.assertIn(test_alias, aliases)
+
+        # Check the metalot and verify that the test_alias with the same type and kind was added
+        parent_aliases = meta_lot["lot"]['saltForm']['parent']['parentAliases']
+        has_test_alias = False
+        for parent_alias in parent_aliases:
+            if parent_alias["aliasName"] == test_alias and parent_alias["lsType"] == alias_type and parent_alias["lsKind"] == alias_kind:
+                has_test_alias = True
+        self.assertTrue(has_test_alias)
 
         # Set the aliases to only the test alias
         self.client.set_parent_aliases(corp_name, [test_alias])

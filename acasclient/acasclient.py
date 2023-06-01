@@ -155,6 +155,34 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         break
     return value
 
+def get_entity_value_by_state_type_kind_value_type(entity, state_type,
+                                                        state_kind, value_type):
+    """Get a values from an acas entity dict object.
+
+    Gets value type values from an acas entity dict object.
+
+    Args:
+        entity: Any ACAS entity (protocol, experiment, analysis_group,
+        treatment_group, container...etc.)
+        state_type: String. The state type of the value.
+        state_kind: String. The state kind of the value.
+        value_type: String. The value type of the value.
+
+    Returns:
+        A dict object representing the value if it exits. Otherwise it
+        returns None
+
+    """
+    values = []
+    if len(entity["lsStates"]) > 0:
+        for s in entity["lsStates"]:
+            if (not s["deleted"] and not s["ignored"] and
+                    s["lsType"] == state_type and s["lsKind"] == state_kind):
+                for v in s["lsValues"]:
+                    if (not v["deleted"] and not v["ignored"] and
+                            v["lsType"] == value_type):
+                        values.append(v)
+    return values
 
 def get_entity_label_by_label_type_kind(entity: dict, label_type: str, label_kind: str) -> str:
     """Get a label from an acas entity dict object.
@@ -1109,15 +1137,17 @@ class client():
             report_file (str): A path to a report file (optional)
             images_file (str): A path to an images file (optional)
         """
-        data_file = self.upload_files([data_file])['files'][0]["name"]
+        data_file_path = self.upload_files([data_file])['files'][0]["name"]
+        report_file_path = ""
         if report_file and report_file != "":
-            report_file = self.upload_files([report_file])['files'][0]["name"]
+            report_file_path = self.upload_files([report_file])['files'][0]["name"]
+        images_file_path = ""
         if images_file and images_file != "":
-            images_file = self.upload_files([images_file])['files'][0]["name"]
+            images_file_path = self.upload_files([images_file])['files'][0]["name"]
         request = {"user": user,
-                   "fileToParse": data_file,
-                   "reportFile": report_file,
-                   "imagesFile": images_file,
+                   "fileToParse": data_file_path,
+                   "reportFile": report_file_path,
+                   "imagesFile": images_file_path,
                    "moduleName": None if validate_dose_response_curves else "DoseResponseDataParserController",
                    "dryRunMode": dry_run}
         resp = self.experiment_loader_request(request)

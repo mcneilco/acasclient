@@ -16,6 +16,9 @@ import requests
 from typing import List, Dict, Any, Optional
 from csv import DictReader
 from acasclient.experiment import Experiment
+from acasclient.acasclient import (get_entity_value_by_state_type_kind_value_type_kind)
+import zipfile
+from acasclient.selfile import Generic
 
 # Import project ls thing
 from datetime import datetime
@@ -435,9 +438,9 @@ class BaseAcasClientTest(unittest.TestCase):
         return user_client
 
     # Helper for testing an experiment upload was successful
-    def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False):
+    def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False, report_file_to_upload=None, images_file_to_upload=None):
         response = self.client.\
-            experiment_loader(data_file_to_upload, "bob", dry_run_mode)
+            experiment_loader(data_file_to_upload, "bob", dry_run_mode, report_file_to_upload, images_file_to_upload)
         self.assertIn('results', response)
         self.assertIn('htmlSummary', response['results'])
         self.assertIn('errorMessages', response)
@@ -450,6 +453,115 @@ class BaseAcasClientTest(unittest.TestCase):
             self.assertIsNone(response['transactionId'])
         else:
             self.assertIsNotNone(response['transactionId'])
+            self.assertIsNotNone(response['results']['experimentCode'])
+            experimentCode = response['results']['experimentCode']
+            experiment_dict = self.client.get_experiment_by_code(experimentCode)
+            experiment = Experiment(experiment_dict, self.client)
+
+            # Make sure the file was moved to the experiment folder by checking the file path
+            self.assertIn(experimentCode, experiment.source_file)
+
+            # Get the experiment source file
+            # Compare the source file['content'] to the data_file_to_upload content
+            # If the file['content'] is bytes then read the data_file_to_upload as bytes
+            # If the file['content'] is string then read the data_file_to_upload as string
+            source_file = experiment.get_source_file()
+            if isinstance(source_file['content'], bytes):
+                with open(data_file_to_upload, 'rb') as f:
+                    upload_bytes = f.read()
+                    self.assertEqual(source_file['content'], upload_bytes)
+            else:
+                with open(data_file_to_upload, 'r') as f:
+                    self.assertEqual(source_file['content'], f.read())
+
+            if report_file_to_upload is not None:
+                report_file = experiment.get_report_file()
+
+                # Make sure the file was moved to the experiment folder by checking the file path
+                self.assertIn(experimentCode, experiment.report_file)
+                
+                if isinstance(report_file['content'], bytes):
+                    with open(report_file_to_upload, 'rb') as f:
+                        upload_bytes = f.read()
+                        self.assertEqual(report_file['content'], upload_bytes)
+                else:
+                    with open(report_file_to_upload, 'r') as f:
+                        self.assertEqual(report_file['content'], f.read())
+
+            if images_file_to_upload is not None:
+                # The images file isn't saved as a file in the experiment, but rather each image file is saved as an analysis group value
+                # So we need to get the analysis group values and compare them to the images files
+                # Get the full experiment
+                experiment_dict = self.client.get_experiment_by_code(experimentCode, full=True)
+    
+                # Use simple experiment to read the file we uploaded
+                simple_experiment = Generic()
+                simple_experiment.loadFile(data_file_to_upload)
+                
+                # Loop through the simple_experiment._datatype  and if the value is "Image File" then get the key of the image file (lsType)
+                image_file_kinds = [k for k, v in simple_experiment._datatype.items() if v == "Image File"]
+                image_values_to_match = []
+                for image_file_kind in image_file_kinds:
+                    image_file_values = simple_experiment.calculated_results_df[image_file_kind]
+                    image_values_to_match.extend(image_file_values)
+                
+                # Now we verify that each of the imagesToMatch is in the experiment and that we can fetch the image file and it matches what we uploaded
+                experiment_value_matches = 0
+                image_zip_reconstruction_matches = 0
+                with zipfile.ZipFile(images_file_to_upload, 'r') as original_zip_ref:
+                    # We also want to verify we can reconstruct the zip from using experiment.get_images_file()
+                    saved_images_zip = experiment.get_images_file()
+                    with zipfile.ZipFile(saved_images_zip, 'r') as saved_zip_ref:
+                        # First match the experiment images to the zip file and compare the bytes and ls kinds
+                        original_zip_images = [f for f in original_zip_ref.namelist() if f.endswith(".png")]
+                        # Get all analysis group values where there is an lsType "inlineFileValue" using get_entity_value_by_state_type_kind_value_type_kind
+                        analysis_groups = experiment_dict["analysisGroups"]
+                        for ag in analysis_groups:
+                            for image_file_kind in image_file_kinds:
+                                inline_file_value = get_entity_value_by_state_type_kind_value_type_kind(ag, "data", "results", "inlineFileValue", image_file_kind)
+                                if inline_file_value is not None:
+                                    file_path = inline_file_value['fileValue']
+
+                                    # Assert that the experiment code name is in the file path to make sure it was uploaded correctly
+                                    self.assertIn(experimentCode, file_path)
+                                    
+                                    # Fetch the file from the API
+                                    file = self.client.get_file("/dataFiles/{}"
+                                                        .format(file_path))
+                                    
+                                    # Match the file name to the zip file name by file name and compare the bytes
+                                    baseName = Path(file_path).name
+                                    # Get the matching zip file
+                                    zipFile = [f for f in original_zip_images if f.endswith(baseName)]
+                                    if len(zipFile) == 0:
+                                        raise AssertionError("Could not find file {} in zip file".format(baseName))
+                                    
+                                    # Read the zipFile bytes
+                                    with original_zip_ref.open(zipFile[0]) as f:
+                                        zip_bytes = f.read()
+                                        self.assertEqual(file['content'], zip_bytes)
+                                        experiment_value_matches += 1
+                        
+                        # Now verify we can reconstruct the image zip from the experiment and make sure the zip images match the original zip images
+                        saved_zip_images = saved_zip_ref.namelist()
+                        for original_image_to_match in original_zip_images:
+                            for saved_image in saved_zip_images:
+                                if Path(original_image_to_match).name.upper() == saved_image.upper():
+                                    # Verify that the bytes match
+                                    with original_zip_ref.open(original_image_to_match) as f:
+                                        zip_bytes = f.read()
+                                        with saved_zip_ref.open(saved_image) as saved_f:
+                                            saved_zip_bytes = saved_f.read()
+                                            self.assertEqual(zip_bytes, saved_zip_bytes)
+                                            image_zip_reconstruction_matches += 1
+                                            break
+                
+                # Here we make sure we match the experiment values to the image values in the upload (which may contain multiple references to the same file)
+                self.assertEqual(experiment_value_matches, len(image_values_to_match))
+
+                # Here we match the unique set of image values as we are constructing a unique set of files in the zip
+                self.assertEqual(image_zip_reconstruction_matches, len(set(image_values_to_match)))
+
         return response
 
     def delete_all_experiments(self):
@@ -4419,3 +4531,23 @@ class TestExperimentLoader(BaseAcasClientTest):
         # Groups should have been sorted by the "Key" analysis group value uploaded in the dose response file
         for i in range(len(accepted_results_analysis_groups)):
             self.assertDictEqual(accepted_results_analysis_groups[i], new_results_analysis_groups[i])
+
+    @requires_basic_cmpd_reg_load
+    def test_017_report_file(self):
+        """Test experiment loader with report file."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'uniform-commas-with-quoted-text.csv')
+        report_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'dummy.pdf')
+        self.experiment_load_test(data_file_to_upload, True, report_file_to_upload=report_file_path)
+        self.experiment_load_test(data_file_to_upload, False, report_file_to_upload=report_file_path)
+
+    @requires_basic_cmpd_reg_load
+    def test_018_image_file(self):
+        """Test experiment loader with image file."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', '12_1_MultipleImage.csv')
+        image_file_path = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', '12_2_MultipleImage.zip')
+        # self.experiment_load_test(data_file_to_upload, True, images_file_to_upload=image_file_path)
+        self.experiment_load_test(data_file_to_upload, False, images_file_to_upload=image_file_path)

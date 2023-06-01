@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 from .acasclient import (get_entity_label_by_label_type_kind,
                          get_entity_value_by_state_type_kind_value_type_kind,
-                         get_entity_value_by_state_type_kind_value_type)
+                         get_entity_values_by_state_type_kind_value_type)
 from .selfile import get_file_type, load_from_str
 from .acasclient import client
 from .selfile import DoseResponse, Generic
@@ -131,7 +131,7 @@ class Experiment(dict):
         analysisGroups = self["analysisGroups"]
         inlineFilePaths = set()
         for ag in analysisGroups:
-            inlineFileValues = get_entity_value_by_state_type_kind_value_type(ag, "data", "results", "inlineFileValue")
+            inlineFileValues = get_entity_values_by_state_type_kind_value_type(ag, "data", "results", "inlineFileValue")
             for inlineFileValue in inlineFileValues:
                 inlineFilePaths.add(inlineFileValue['fileValue'])
 

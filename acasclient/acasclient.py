@@ -155,11 +155,11 @@ def get_entity_value_by_state_type_kind_value_type_kind(entity, state_type,
                         break
     return value
 
-def get_entity_value_by_state_type_kind_value_type(entity, state_type,
+def get_entity_values_by_state_type_kind_value_type(entity, state_type,
                                                         state_kind, value_type):
-    """Get a values from an acas entity dict object.
+    """Gets values from an acas entity dict object.
 
-    Gets value type values from an acas entity dict object.
+    Gets values from an acas entity dict object by state type, state kind and value type.
 
     Args:
         entity: Any ACAS entity (protocol, experiment, analysis_group,
@@ -169,8 +169,8 @@ def get_entity_value_by_state_type_kind_value_type(entity, state_type,
         value_type: String. The value type of the value.
 
     Returns:
-        A dict object representing the value if it exits. Otherwise it
-        returns None
+        A list of dict objects representing the values if they exits. Otherwise it
+        returns an empty list
 
     """
     values = []

@@ -24,6 +24,10 @@ VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "similarity", "full"}
 
 def isBase64(s):
+    """Checks if a string is base64 encoded.
+    """
+    if not isinstance(s, str):
+        return False
     return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
 
 

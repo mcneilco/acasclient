@@ -1,8 +1,11 @@
 """
 A module to read, edit, and write ACAS 'Single Experiment
 Loader' files.
+
 Common formats are supported for both input and output: csv, and
 excel
+
+
 """
 # Contributors:  Shawn Watts
 
@@ -68,15 +71,20 @@ def get_file_type(file_name):
     """
     :return: The file extension
     :rtype: str
+
     :param file_name: Path to file to check.
     :type file_name: str
+
     :note: a guess at the file format based on the extension:  csv, xls, or xlsx.
+
     :raise: ValueError if the file extension is not recognized.
+
     """
 
     try:
         ext = os.path.splitext(file_name)[1].lower()
-    except TypeError as err:
+    except (TypeError, ValueError) as err:
+        logger.critical(err)
         raise ValueError(f"Unknown file name extension: {file_name}")
 
     allowed_extensions = (CSV, XLSX, XLS)
@@ -90,8 +98,10 @@ def get_read_func_by_file_type(file_type):
     """
     :return: The pandas read_x function
     :rtype: function
+
     :param file_type: File extension.
     :type file_type: str
+
     """
 
     if file_type == CSV:
@@ -106,10 +116,13 @@ def get_read_func_by_file_type(file_type):
 def load_from_str(file_str, file_type):
     """
     'Factory function' for Generic or DoseResponse experiments.
+
     :param file_str:  Contents of an experiment file to load.
     :type file_str: str
+
     :param file_type: File extension that indicates the file format.
     :type file_type: Module constant
+
     """
 
     expt = Generic()
@@ -127,6 +140,7 @@ def load_from_str(file_str, file_type):
 class AbstractExperiment():
     """
     Interface for reading formatted ACAS SEL files.
+
     """
 
     META_HEADER = [
@@ -162,6 +176,7 @@ class AbstractExperiment():
         """
         :param file_name: Path to the ACAS Experiment file to load.
         :type file_name:  str
+
         """
 
         self.file_name = file_name
@@ -222,6 +237,7 @@ class AbstractExperiment():
         """
         :param file_name: Path to the file to load.
         :type file_name: str
+
         """
 
         self.file_name = file_name
@@ -233,8 +249,10 @@ class AbstractExperiment():
         """
         :param file_str:  Contents of an experiment file to load.
         :type file_str: str
+
         :param file_type: File extension that indicates the file format.
         :type file_type: Module constant
+
         """
 
         self._file_type = file_type
@@ -250,6 +268,7 @@ class AbstractExperiment():
         raise NotImplementedError("Defined by subclass")
 
     def validate(self):
+        """Validate the contents"""
         raise NotImplementedError("Defined by subclass")
 
     def getCorporateBatchIds(self):
@@ -267,13 +286,13 @@ class AbstractExperiment():
         endpoint_names.discard(LOT_CORP_NAME)
         return endpoint_names
 
-
     # Meta data property() decorators to flag when the representation
     # is altered.
     @property
     def meta_has_changed(self):
         """Return boolean,  True if the meta data changed after file parsing."""
         return self._meta_has_changed
+
     @meta_has_changed.setter
     def meta_has_changed(self, value):
         # Only set this if True so subsequent checks that are not changes
@@ -281,41 +300,41 @@ class AbstractExperiment():
         if value:
             self._meta_has_changed = value
 
-
     @property
     def experimental_meta_data(self):
         """Experimental Meta Data (Meta Data)"""
         return self._experimental_meta_data
+
     @experimental_meta_data.setter
     def experimental_meta_data(self, value):
         self.meta_has_changed = (value != self._experimental_meta_data)
         self._experimental_meta_data = value
 
-
     @property
     def format(self):
         """Format (Meta Data)"""
         return self._format
+
     @format.setter
     def format(self, value):
         self.meta_has_changed = (value != self._format)
         self._format = value
 
-
     @property
     def protocol_name(self):
         """Protocol Name (Meta Data)"""
         return self._protocol_name
+
     @protocol_name.setter
     def protocol_name(self, value):
         self.meta_has_changed = (value != self._protocol_name)
         self._protocol_name = value
 
-
     @property
     def experiment_name(self):
         """Experiment Name (Meta Data)"""
         return self._experiment_name
+
     @experiment_name.setter
     def experiment_name(self, value):
         self.meta_has_changed = (value != self._experiment_name)
@@ -323,51 +342,51 @@ class AbstractExperiment():
     # Alias
     name = experiment_name
 
-
     @property
     def scientist(self):
         """Scientist (Meta Data)"""
         return self._scientist
+
     @scientist.setter
     def scientist(self, value):
         self.meta_has_changed = (value != self._scientist)
         self._scientist = value
 
-
     @property
     def notebook(self):
         """Notebook (Meta Data)"""
         return self._notebook
+
     @notebook.setter
     def notebook(self, value):
         self.meta_has_changed = (value != self._notebook)
         self._notebook = value
 
-
     @property
     def page(self):
         """Page (Meta Data)"""
         return self._page
+
     @page.setter
     def page(self, value):
         self.meta_has_changed = (value != self._page)
         self._page = value
 
-
     @property
     def assay_date(self):
         """Assay Date (Meta Data)"""
         return self._assay_date
+
     @assay_date.setter
     def assay_date(self, value):
         self.meta_has_changed = (value != self._assay_date)
         self._assay_date = value
 
-
     @property
     def project(self):
         """Project (Meta Data)"""
         return self._project
+
     @project.setter
     def project(self, value):
         self.meta_has_changed = (value != self._project)
@@ -383,8 +402,12 @@ class AbstractExperiment():
 
     @property
     def expt_df(self):
-        """pd.DataFrame container for the experimental results data.  Also aliased as calculated_results_df"""
+        """
+        pd.DataFrame container for the experimental results data.  Also aliased
+        as calculated_results_df
+        """
         return self._expt_df.copy()
+
     @expt_df.setter
     def expt_df(self, new_expt_df):
         self._expt_has_changed = self._expt_df.equals(new_expt_df)
@@ -394,7 +417,11 @@ class AbstractExperiment():
     def calculated_results_df(self):
         """
         pd.DataFrame container for the 'Calculated Results'.
-        :note:  The df.columns are just the 'Corporate Batch ID' and endpoints, rows represent the values to register.  See calculated_results_datatype for the 'Datatype' mapping of the endpoints to type.
+
+        :note:  The df.columns are just the 'Corporate Batch ID' and endpoints,
+        rows represent the values to register.  See calculated_results_datatype
+        for the 'Datatype' mapping of the endpoints to type.
+
         """
         return self._expt_df.copy()
 
@@ -403,21 +430,26 @@ class AbstractExperiment():
         self._expt_has_changed = self._expt_df.equals(new_expt_df)
         self._expt_df = new_expt_df
 
-
     @property
     def datatype(self):
-        """OrderedDict {(column1: datatype1), ...)} column name keys for datatype."""
+        """
+        OrderedDict {(column1: datatype1), ...)} column name keys for datatype.
+        """
         return self._datatype
+
     @datatype.setter
     def datatype(self, new_dict):
         self._datatype_has_changed = (self._datatype == new_dict)
         self._datatype = new_dict
 
-
     @property
     def calculated_results_datatype(self):
-        """OrderedDict {(column1: datatype1), ...)} column name keys for Calculated Results datatype."""
+        """
+        OrderedDict {(column1: datatype1), ...)} column name keys for
+        Calculated Results datatype.
+        """
         return self._datatype
+
     @calculated_results_datatype.setter
     def calculated_results_datatype(self, new_dict):
         self._datatype_has_changed = (self._datatype == new_dict)
@@ -427,25 +459,31 @@ class AbstractExperiment():
 class Generic(AbstractExperiment):
     """
     Class to represent a Generic ACAS experiment file.
+
     Logical units (meta data, datatype, and calculated_results) are
     represented as separate data members.  There is some internal
     tracking to detect if the original data content is altered, but
     the datatype changes need to be updated by the caller.
+
     calculated_results_datatype - Datatype endpoint mapping.
     calculated_results_df - Calculated Results dataframe.
+
     Common formats are supported for both input and output:  csv,
     and excel
+
     API examples:
     # Read an existing file, change the 'Project' metadata and save.
     import datateam.fileio.acas as acas
     expt = acas.Generic('35250_FG_acas.csv')
     expt.project = 'Test Project'
     expt.saveAs('35250_FG_modified.xlsx')
+
     # Change the experimental values and save.
     import pandas as pd
     new_results = pd.read_csv('new_data.csv')
     expt.calculated_results_df = new_results
     expt.saveAs('replaced_data.csv')
+
     # Create new, completely empty handle, and populate it.
     expt = acas.Generic()
     expt.protocol_name = 'my super cool protocol'
@@ -473,12 +511,14 @@ class Generic(AbstractExperiment):
         'Assay Comment': 'Text'
     }
     expt.saveAs('my_expt.csv')
+
     """
 
     def __init__(self, file_name=None):
         """
         :param file_name: Path to the ACAS Generic Experiment file to load.
         :type file_name:  str
+
         """
 
         super().__init__(file_name)
@@ -489,7 +529,7 @@ class Generic(AbstractExperiment):
             self.file_name,
             header=None
         )
-        self._parseMeta(raw_df.iloc[0:self._meta_rows, [0,1]])
+        self._parseMeta(raw_df.iloc[0:self._meta_rows, [0, 1]])
 
         # Slice the 'calculated results'.
         self._expt_df = raw_df.iloc[self.RESULTS_HEADER['Datatype']+1:, :]
@@ -514,7 +554,7 @@ class Generic(AbstractExperiment):
             if row[0] in self.RESULTS_HEADER:
                 self.RESULTS_HEADER[row[0]] = idx
         self._experimental_meta_data = meta['Experiment Meta Data']
-        self._format = meta['Format']
+        self._format = meta['Format'].strip()
         self._protocol_name = meta['Protocol Name']
         self._experiment_name = meta['Experiment Name']
         self._scientist = meta['Scientist']
@@ -553,7 +593,7 @@ class Generic(AbstractExperiment):
         ]
         blanks = [self.blank, self.blank, self.blank]
         # Use zero-based numeric column name for all the logical
-        # units so they df.append() nicely.
+        # units so they df.concat() nicely.
         df_meta = pd.DataFrame(
             {
                 0: self.META_HEADER+blanks[0:2]+['Calculated Results'],
@@ -570,14 +610,20 @@ class Generic(AbstractExperiment):
         df_expt.columns = range(0, len(df_expt.columns))
 
         # Append the components into one output df.
-        df_out = df_meta.append(df_datatype.T, sort=True)
-        df_out = df_out.append(df_expt, ignore_index=True, sort=True)
+        df_out = pd.concat([df_meta, df_datatype.T], sort=True)
+        df_out = pd.concat([df_out, df_expt], ignore_index=True, sort=True)
 
     
         if file_type == CSV:
             output = df_out.to_csv(file_name, header=None, index=False)
         elif file_type in [XLS, XLSX]:
-            output = df_out.to_excel(file_name, header=None, index=False)
+            if file_name is None:
+                # Create excel writer object.
+                bio = io.BytesIO()
+                file_name = pd.ExcelWriter(bio, engine='openpyxl')
+            df_out.to_excel(file_name, header=None, index=False)
+            file_name.save()
+            output = bio.getvalue()
         else:
             raise ValueError(f'Unknown file type {file_type}')
         return output
@@ -587,6 +633,7 @@ class Generic(AbstractExperiment):
         Return True if:
             Format is 'Generic'
             expt_df.columns have a valid datatype.
+
         """
         if self.format != GENERIC:
             msg = f"Verify Format. {self.format} != {GENERIC}"
@@ -609,20 +656,25 @@ class DoseResponse(AbstractExperiment):
     Class to represent a Dose Response ACAS experiment file, which
     has 'raw results' that describe the 'dose-response' titration
     observations.
+
     Logical units (meta data, datatype, and calculated_results,
     raw_results and raw_results_datatype) are represented as separate
     data members.  There is some internal tracking to detect if the
     original data content is altered, but the datatype changes need
     to be updated by the caller.  The 'Raw Results' string is treated
     as a dummy/spacer.
+
     Common formats are supported for both input and output:  csv,
     and excel
+
     API examples:
     import datateam.fileio.acas as acas
     expt = acas.DoseResponse('DoseResponse_Fit_Pre-Fit.xlsx')
     expt.project = 'Test Project'
     expt.saveAs('DoseResponse_Fit_Pre-Fit-out.csv')
+
     See Generic for more API examples.
+
     """
 
     RESULTS_HEADER = {
@@ -643,15 +695,25 @@ class DoseResponse(AbstractExperiment):
         'Scatter Log-y',
         'Scatter Log-x,y'
     ]
+
+    _datatype = {
+        'curve id': 'temp id',
+        'Concentration (nM)': 'x',
+        'Response': 'y',
+        'flag': 'flag'
+    }
     _meta_rows = 300  # Scan this many rows for the start of 'raw results'.
     _raw_has_changed = None
     _raw_expt_df = None
 
-
     @property
     def raw_expt_df(self):
-        """pd.DataFrame container for the experimental raw results data.  Also aliased as raw_results_df"""
+        """
+        pd.DataFrame container for the experimental raw results data.  Also
+        aliased as raw_results_df
+        """
         return self._raw_expt_df.copy()
+
     @raw_expt_df.setter
     def raw_expt_df(self, new_raw_expt_df):
         self._raw_expt_has_changed = self._raw_expt_df.equals(new_raw_expt_df)
@@ -661,18 +723,33 @@ class DoseResponse(AbstractExperiment):
     def raw_results_df(self):
         """
         pd.DataFrame container for the experimental Raw Results data.
-        :note:  The df.columns are just the 'curve id', 'dose (units)', 'response' and 'flag', rows represent the values to register.  See raw_results_datatype for the 'temp id'  mapping of the endpoints to type.
+
+        :note:  The df.columns are just the 'curve id', 'dose (units)',
+        'response' and 'flag', rows represent the values to register.  See
+        raw_results_datatype for the 'temp id'  mapping of the endpoints to
+        type.
+
         """
         return self._raw_expt_df.copy()
+
     @raw_results_df.setter
     def raw_results_df(self, new_raw_expt_df):
-        self._raw_expt_has_changed = self._raw_expt_df.equals(new_raw_expt_df)
-        self._raw_expt_df = new_raw_expt_df
+        if self._raw_expt_df:
+            self._raw_expt_has_changed = self._raw_expt_df.equals(new_raw_expt_df)
+            self._raw_expt_df = new_raw_expt_df
+        else:
+            self._raw_expt_has_changed = True
+            self._raw_expt_df = new_raw_expt_df
+
 
     @property
     def raw_results(self):
         """OrderedDict {(column1: temp_id1), ...)} column name keys for raw results data."""
-        return self._raw_results
+        if hasattr(self, '_raw_results'):
+            return self._raw_results
+        else:
+            return self._datatype
+
     @raw_results.setter
     def raw_results(self, new_dict):
         self._raw_results_has_changed = (self._raw_results == new_dict)
@@ -682,8 +759,9 @@ class DoseResponse(AbstractExperiment):
     def raw_results_datatype(self):
         """OrderedDict {(column1: temp_id1), ...)} column name keys for raw results data."""
         return self._raw_results
+
     @raw_results.setter
-    def raw_results(self, new_dict):
+    def raw_results_datatype(self, new_dict):
         self._raw_results_has_changed = (self._raw_results == new_dict)
         self._raw_results = new_dict
 
@@ -691,6 +769,7 @@ class DoseResponse(AbstractExperiment):
         """
         :param file_name: Path to the ACAS Dose Response Experiment file to load.
         :type file_name:  str
+
         """
 
         super().__init__(file_name)
@@ -701,7 +780,7 @@ class DoseResponse(AbstractExperiment):
             self.file_name,
             header=None,
         )
-        self._parseMeta(raw_df.iloc[0:self._meta_rows, [0,1]])
+        self._parseMeta(raw_df.iloc[0:self._meta_rows, [0, 1]])
 
         # Slice the 'calculated results'.
         self._expt_df = raw_df.iloc[self.RESULTS_HEADER['Datatype']+1:self.RESULTS_HEADER['Raw Results'], :]
@@ -741,7 +820,7 @@ class DoseResponse(AbstractExperiment):
             if row[0] in self.RESULTS_HEADER:
                 self.RESULTS_HEADER[row[0]] = idx
         self._experimental_meta_data = meta['Experiment Meta Data']
-        self._format = meta['Format']
+        self._format = meta['Format'].strip()
         self._protocol_name = meta['Protocol Name']
         self._experiment_name = meta['Experiment Name']
         self._scientist = meta['Scientist']
@@ -768,6 +847,7 @@ class DoseResponse(AbstractExperiment):
         """
         :param file_name: Path to output file to save record.
         :type file_name: str
+
         """
 
         # Must provide either a file_name or a file_type but not both.
@@ -788,7 +868,7 @@ class DoseResponse(AbstractExperiment):
         ]
         blanks = [self.blank, self.blank, self.blank]
         # Use zero-based numeric column name for all the logical
-        # units so they df.append() nicely.
+        # units so they pd.concat() nicely.
         df_meta = pd.DataFrame(
             {
                 0: self.META_HEADER+blanks[0:2]+['Calculated Results'],
@@ -819,19 +899,27 @@ class DoseResponse(AbstractExperiment):
         df_raw_expt.columns = range(0, len(df_raw_expt.columns))
 
         # Append the components into one output df.
-        df_out = df_meta.append(df_datatype.T, sort=True)
-        df_out = df_out.append(df_expt, ignore_index=True, sort=True)
-        df_out = df_out.append(
-            df_raw_results_header.T,
+        df_out = pd.concat([df_meta, df_datatype.T], sort=True)
+        df_out = pd.concat([df_out, df_expt], ignore_index=True, sort=True)
+        df_out = pd.concat(
+            [df_out, df_raw_results_header.T],
             ignore_index=True,
             sort=True
         )
-        df_out = df_out.append(df_raw_results.T, ignore_index=True, sort=True)
-        df_out = df_out.append(df_raw_expt, ignore_index=True, sort=True)
+        df_out = pd.concat([df_out, df_raw_results.T], ignore_index=True, sort=True)
+        df_out = pd.concat([df_out, df_raw_expt], ignore_index=True, sort=True)
         if file_type == CSV:
             output = df_out.to_csv(file_name, header=None, index=False)
         elif file_type in [XLS, XLSX]:
-            output = df_out.to_excel(file_name, header=None, index=False)
+            if file_name is None:
+                # Create excel writer object.
+                bio = io.BytesIO()
+                file_name = pd.ExcelWriter(bio, engine='openpyxl')
+                df_out.to_excel(file_name, header=None, index=False)
+                file_name.save()
+                output = bio.getvalue()
+            else:
+                output = df_out.to_excel(file_name, header=None, index=False)
         else:
             raise ValueError(f'Unknown file type {file_type}')
         return output

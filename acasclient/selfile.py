@@ -206,6 +206,11 @@ class AbstractExperiment():
             [('Corporate Batch ID', 'Datatype')]
         )
 
+        # OrderedDict of 'Datatype' for raw results, Column keys for type.
+        self._raw_datatype = collections.OrderedDict(
+            [('curve id', 'temp id')]
+        )
+
         # Experimental results payload is a data frame.
         self._expt_df = pd.DataFrame()
 
@@ -535,6 +540,7 @@ class Generic(AbstractExperiment):
         self._expt_df = raw_df.iloc[self.RESULTS_HEADER['Datatype']+1:, :]
         self._expt_df.columns = self._expt_df.iloc[0]
         self._expt_df = self._expt_df.drop(self._expt_df.index[0])
+        self._expt_df = self._expt_df.dropna(axis='index', how='all') 
 
         # Do datatype after determining expt_df so the df.columns can be zipped.
         dt_rows = [self.RESULTS_HEADER['Datatype'], self.RESULTS_HEADER['Datatype']+1]
@@ -760,9 +766,8 @@ class DoseResponse(AbstractExperiment):
         """OrderedDict {(column1: temp_id1), ...)} column name keys for raw results data."""
         return self._raw_results
 
-    @raw_results.setter
+    @raw_results_datatype.setter
     def raw_results_datatype(self, new_dict):
-        self._raw_results_has_changed = (self._raw_results == new_dict)
         self._raw_results = new_dict
 
     def __init__(self, file_name=None):
@@ -787,6 +792,7 @@ class DoseResponse(AbstractExperiment):
         self._expt_df.columns = self._expt_df.iloc[0]
         self._expt_df = self._expt_df.drop(self._expt_df.index[0])
         self._expt_df = self._expt_df.loc[:, self._expt_df.columns.notna()]
+        self._expt_df = self._expt_df.dropna(axis='index', how='all') 
 
         # Do datatype after determining expt_df so the df.columns can be zipped.
         dt_rows = [self.RESULTS_HEADER['Datatype'], self.RESULTS_HEADER['Datatype']+1]
@@ -886,7 +892,8 @@ class DoseResponse(AbstractExperiment):
 
         df_raw_results_header = pd.DataFrame(
             {
-                0: ['Raw Results'],
+                0: [self.blank],
+                1: ['Raw Results'],
             }
         )
         df_raw_results = pd.DataFrame(

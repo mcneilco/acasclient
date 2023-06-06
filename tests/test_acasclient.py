@@ -4549,5 +4549,4 @@ class TestExperimentLoader(BaseAcasClientTest):
             .parent.joinpath('test_acasclient', '12_1_MultipleImage.csv')
         image_file_path = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', '12_2_MultipleImage.zip')
-        # self.experiment_load_test(data_file_to_upload, True, images_file_to_upload=image_file_path)
         self.experiment_load_test(data_file_to_upload, False, images_file_to_upload=image_file_path)

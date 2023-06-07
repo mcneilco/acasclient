@@ -180,8 +180,13 @@ class Experiment(dict):
         get a simple experiment from the server
         """
         file = self.get_source_file(client=client)
+        if file is None:
+            raise Exception("Could not find source file for experiment {}".format(self.code))
         file_type = get_file_type(file["name"])
-        simple_experiment = load_from_str(file["content"], file_type=file_type)
+        try:
+            simple_experiment = load_from_str(file["content"], file_type=file_type)
+        except Exception as e:
+            raise Exception("Could not load source file for experiment {}: {}".format(self.code, e))
         simple_experiment.file_name = file["name"]
         simple_experiment.id = self.id
         return simple_experiment
@@ -225,3 +230,5 @@ class Experiment(dict):
             value_type="codeValue",
             value_kind="scientist")
         return data.get('codeValue') if data else None
+
+    as_dict = dict.__str__

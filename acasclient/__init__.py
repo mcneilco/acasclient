@@ -2,4 +2,4 @@
 
 __author__ = """Brian Bolt"""
 __email__ = 'brian.bolt@boltengineered.com'
-__version__ = '2023.1.0'
+__version__ = '2023.2.0'

@@ -1376,17 +1376,45 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_basic_experiment_load
     def test_016_get_experiments_by_protocol_code(self, experiment):
         """Test get experiments by protocol code."""
-        protocols = self.client.get_protocols_by_label("Test Protocol")
         experiments = self.client.\
-            get_experiments_by_protocol_code(protocols[0]["codeName"])
+            get_experiments_by_protocol_code(experiment["protocol"]["codeName"])
         self.assertGreater(len(experiments), 0)
+        # Filter experiments and get the one matching our codeName
+        experiments = [e for e in experiments if e['codeName'] == experiment['codeName']]
+        self.assertEqual(len(experiments), 1)
         self.assertIn('codeName', experiments[0])
         self.assertIn('lsLabels', experiments[0])
+
         self.assertEqual(experiments[0]["lsLabels"][0]["labelText"],
-                         "Test Experiment")
+                         experiment["lsLabels"][0]["labelText"])
         experiments = self.client.\
             get_experiments_by_protocol_code("FAKECODE")
         self.assertIsNone(experiments)
+
+        # Verify project restrictions work
+        # Create a restricted project 
+        project = self.create_basic_project_with_roles()
+
+        # Load an experiment to the newly created restricted project using the global project lots
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, project.names[PROJECT_NAME])
+        response = self.client.\
+            experiment_loader(file_to_upload, "bob", False)
+        restricted_experiment_code_name = response['results']['experimentCode']
+
+        # Verify admin user can see the experiment
+        restricted_experiment = self.client.get_experiment_by_code(restricted_experiment_code_name)
+        experiments = self.client.\
+            get_experiments_by_protocol_code(restricted_experiment['protocol']['codeName'])
+        found_restricted_experiments = [e for e in experiments if e['codeName'] == restricted_experiment_code_name]
+        self.assertEqual(len(found_restricted_experiments), 1)
+
+        # Create an acas user with no access to the project
+        user_client = self.create_and_connect_backdoor_user(acas_user=True, acas_admin=False, creg_user=False, creg_admin=False)
+
+        # Fetch experiments from the prtocol code and verify the user cannot see the experiment
+        experiments = user_client.get_experiments_by_protocol_code(restricted_experiment['protocol']['codeName'])
+        found_restricted_experiments = [e for e in experiments if e['codeName'] == restricted_experiment_code_name]
+        self.assertEqual(len(found_restricted_experiments), 0)
 
     @requires_basic_experiment_load
     def test_017_get_experiment_by_code(self, experiment):

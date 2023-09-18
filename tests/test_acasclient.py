@@ -3042,10 +3042,15 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # Verify the analysis group information
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)
+        self.assertIn('analysisGroups', meta_lot_dependencies['linkedExperiments'][0])
         item = meta_lot_dependencies['linkedExperiments'][0]['analysisGroups'][0]
         self.assertIn('code', item)
         self.assertIn('values', item)
         self.assertEqual(len(item['values']), 3)
+
+        # Verify we can turn off the analysis group fetching
+        meta_lot_dependencies_no_analysis_groups = self.client.get_lot_dependencies("CMPD-0000001-001", include_linked_lots=False, include_analysis_group_values=False)
+        self.assertNotIn('analysisGroups', meta_lot_dependencies_no_analysis_groups['linkedExperiments'][0])
 
         # Delete the experiment and then check the meta lot dependencies again, this time the experiment should be removed from the linkedExperiments list
         self.client.delete_experiment(experiment['id'])

@@ -2147,7 +2147,7 @@ en array of protocols
         resp.raise_for_status()
         return resp.json()
 
-    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True):
+    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True, include_analysis_group_values=True):
         """Get lot dependencies for a lot by corp name
 
         Args:
@@ -2213,7 +2213,7 @@ en array of protocols
             HTTPError: If permission denied
         """
 
-        params = {'includeLinkedLots': str(include_linked_lots).lower()}
+        params = {'includeLinkedLots': str(include_linked_lots).lower(), 'includeAnalysisGroupValues': str(include_analysis_group_values).lower()}
         resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}"
                                 .format(self.url, lot_corp_name),
                                 params=params)

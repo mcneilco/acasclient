@@ -2153,6 +2153,7 @@ en array of protocols
         Args:
             lot_corp_name (str): Corp name of lot to get dependencies for
             include_linked_lots (bool): Whether to include linked lots in the response, default True.  Linked lots are purely informational as they are not a dependency preventing the lot from being deleted.
+            include_analysis_group_values (bool): Whether to include analysis group values in the response, default True.  Analysis group values are purely informational as they are not a dependency preventing the lot from being deleted.
 
         Returns:
             A dict of the lot dependencies

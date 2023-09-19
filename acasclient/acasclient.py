@@ -542,7 +542,7 @@ class client():
         """
         resp = self.session.get("{}/cmpdreg/metalots/corpName/{}/"
                                 .format(self.url, lot_corp_name))
-        if resp.status_code == 500:
+        if resp.status_code == 500 or resp.status_code == 404:
             return None
         resp.raise_for_status()
         return resp.json()
@@ -2147,12 +2147,13 @@ en array of protocols
         resp.raise_for_status()
         return resp.json()
 
-    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True):
+    def get_lot_dependencies(self, lot_corp_name, include_linked_lots=True, include_analysis_group_values=True):
         """Get lot dependencies for a lot by corp name
 
         Args:
             lot_corp_name (str): Corp name of lot to get dependencies for
             include_linked_lots (bool): Whether to include linked lots in the response, default True.  Linked lots are purely informational as they are not a dependency preventing the lot from being deleted.
+            include_analysis_group_values (bool): Whether to include analysis group values in the response, default True.  Analysis group values are purely informational as they are not a dependency preventing the lot from being deleted.
 
         Returns:
             A dict of the lot dependencies
@@ -2213,7 +2214,7 @@ en array of protocols
             HTTPError: If permission denied
         """
 
-        params = {'includeLinkedLots': str(include_linked_lots).lower()}
+        params = {'includeLinkedLots': str(include_linked_lots).lower(), 'includeAnalysisGroupValues': str(include_analysis_group_values).lower()}
         resp = self.session.get("{}/cmpdreg/metalots/checkDependencies/corpName/{}"
                                 .format(self.url, lot_corp_name),
                                 params=params)

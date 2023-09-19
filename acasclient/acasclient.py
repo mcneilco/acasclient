@@ -542,7 +542,7 @@ class client():
         """
         resp = self.session.get("{}/cmpdreg/metalots/corpName/{}/"
                                 .format(self.url, lot_corp_name))
-        if resp.status_code == 500:
+        if resp.status_code == 500 or resp.status_code == 404:
             return None
         resp.raise_for_status()
         return resp.json()

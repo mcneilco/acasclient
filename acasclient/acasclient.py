@@ -2332,7 +2332,7 @@ en array of protocols
 
         if not found_parent:
             raise RuntimeError(f'Parent corp name {parent_corp_name} could not be found')
-        lot_corp_name = found_parent['corpName']
+        lot_corp_name = found_parent['lotIDs'][0]['corpName']
         return self.get_meta_lot(lot_corp_name)
     
     def get_parent_alias_kinds(self) -> List[Dict]:

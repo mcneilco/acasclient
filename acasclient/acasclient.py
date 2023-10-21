@@ -440,6 +440,25 @@ class client():
         """
         return self.add_files_to_lot(lot_corp_name, [{"file": file, "file_type": file_type, "writeup": writeup}])
 
+    def _get_cmpdreg_files_content(self, files):
+        """Get the content of cmpdreg files
+
+        Pass an array of cmpdreg_files to download and fill their content attribute
+
+        Args:
+            files: An array of cmpdreg_files to download in the format
+                "subdir": The subdir of the file (usually lot_corp_name)
+                "url": The url of the file to download
+
+        Returns:
+            The same array of cmpdreg_files with the "content" attribute added
+        """
+        for file in files:
+            resp = self.session.get("{}/cmpdreg/MultipleFilePicker/{}".format(self.url, file["url"]))
+            resp.raise_for_status()
+            file["content"] = resp.content
+        return files
+
     def _upload_cmpdreg_files(self, lot_corp_name, files):
         """Upload a list of files to CmpdReg.
 

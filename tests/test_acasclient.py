@@ -437,6 +437,16 @@ class BaseAcasClientTest(unittest.TestCase):
         user_client = acasclient.client(user_creds)
         return user_client
 
+    def verify_file_and_content_equal(self, content, file):
+        """ Compare the content to the file contents"""
+        if isinstance(content, bytes):
+            with open(file, 'rb') as f:
+                upload_bytes = f.read()
+                self.assertEqual(content, upload_bytes)
+        else:
+            with open(file, 'r') as f:
+                self.assertEqual(content, f.read())
+
     # Helper for testing an experiment upload was successful
     def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False, report_file_to_upload=None, images_file_to_upload=None):
         response = self.client.\
@@ -466,13 +476,7 @@ class BaseAcasClientTest(unittest.TestCase):
             # If the file['content'] is bytes then read the data_file_to_upload as bytes
             # If the file['content'] is string then read the data_file_to_upload as string
             source_file = experiment.get_source_file()
-            if isinstance(source_file['content'], bytes):
-                with open(data_file_to_upload, 'rb') as f:
-                    upload_bytes = f.read()
-                    self.assertEqual(source_file['content'], upload_bytes)
-            else:
-                with open(data_file_to_upload, 'r') as f:
-                    self.assertEqual(source_file['content'], f.read())
+            self.verify_file_and_content_equal(source_file['content'], data_file_to_upload)
 
             if report_file_to_upload is not None:
                 report_file = experiment.get_report_file()
@@ -480,13 +484,8 @@ class BaseAcasClientTest(unittest.TestCase):
                 # Make sure the file was moved to the experiment folder by checking the file path
                 self.assertIn(experimentCode, experiment.report_file)
                 
-                if isinstance(report_file['content'], bytes):
-                    with open(report_file_to_upload, 'rb') as f:
-                        upload_bytes = f.read()
-                        self.assertEqual(report_file['content'], upload_bytes)
-                else:
-                    with open(report_file_to_upload, 'r') as f:
-                        self.assertEqual(report_file['content'], f.read())
+                # Verify matching file content
+                self.verify_file_and_content_equal(report_file['content'], report_file_to_upload)
 
             if images_file_to_upload is not None:
                 # The images file isn't saved as a file in the experiment, but rather each image file is saved as an analysis group value
@@ -3999,7 +3998,7 @@ class TestCmpdReg(BaseAcasClientTest):
         file_name1 = 'dummy.pdf'
         file_test_path1 = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name1)
-        file_name2 = 'dummy2.pdf'
+        file_name2 = 'dummy2.PDF' # Upper case on purpose to verify we can handle uppercase extensions
         file_test_path2 = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name2)
         # Save the file
@@ -4064,7 +4063,7 @@ class TestCmpdReg(BaseAcasClientTest):
         file_type1 = "HPLC"
         writeup1="My writeup on the file1"
 
-        file_name2 = 'dummy2.pdf'
+        file_name2 = 'dummy2.PDF'
         file_test_path2 = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name2)
         file_type2 = "LCMS"
@@ -4102,14 +4101,20 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn("metalot", meta_lot_save_response)
         self.assertIn("fileList", meta_lot_save_response["metalot"])
 
+        # Fill the content of the files
+        saved_files = self.client._get_cmpdreg_files_content(meta_lot_save_response["metalot"]["fileList"])
+
         # Verify that the fileList has the files we just uploaded by checking the names
         has_file1 = False
         has_file2 = False
-        for file in meta_lot_save_response["metalot"]["fileList"]:
+        for file in saved_files:
             if file["name"] == file_name1:
                 has_file1 = True
+                self.verify_file_and_content_equal(file['content'], file_test_path1)
             if file["name"] == file_name2:
                 has_file2 = True
+                self.verify_file_and_content_equal(file['content'], file_test_path2)
+                
         self.assertTrue(has_file1)
         self.assertTrue(has_file2)
         

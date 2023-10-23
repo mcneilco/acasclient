@@ -439,13 +439,9 @@ class BaseAcasClientTest(unittest.TestCase):
 
     def verify_file_and_content_equal(self, file_path, content):
         """ Compare the content to the file contents"""
-        if isinstance(content, bytes):
-            with open(file_path, 'rb') as f:
-                upload_bytes = f.read()
-                self.assertEqual(content, upload_bytes)
-        else:
-            with open(file_path, 'r') as f:
-                self.assertEqual(content, f.read())
+        mode = 'rb' if isinstance(content, bytes) else 'r'
+        with open(file_path, mode) as f:
+            self.assertEqual(content, f.read())
 
     # Helper for testing an experiment upload was successful
     def experiment_load_test(self, data_file_to_upload, dry_run_mode, expect_failure=False, report_file_to_upload=None, images_file_to_upload=None):

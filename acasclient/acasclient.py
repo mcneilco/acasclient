@@ -440,6 +440,24 @@ class client():
         """
         return self.add_files_to_lot(lot_corp_name, [{"file": file, "file_type": file_type, "writeup": writeup}])
 
+    def _get_cmpdreg_files_content(self, cmpdreg_lot_file_list):
+        """Get the content of cmpdreg files
+
+        Pass the lot fileList array of array attribute of a cmpdreg metalot object to update or add the content attribute to each file
+
+        Args:
+            files: An array of dictionaries from the lot fileList attribute (attributes other than url are ignored)
+                "url": The url of the file to download
+
+        Returns:
+            The the original array of dictionaries with the content attribute updated or added to each file
+        """
+        for file in cmpdreg_lot_file_list:
+            resp = self.session.get("{}/cmpdreg/MultipleFilePicker/{}".format(self.url, file["url"]))
+            resp.raise_for_status()
+            file["content"] = resp.content
+        return cmpdreg_lot_file_list
+
     def _upload_cmpdreg_files(self, lot_corp_name, files):
         """Upload a list of files to CmpdReg.
 

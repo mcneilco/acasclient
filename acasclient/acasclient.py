@@ -446,8 +446,7 @@ class client():
         Pass an array of cmpdreg_files to download and fill their content attribute
 
         Args:
-            files: An array of cmpdreg_files to download in the format
-                "subdir": The subdir of the file (usually lot_corp_name)
+            files: An array of cmpdreg_files to download in the format (attributes other than url are ignored)
                 "url": The url of the file to download
 
         Returns:

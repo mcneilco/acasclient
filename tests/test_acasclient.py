@@ -437,7 +437,7 @@ class BaseAcasClientTest(unittest.TestCase):
         user_client = acasclient.client(user_creds)
         return user_client
 
-    def verify_file_and_content_equal(self, content, file_path):
+    def verify_file_and_content_equal(self, file_path, content):
         """ Compare the content to the file contents"""
         if isinstance(content, bytes):
             with open(file_path, 'rb') as f:
@@ -476,7 +476,7 @@ class BaseAcasClientTest(unittest.TestCase):
             # If the file['content'] is bytes then read the data_file_to_upload as bytes
             # If the file['content'] is string then read the data_file_to_upload as string
             source_file = experiment.get_source_file()
-            self.verify_file_and_content_equal(source_file['content'], data_file_to_upload)
+            self.verify_file_and_content_equal(data_file_to_upload, source_file['content'])
 
             if report_file_to_upload is not None:
                 report_file = experiment.get_report_file()
@@ -485,7 +485,7 @@ class BaseAcasClientTest(unittest.TestCase):
                 self.assertIn(experimentCode, experiment.report_file)
                 
                 # Verify matching file content
-                self.verify_file_and_content_equal(report_file['content'], report_file_to_upload)
+                self.verify_file_and_content_equal(report_file_to_upload, report_file['content'])
 
             if images_file_to_upload is not None:
                 # The images file isn't saved as a file in the experiment, but rather each image file is saved as an analysis group value
@@ -4110,10 +4110,10 @@ class TestCmpdReg(BaseAcasClientTest):
         for file in saved_files:
             if file["name"] == file_name1:
                 has_file1 = True
-                self.verify_file_and_content_equal(file['content'], file_test_path1)
+                self.verify_file_and_content_equal(file_test_path1, file['content'])
             if file["name"] == file_name2:
                 has_file2 = True
-                self.verify_file_and_content_equal(file['content'], file_test_path2)
+                self.verify_file_and_content_equal(file_test_path2, file['content'])
                 
         self.assertTrue(has_file1)
         self.assertTrue(has_file2)

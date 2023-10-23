@@ -437,14 +437,14 @@ class BaseAcasClientTest(unittest.TestCase):
         user_client = acasclient.client(user_creds)
         return user_client
 
-    def verify_file_and_content_equal(self, content, file):
+    def verify_file_and_content_equal(self, content, file_path):
         """ Compare the content to the file contents"""
         if isinstance(content, bytes):
-            with open(file, 'rb') as f:
+            with open(file_path, 'rb') as f:
                 upload_bytes = f.read()
                 self.assertEqual(content, upload_bytes)
         else:
-            with open(file, 'r') as f:
+            with open(file_path, 'r') as f:
                 self.assertEqual(content, f.read())
 
     # Helper for testing an experiment upload was successful

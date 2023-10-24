@@ -3216,12 +3216,15 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # Verify our cmpdreg admin user can save the restricted lot
         meta_lot["lot"]["color"] = "red"
+        VENDOR_ID = "12345"
+        meta_lot["lot"]["vendorID"] = VENDOR_ID
         response = self.client.\
             save_meta_lot(meta_lot)
         self.assertEqual(len(response["errors"]), 0)
         self.assertIn("metalot", response)
         self.assertIn("lot", response["metalot"])
         self.assertEqual(response["metalot"]["lot"]["color"], "red")
+        self.assertEqual(response["metalot"]["lot"]["vendorID"], VENDOR_ID)
         self.assertIsNotNone(response["metalot"]["lot"]["modifiedDate"])  # Lot is modified
 
         # Verify our admin user can update the project

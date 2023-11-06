@@ -36,7 +36,7 @@ class TestLsThing(BaseAcasClientTest):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
-        files_to_delete = ['dummy.pdf', 'dummy2.pdf']
+        files_to_delete = ['dummy.pdf', 'dummy2.PDF']
         for f in files_to_delete:
             file = Path(f)
             if file.exists():
@@ -227,7 +227,7 @@ class TestLsThing(BaseAcasClientTest):
         file_name = 'dummy.pdf'
         file_test_path = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name)
-        file_name_2 = 'dummy2.pdf'
+        file_name_2 = 'dummy2.PDF'
         file_test_path_2 = Path(__file__).resolve().parent\
             .joinpath('test_acasclient', file_name_2)
 

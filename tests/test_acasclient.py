@@ -282,6 +282,13 @@ def get_or_create_global_project():
     output = r.json()
     return output["messages"]
 
+def delete_all_lots_and_experiments(self):
+    """ Deletes all lots and experiments """
+    lots = self.client.get_all_lots()
+    if len(lots) > 0:
+        self.delete_all_experiments()
+        self.delete_all_cmpd_reg_bulk_load_files()
+
 def requires_basic_cmpd_reg_load(func):
     """
     Decorator to load the basic cmpdreg data if it is not already loaded
@@ -289,6 +296,8 @@ def requires_basic_cmpd_reg_load(func):
     @wraps(func)
     def wrapper(self):
         if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
+            # Delete everything to be safe
+            delete_all_lots_and_experiments(self)
             response = self.basic_cmpd_reg_load()
             # Verify they were loaded
             self.assertIn('New compounds: 2', response['summary'])
@@ -303,10 +312,7 @@ def requires_absent_basic_cmpd_reg_load(func):
     """
     @wraps(func)
     def wrapper(self):
-        lots = self.client.get_all_lots()
-        if len(lots) > 0:
-            self.delete_all_experiments()
-            self.delete_all_cmpd_reg_bulk_load_files()
+        delete_all_lots_and_experiments(self)
         return func(self)   
     return wrapper
 

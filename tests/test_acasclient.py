@@ -2069,10 +2069,12 @@ class TestAcasclient(BaseAcasClientTest):
         role = updated_author['authorRoles'][0]['roleEntry']
         self.assertEqual(role['roleName'], 'ROLE_ACAS-USERS')
         # Try adding a role by updating the author
-        # Unfortunately we need to hardcode the id of the role, or fetch it from the server
+        # We need to fetch the lsRole id from the server
+        ls_roles = self.client.session.get(self.client.url + '/api/lsRoles/codeTable').json()
+        cmpdreg_role_id = [role for role in ls_roles if role['code'] == 'System_CmpdReg_ROLE_CMPDREG-USERS'][0]['id']
         nested_cmpdreg_role = {
             'roleEntry': {
-                'id': 3,
+                'id': cmpdreg_role_id,
                 'lsType': 'System',
                 'lsKind': 'CmpdReg',
                 'roleName': 'ROLE_CMPDREG-USERS',

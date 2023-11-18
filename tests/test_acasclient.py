@@ -288,6 +288,12 @@ def delete_all_lots_and_experiments(self):
     if len(lots) > 0:
         self.delete_all_experiments()
         self.delete_all_cmpd_reg_bulk_load_files()
+        # Check lots again
+        lots = self.client.get_all_lots()
+        if len(lots) > 0:
+            # Delete any remaining lots not from bulk loads
+            for lot in lots:
+                self.client.delete_lot(lot['lotCorpName'])
 
 def requires_basic_cmpd_reg_load(func):
     """

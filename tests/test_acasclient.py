@@ -1188,9 +1188,15 @@ class TestAcasclient(BaseAcasClientTest):
             cmpd_search_request(searchRequest)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
 
+    @requires_absent_basic_cmpd_reg_load
     @requires_basic_cmpd_reg_load
     def test_008_cmpd_search(self):
         """Test cmpd search request."""
+
+        # Add more compounds.
+        file = Path(__file__).resolve().parent\
+            .joinpath('test_acasclient', 'nci50.sdf')
+        self.basic_cmpd_reg_load(file=file)
 
         # Search by structure
         molStructure = (
@@ -1223,10 +1229,24 @@ class TestAcasclient(BaseAcasClientTest):
         search_results = self.client.\
             cmpd_search(molStructure=molStructure)
         self.assertGreater(len(search_results["foundCompounds"]), 0)
+
+        lots = self.client.get_all_lots()
+        parent_corp_names = sorted([lot['parentCorpName'] for lot in lots])
+        self.assertGreater(len(parent_corp_names), 1)
+        search_corp_name = parent_corp_names[0]
+        formatted_corp_name = f"CMPD-00{int(search_corp_name.split('-')[1])}"
+        corp_name_list = [formatted_corp_name]
+
         # Search by ID list
-        corp_name_list = ["CMPD-0000001"]
         search_results = self.client.cmpd_search(corpNameList=corp_name_list)
-        self.assertGreater(len(search_results["foundCompounds"]), 0)
+        corp_names = [
+            found_compound['corpName']
+            for found_compound in search_results["foundCompounds"]
+        ]
+        # Corporate name with higher similarity should be returned first
+        self.assertGreater(len(corp_names), 1)  # sanity check
+        self.assertEqual(corp_names[0], search_corp_name)
+
         # Filter results by project code
         search_results = self.client.cmpd_search(
             corpNameList=corp_name_list, projectCodes=[self.global_project_code])

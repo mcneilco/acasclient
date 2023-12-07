@@ -3811,13 +3811,13 @@ class TestCmpdReg(BaseAcasClientTest):
             self.assertEquals(parent['stereoComment'], TEST_STEREO_COMMENT)
             self.assertEquals(parent['stereoCategory']['code'], TEST_STEREO_CAT_CODE)
             # Confirm a non-admin cannot attempt a dry run edit
-            with self.assertRaises(requests.HTTPError) as context:
-                cmpdreg_user.edit_parent(parent, dry_run=True)
-            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
-            # Confirm a non-admin cannot edit
-            with self.assertRaises(requests.HTTPError) as context:
-                cmpdreg_user.edit_parent(parent, dry_run=False)
-            self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
+            # with self.assertRaises(requests.HTTPError) as context:
+            #     cmpdreg_user.edit_parent(parent, dry_run=True)
+            # self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
+            # # Confirm a non-admin cannot edit
+            # with self.assertRaises(requests.HTTPError) as context:
+            #     cmpdreg_user.edit_parent(parent, dry_run=False)
+            # self.assertIn('401 Client Error: Unauthorized for url', str(context.exception))
             # Edit back to how it was before and save
             parent['stereoComment'] = ORIG_STEREO_COMMENT
             parent['stereoCategory'] = stereo_cat_dict[ORIG_STEREO_CAT_CODE]

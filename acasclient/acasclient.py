@@ -440,6 +440,24 @@ class client():
         """
         return self.add_files_to_lot(lot_corp_name, [{"file": file, "file_type": file_type, "writeup": writeup}])
 
+    def _get_cmpdreg_files_content(self, cmpdreg_lot_file_list):
+        """Get the content of cmpdreg files
+
+        Pass the lot fileList array of array attribute of a cmpdreg metalot object to update or add the content attribute to each file
+
+        Args:
+            files: An array of dictionaries from the lot fileList attribute (attributes other than url are ignored)
+                "url": The url of the file to download
+
+        Returns:
+            The the original array of dictionaries with the content attribute updated or added to each file
+        """
+        for file in cmpdreg_lot_file_list:
+            resp = self.session.get("{}/cmpdreg/MultipleFilePicker/{}".format(self.url, file["url"]))
+            resp.raise_for_status()
+            file["content"] = resp.content
+        return cmpdreg_lot_file_list
+
     def _upload_cmpdreg_files(self, lot_corp_name, files):
         """Upload a list of files to CmpdReg.
 
@@ -2324,9 +2342,15 @@ en array of protocols
         """
         # Look up the compound to find a lot, so we can access a MetaLot
         search_results = self.cmpd_search(corpNameList=parent_corp_name)
-        if len(search_results['foundCompounds']) == 0:
+
+        found_compounds = search_results['foundCompounds']
+
+        # Return the first found_compound which matches the parent_corp_name
+        found_parent = next((x for x in found_compounds if x['corpName'] == parent_corp_name), None)
+
+        if not found_parent:
             raise RuntimeError(f'Parent corp name {parent_corp_name} could not be found')
-        lot_corp_name = search_results['foundCompounds'][0]['lotIDs'][0]['corpName']
+        lot_corp_name = found_parent['lotIDs'][0]['corpName']
         return self.get_meta_lot(lot_corp_name)
     
     def get_parent_alias_kinds(self) -> List[Dict]:

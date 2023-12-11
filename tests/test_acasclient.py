@@ -830,7 +830,7 @@ class BaseAcasClientTest(unittest.TestCase):
                     "dbProperty": "Parent Alias",
                     "defaultVal": None,
                     "required": False,
-                    "sdfProperty": "Parent Aliases"
+                    "sdfProperty": "Parent Alias"
                 }
             ]
 
@@ -4116,7 +4116,64 @@ class TestCmpdReg(BaseAcasClientTest):
                 
         self.assertTrue(has_file1)
         self.assertTrue(has_file2)
+
+    @requires_basic_cmpd_reg_load
+    def test_013_bulk_load_multiple_lots(self):
+        """Test bulk loading multiple lots to an existing parent"""
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_multiple_lots.sdf')
+
+        project_code = self.global_project_code
+
+        mappings = [
+                {
+                    "dbProperty": "Parent Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Corp Name",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Lot Corp Name"
+                },
+                {
+                    "dbProperty": "Lot Chemist",
+                    "defaultVal": "bob",
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Project",
+                    "defaultVal": project_code,
+                    "required": True,
+                    "sdfProperty": "Project Code Name"
+                },
+                {
+                    "dbProperty": "Parent Stereo Category",
+                    "defaultVal": STEREO_CATEGORY,
+                    "required": True,
+                    "sdfProperty": None
+                },
+                {
+                    "dbProperty": "Parent Alias",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Alias"
+                }
+            ]
+        # Confirm this dryruns successfully
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
         
+        # There should not be any errors
+        self.assertIn("New lots of existing compounds: 2", response['summary'])
+        self.assertEqual(0, len(response['results']))
+
+        # Confirm this loads successfully
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("New lots of existing compounds: 2", response['summary'])
+        self.assertEqual(0, len(response['results']))
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

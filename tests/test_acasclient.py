@@ -3415,7 +3415,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # CMPD-0000002 / alias-2 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer)
         # CMPD-0000003 / alias-3 (structure: A'(stereoisomer of 1), stereo category: Single stereoisomer - arbitrary assign)
         # CMPD-0000004 / alias-4 (structure: B, stereo category: Single stereoisomer)
-        # CMPD-0000005 / alias-4(structure: C, stereo category: Unknown, stereo comment: foo)
+        # CMPD-0000005 / alias-4-a(structure: C, stereo category: Unknown, stereo comment: foo)
         # CMPD-0000006 / alias-6, alias-6a(structure: C'(stereoisomer of 5), stereo category: Unknown, stereo comment: foo)
 
         def _get_mol_weights_and_formula(lot_corp_name):
@@ -3502,13 +3502,14 @@ class TestCmpdReg(BaseAcasClientTest):
                 corp_name1='alias-1', corp_name2='alias-2')
             self.assertFalse(response["hasError"])
 
+            # REMOVED TEST BECAUSE BY DEFAULT ACAS NO LONGER ALLOWS LOADING DUPLICATE ALIAS BY DEFAULT
             # Swap a non-unique alias.
-            exp_error_msg = ("Alias name 'alias-4' has multiple corporate id matches: CMPD-0000004, CMPD-0000005")
-            response = self.client.swap_parent_structures(
-                corp_name1='CMPD-0000006', corp_name2='alias-4'
-            )
-            self.assertTrue(response["hasError"])
-            self.assertEqual(response["errorMessage"], exp_error_msg)
+            # exp_error_msg = ("Alias name 'alias-4' has multiple corporate id matches: CMPD-0000004, CMPD-0000005")
+            # response = self.client.swap_parent_structures(
+            #     corp_name1='CMPD-0000006', corp_name2='alias-4'
+            # )
+            # self.assertTrue(response["hasError"])
+            # self.assertEqual(response["errorMessage"], exp_error_msg)
 
             # Try making a valid swap as a non-admin and confirm it fails
             # due to permissions
@@ -4117,14 +4118,31 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertTrue(has_file1)
         self.assertTrue(has_file2)
 
-    @requires_basic_cmpd_reg_load
-    def test_013_bulk_load_multiple_lots(self):
+    @requires_absent_basic_cmpd_reg_load
+    def test_013_unique_parent_alias_tests(self):
         """Test bulk loading multiple lots to an existing parent"""
+
+        # Get a file that just has a simple mol structure
         file = Path(__file__).resolve().parent.joinpath(
-            'test_acasclient', 'test_multiple_lots.sdf')
+            'test_acasclient', 'test_simple_mol.sdf')
+        
+        # Read the mol
+        with open(file, 'r') as f:
+            simple_mol = f.read()
+
+        # Append the > <Parent Alias> to the file content after "M  END"
+        parent_alias_1 = str(uuid.uuid4())
+        stereo_comment_1 = str(uuid.uuid4())
+        parent_1 = simple_mol.replace("M  END", f"M  END\n> <Parent Alias>\n{parent_alias_1}\n")
+        parent_1 = parent_1.replace("M  END", f"M  END\n> <Parent Stereo Comment>\n{stereo_comment_1}\n")
+
+        # Write the file back out to self.tempdir
+        file = Path(self.tempdir).joinpath('test_multiple_lots.sdf')
+        with open(file, 'w') as f:
+            # Write out the content twice so we can test that we can load multiple lots of the same parent
+            f.write(parent_1)
 
         project_code = self.global_project_code
-
         mappings = [
                 {
                     "dbProperty": "Parent Corp Name",
@@ -4161,19 +4179,105 @@ class TestCmpdReg(BaseAcasClientTest):
                     "defaultVal": None,
                     "required": False,
                     "sdfProperty": "Parent Alias"
-                }
+                },
+                {
+                    "dbProperty": "Parent Stereo Comment",
+                    "defaultVal": None,
+                    "required": False,
+                    "sdfProperty": "Parent Stereo Comment"
+                },
             ]
+        
+        # Load the parent with the alias
+        # Confirm this dryruns successfully and loads successfully
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("Number of entries processed: 1", response['summary'])
+        self.assertIn("Number of entries with error: 0", response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+
+        # Test 1: Load lots 2, 3 in the same file with the same parent alias and confirm it succeeds
+        # Append the content into the file again
+        # The file will contain lots 2, 3 of the parent we just loaded
+        with open(file, 'a') as f:
+            f.write(parent_1)
         # Confirm this dryruns successfully
         response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
-        
         # There should not be any errors
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 0", response['summary'])
+        self.assertIn("New lots of existing compounds: 2", response['summary'])
+        self.assertEqual(0, len(response['results']))
+        # Confirm this loads successfully
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 0", response['summary'])
         self.assertIn("New lots of existing compounds: 2", response['summary'])
         self.assertEqual(0, len(response['results']))
 
-        # Confirm this loads successfully
+        # Test 2: Load a new parent with the same alias as the first parent and confirm it fails
+        stereo_comment_2 = str(uuid.uuid4())
+        parent_2 = simple_mol.replace("M  END", f"M  END\n> <Parent Stereo Comment>\n{stereo_comment_2}\n")
+        parent_2_with_parent_alias_1 = parent_2.replace("M  END", f"M  END\n> <Parent Alias>\n{parent_alias_1}\n")
+        # Write a file with the new parent
+        file = Path(self.tempdir).joinpath('fail_duplicate_blah.sdf')
+        with open(file, 'w') as f:
+            # Write out the content twice so we can test that we can load multiple lots of the same parent
+            f.write(parent_2_with_parent_alias_1)
+        # Should fail dry run
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
+        self.assertIn(f"1 entries had: Duplicate parent alias {parent_alias_1}", response['summary'])
+        # Should fail load
         response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
-        self.assertIn("New lots of existing compounds: 2", response['summary'])
-        self.assertEqual(0, len(response['results']))
+        self.assertIn(f"1 entries had: Duplicate parent alias {parent_alias_1}", response['summary'])
+
+        # Test 3: Load 2 new parents with the same alias and confirm it fails
+        parent_alias_3 = str(uuid.uuid4())
+        stereo_comment_3 = str(uuid.uuid4())
+        stereo_comment_4 = str(uuid.uuid4())
+        parent_3 = simple_mol.replace("M  END", f"M  END\n> <Parent Stereo Comment>\n{stereo_comment_3}\n")
+        parent_3 = parent_3.replace("M  END", f"M  END\n> <Parent Alias>\n{parent_alias_3}\n")
+        parent_4 = simple_mol.replace("M  END", f"M  END\n> <Parent Stereo Comment>\n{stereo_comment_4}\n")
+        parent_4_alias_3 = parent_4.replace("M  END", f"M  END\n> <Parent Alias>\n{parent_alias_3}\n")
+        # Write the file with 2 new parents and same alias
+        file = Path(self.tempdir).joinpath('within_file_same_alias_2_compounds.sdf')
+        with open(file, 'w') as f:
+            f.write(parent_3)
+            f.write(parent_4_alias_3)
+        # Should fail dry run
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 1", response['summary'])
+        self.assertIn(f"1 entries had: Within File, Parent Alias {parent_alias_3} is not unique", response['summary'])
+        # Should fail load the second lot
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 1", response['summary'])
+        self.assertIn(f"1 entries had: Duplicate parent alias {parent_alias_3}", response['summary'])
+
+        # Test 4: Load 2 new parents, one with a parent alias that already exists and one new alias
+        stereo_comment_5 = str(uuid.uuid4())
+        parent_alias_6 = str(uuid.uuid4())
+        stereo_comment_6 = str(uuid.uuid4())
+        parent_5 = simple_mol.replace("M  END", f"M  END\n> <Parent Stereo Comment>\n{stereo_comment_5}\n")
+        parent_5_alias_1 = parent_5.replace("M  END", f"M  END\n> <Parent Alias>\n{parent_alias_1}\n")
+        parent_6 = simple_mol.replace("M  END", f"M  END\n> <Parent Stereo Comment>\n{stereo_comment_6}\n")
+        parent_6 = parent_6.replace("M  END", f"M  END\n> <Parent Alias>\n{parent_alias_6}\n")
+        # Write the file with 2 new parents and same alias
+        file = Path(self.tempdir).joinpath('within_file_same_alias_2_compounds.sdf')
+        with open(file, 'w') as f:
+            # Write out the content twice so we can test that we can load multiple lots of the same parent
+            f.write(parent_5_alias_1)
+            f.write(parent_6)
+        # Should fail dry run
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 1", response['summary'])
+        self.assertIn(f"1 entries had: Duplicate parent alias {parent_alias_1}", response['summary'])
+        # Should fail load one
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 1", response['summary'])
+        self.assertIn(f"1 entries had: Duplicate parent alias {parent_alias_1}", response['summary'])
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

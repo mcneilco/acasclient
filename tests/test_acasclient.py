@@ -3343,7 +3343,7 @@ class TestCmpdReg(BaseAcasClientTest):
         file_to_upload = get_basic_experiment_load_file(self.tempdir, project.names[PROJECT_NAME], restricted_lot_corp_name, file_name='4 parameter D-R.csv')
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
-        self.assertTrue(self.check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
+        self.assertTrue(self.check_lot_exists_in_experiment(restricted_lot_corp_name, response['results']['experimentCode']))
                         
         # Deny rule: Creg admin is not an acas user
         self.assertFalse(can_delete_lot(self, cmpdreg_admin, restricted_lot_corp_name, set_owner_first=True))
@@ -3359,7 +3359,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIsNone(meta_lot)
 
         # Get the experiment and verify the lot is deleted
-        self.assertFalse(self.check_lot_exists_in_experiment(self, restricted_lot_corp_name, response['results']['experimentCode']))
+        self.assertFalse(self.check_lot_exists_in_experiment(restricted_lot_corp_name, response['results']['experimentCode']))
 
         # TODO: The following tests are dependent on a non default configuration: client.cmpdreg.metaLot.disableDeleteMyLots = false so we can't test this by default. We should turn this back on when we have a testing system which can change the configurations of acas.
         # # Global compound, with experiment in Global project
@@ -4611,27 +4611,27 @@ class TestExperimentLoader(BaseAcasClientTest):
         restricted_project_1 = self.create_basic_project_with_roles()
         # Create a restricted lot in a different restricted project
         restricted_project_2 = self.create_basic_project_with_roles()
-        restricted_lot_corp_name = self.create_restricted_lot(restricted_project_2.code_name)
+        restricted_lot_corp_name_2 = self.create_restricted_lot(restricted_project_2.code_name)
 
         # (Dissallowed) Restricted experiment proj1 with lot restricted proj2
         # Create an upload file which uploads to restricted_project_1 but has a lot from restricted_project_2
-        file_to_upload = get_basic_experiment_load_file(self.tempdir, restricted_project_1.names[PROJECT_NAME], corp_name=restricted_lot_corp_name, file_name='uniform-commas-with-quoted-text.csv')
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, restricted_project_1.names[PROJECT_NAME], corp_name=restricted_lot_corp_name_2, file_name='uniform-commas-with-quoted-text.csv')
         # Upload the file and expect it to fail
         response = self.experiment_load_test(file_to_upload, True, expect_failure=True)
         # Verify that the error message is correct
         expected_messages = [
             {
                 "errorLevel": "error",
-                "message": f"Compounds '{restricted_lot_corp_name}' are in a restricted project that does not match the one entered for this Experiment."
+                "message": f"Compounds '{restricted_lot_corp_name_2}' are in a restricted project that does not match the one entered for this Experiment."
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])
 
         # (Allowed) Restricted experiment proj1 with lot restricted proj1
         # Create another restricted lot in restricted_project_1
-        restricted_lot_corp_name = self.create_restricted_lot(restricted_project_1.code_name)
+        restricted_lot_corp_name_1 = self.create_restricted_lot(restricted_project_1.code_name)
         # Create an upload file which uploads to restricted_project_1 and has a lot from restricted_project_1
-        file_to_upload = get_basic_experiment_load_file(self.tempdir, restricted_project_1.names[PROJECT_NAME], corp_name=restricted_lot_corp_name, file_name='uniform-commas-with-quoted-text.csv')
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, restricted_project_1.names[PROJECT_NAME], corp_name=restricted_lot_corp_name_1, file_name='uniform-commas-with-quoted-text.csv')
         # Upload the file and expect it to succeed
         response = self.experiment_load_test(file_to_upload, True, expect_failure=False)
 
@@ -4643,8 +4643,8 @@ class TestExperimentLoader(BaseAcasClientTest):
         # Upload the file and expect it to succeed
         response = self.experiment_load_test(file_to_upload, True, expect_failure=False)
 
-        # (Allowed) Unrestricted experiment proj1 with lot restricted proj2
-        # Create an upload file which uploads to restricted_project_1 but has a lot from restricted_project_2
-        file_to_upload = get_basic_experiment_load_file(self.tempdir, restricted_project_1.names[PROJECT_NAME], corp_name=restricted_lot_corp_name, file_name='uniform-commas-with-quoted-text.csv')
+        # (Allowed) Unrestricted experiment Global with lot restricted proj2
+        # Create an upload file which uploads to Global(unrestricted) but has a lot from restricted_project_2
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, project_code=None, corp_name=restricted_lot_corp_name_2, file_name='uniform-commas-with-quoted-text.csv')
         # Upload the file and expect it to succeed
         response = self.experiment_load_test(file_to_upload, False, expect_failure=False)

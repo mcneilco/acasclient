@@ -2444,3 +2444,48 @@ en array of protocols
         resp.raise_for_status()
         resp_data = resp.json()
         return success, resp_data
+
+
+    def get_entity_reference_codes(self, entity_display_name: str, entity_requests: List[str]) -> List[Dict]:
+        """Get the reference codes for a given entity
+
+        Args:
+            entity_display_name (str): The display name of the entity (e.g. Corporate Batch ID)
+            entity_requests (List[str]): A list of entity request names (e.g. ["CMPD-0000001-001"])
+
+        Returns:
+            A list of dicts representing the reference codes for the entity requests e.g.
+            [
+                {
+                    "requestName": "CMPD-0000001-001",
+                    "referenceName": "CMPD-0000001-001"
+                }
+            ]
+        """
+        # Request body needs to be "displayName", "requests": [{"requestName": "entity_display_name1", "requestName": "entity_display_name2"}]
+        body = {
+            "displayName": entity_display_name,
+            "requests": [{"requestName": name} for name in entity_requests]
+        }
+        resp = self.session.post("{}/api/entitymeta/referenceCodes".format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(body))
+        resp.raise_for_status()
+        return resp.json()['results']
+        
+    def get_preferred_lot_corp_names(self, lot_corp_names: List[str]) -> List[Dict]:
+        """Get the preferred lot corp names for a list of corp names
+
+        Args:
+            lot_corp_names (List[str]): A list of lot corp names (e.g. ["CMPD-0000001-001"])
+        
+        Returns:
+            A list of dicts representing the preferred lot corp names for the input corp names e.g.
+            [
+                {
+                    "requestName": "CMPD-0000001-001",
+                    "referenceName": "CMPD-0000001-001"
+                }
+            ]
+        """
+        return self.get_entity_reference_codes("Corporate Batch ID", lot_corp_names)

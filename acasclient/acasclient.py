@@ -23,6 +23,8 @@ VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "stereo_ignore", "full_tautomer", "substructure",
                         "similarity", "full"}
 
+CORPORATE_BATCH_ID = "Corporate Batch ID"
+
 def isBase64(s):
     """Checks if a string is base64 encoded.
     """
@@ -2488,4 +2490,4 @@ en array of protocols
                 }
             ]
         """
-        return self.get_entity_reference_codes("Corporate Batch ID", lot_corp_names)
+        return self.get_entity_reference_codes(CORPORATE_BATCH_ID, lot_corp_names)

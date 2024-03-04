@@ -1904,6 +1904,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('parentCorpName', all_lots[0])
         self.assertIn('registrationDate', all_lots[0])
         self.assertIn('project', all_lots[0])
+        self.assertIn('chemist', all_lots[0])
 
         # Test filter for a specific project
         # Should return more than 0 lots

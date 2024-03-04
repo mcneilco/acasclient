@@ -627,6 +627,7 @@ class client():
             parentCorpName (str): the lots parent corp name
             registrationDate (int): the registration date
             project (str): the lots project
+            chemist (str): the lots chemist
         """
         resp = self.session.get("{}/cmpdReg/parentLot/getAllAuthorizedLots"
                                 .format(self.url))

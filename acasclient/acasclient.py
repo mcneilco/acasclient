@@ -628,6 +628,9 @@ class client():
             registrationDate (int): the registration date
             project (str): the lots project
             chemist (str): the lots chemist
+            supplier (str): the lots supplier
+            vendorName (str): the lots vendor name
+            vendorCode (str): the lots vendor code
         """
         resp = self.session.get("{}/cmpdReg/parentLot/getAllAuthorizedLots"
                                 .format(self.url))

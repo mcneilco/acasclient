@@ -48,6 +48,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/mcneilco/acasclient',
-    version='2023.2.4',
+    version='2023.2.5',
     zip_safe=False,
 )

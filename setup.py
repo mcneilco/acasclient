@@ -10,7 +10,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['requests', 'pandas', 'six', 'decorator', 'openpyxl', 'xlrd'],
+requirements = ['requests', 'pandas', 'six', 'decorator', 'openpyxl', 'xlrd', 'chardet'],
 
 setup_requirements = [ ]
 
@@ -48,6 +48,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/mcneilco/acasclient',
-    version='2023.3.1',
+    version='2023.4.1',
     zip_safe=False,
 )

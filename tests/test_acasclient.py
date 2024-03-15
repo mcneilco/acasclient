@@ -1904,6 +1904,10 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('parentCorpName', all_lots[0])
         self.assertIn('registrationDate', all_lots[0])
         self.assertIn('project', all_lots[0])
+        self.assertIn('chemist', all_lots[0])
+        self.assertIn('supplier', all_lots[0])
+        self.assertIn('vendorName', all_lots[0])
+        self.assertIn('vendorCode', all_lots[0])
 
         # Test filter for a specific project
         # Should return more than 0 lots
@@ -2977,6 +2981,14 @@ def csv_to_txt(data_file_to_upload, dir):
 
 class TestCmpdReg(BaseAcasClientTest):
         
+    def get_first_parent_alias_type_kind(self):
+        """Get the first alias type kind from a lot."""
+        parent_alias_kinds = self.client.get_parent_alias_kinds()
+        self.assertGreater(len(parent_alias_kinds), 0)
+        alias_type = parent_alias_kinds[0]["kindName"]
+        alias_kind = parent_alias_kinds[0]["lsType"]['typeName']
+        return alias_type, alias_kind
+
     @requires_node_api
     @requires_basic_cmpd_reg_load
     def test_001_get_meta_lot(self):
@@ -3671,10 +3683,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEquals(aliases[0], alias_1)
 
         # Get parent alias kinds
-        parent_alias_kinds = self.client.get_parent_alias_kinds()
-        self.assertGreater(len(parent_alias_kinds), 0)
-        alias_type = parent_alias_kinds[0]["kindName"]
-        alias_kind = parent_alias_kinds[0]["lsType"]['typeName']
+        alias_type, alias_kind = self.get_first_parent_alias_type_kind()
 
         # Add an alias
         meta_lot = self.client.add_parent_alias(corp_name, test_alias, alias_type, alias_kind)
@@ -4292,6 +4301,40 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn("Number of entries processed: 2", response['summary'])
         self.assertIn("Number of entries with error: 1", response['summary'])
         self.assertIn(f"1 entries had: Duplicate parent alias {parent_alias_1}", response['summary'])
+
+
+    @requires_basic_cmpd_reg_load
+    def test_014_get_preferred_lot_corp_names(self):
+        """Test get preferred lot corp names"""
+        # Setup constants
+        corp_name = "CMPD-0000001"
+        lot_corp_name = f"{corp_name}-001"
+        parent_alias = str(uuid.uuid4())
+        parent_alias_lot_corp_name = f"{parent_alias}-001"
+
+        
+        # Add the parent alias to the parent
+        alias_type, alias_kind = self.get_first_parent_alias_type_kind()
+        self.client.add_parent_alias(corp_name, parent_alias, alias_type, alias_kind)
+
+        # Call get preferred lot corp names and verify that the lot corp name is returned
+        requests = [parent_alias_lot_corp_name, "FAKE"]
+        preferred_lot_corp_names_response = self.client.get_preferred_lot_corp_names(requests)
+
+        # Response length should always match the request length
+        self.assertEqual(len(preferred_lot_corp_names_response), 2)
+
+        # Items should have requestName and referenceCode
+        self.assertIn("requestName", preferred_lot_corp_names_response[0])
+        self.assertIn("referenceCode", preferred_lot_corp_names_response[0])
+
+        # First response should be the parent alias lot corp name
+        self.assertEqual(preferred_lot_corp_names_response[0]["requestName"], parent_alias_lot_corp_name)
+        self.assertEqual(preferred_lot_corp_names_response[0]["referenceCode"], lot_corp_name)
+
+        # Second response should be empty string returned
+        self.assertEqual(preferred_lot_corp_names_response[1]["requestName"], "FAKE")
+        self.assertEqual(preferred_lot_corp_names_response[1]["referenceCode"], "")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

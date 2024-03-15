@@ -13,6 +13,7 @@ import base64
 import hashlib
 from io import StringIO, IOBase
 from typing import Dict, List, Tuple
+import chardet
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "duplicate_tautomer", "duplicate_no_tautomer",
                         "stereo_ignore", "full_tautomer", "substructure",
                         "similarity", "full"}
+
+CORPORATE_BATCH_ID = "Corporate Batch ID"
 
 def isBase64(s):
     """Checks if a string is base64 encoded.
@@ -627,6 +630,10 @@ class client():
             parentCorpName (str): the lots parent corp name
             registrationDate (int): the registration date
             project (str): the lots project
+            chemist (str): the lots chemist
+            supplier (str): the lots supplier
+            vendorName (str): the lots vendor name
+            vendorCode (str): the lots vendor code
         """
         resp = self.session.get("{}/cmpdReg/parentLot/getAllAuthorizedLots"
                                 .format(self.url))
@@ -905,8 +912,18 @@ class client():
             'content-type': resp.headers.get('content-type', None),
             'content-length': resp.headers.get('content-length', None),
             'last-modified': resp.headers.get('Last-modified', None),
-            'name': name,
-            'content': resp.content}
+            'name': name}
+        
+        # Try and decode the content using chardet
+        try:
+            encoding = chardet.detect(resp.content)['encoding']
+            if encoding is not None:
+                return_dict['content'] = resp.content.decode(encoding)
+            else:
+                return_dict['content'] = resp.content
+        except UnicodeDecodeError:
+            # Just write as bites
+            return_dict['content'] = resp.content
 
         # Get file extension
         file_extension = PurePath(Path(file_path)).suffix
@@ -2444,3 +2461,48 @@ en array of protocols
         resp.raise_for_status()
         resp_data = resp.json()
         return success, resp_data
+
+
+    def get_entity_reference_codes(self, entity_display_name: str, entity_requests: List[str]) -> List[Dict]:
+        """Get the reference codes for a given entity
+
+        Args:
+            entity_display_name (str): The display name of the entity (e.g. Corporate Batch ID)
+            entity_requests (List[str]): A list of entity request names (e.g. ["CMPD-0000001-001"])
+
+        Returns:
+            A list of dicts representing the reference codes for the entity requests e.g.
+            [
+                {
+                    "requestName": "CMPD-0000001-001",
+                    "referenceName": "CMPD-0000001-001"
+                }
+            ]
+        """
+        # Request body needs to be "displayName", "requests": [{"requestName": "entity_display_name1", "requestName": "entity_display_name2"}]
+        body = {
+            "displayName": entity_display_name,
+            "requests": [{"requestName": name} for name in entity_requests]
+        }
+        resp = self.session.post("{}/api/entitymeta/referenceCodes".format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(body))
+        resp.raise_for_status()
+        return resp.json()['results']
+        
+    def get_preferred_lot_corp_names(self, lot_corp_names: List[str]) -> List[Dict]:
+        """Get the preferred lot corp names for a list of corp names
+
+        Args:
+            lot_corp_names (List[str]): A list of lot corp names (e.g. ["CMPD-0000001-001"])
+        
+        Returns:
+            A list of dicts representing the preferred lot corp names for the input corp names e.g.
+            [
+                {
+                    "requestName": "CMPD-0000001-001",
+                    "referenceName": "CMPD-0000001-001"
+                }
+            ]
+        """
+        return self.get_entity_reference_codes(CORPORATE_BATCH_ID, lot_corp_names)

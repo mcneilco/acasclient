@@ -13,7 +13,6 @@ import base64
 import hashlib
 from io import StringIO, IOBase
 from typing import Dict, List, Tuple
-import chardet
 
 
 logger = logging.getLogger(__name__)
@@ -912,18 +911,8 @@ class client():
             'content-type': resp.headers.get('content-type', None),
             'content-length': resp.headers.get('content-length', None),
             'last-modified': resp.headers.get('Last-modified', None),
-            'name': name}
-        
-        # Try and decode the content using chardet
-        try:
-            encoding = chardet.detect(resp.content)['encoding']
-            if encoding is not None:
-                return_dict['content'] = resp.content.decode(encoding)
-            else:
-                return_dict['content'] = resp.content
-        except UnicodeDecodeError:
-            # Just write as bites
-            return_dict['content'] = resp.content
+            'name': name,
+            'content': resp.content}
 
         # Get file extension
         file_extension = PurePath(Path(file_path)).suffix

@@ -1,0 +1,15 @@
+Experiment Meta Data,,,
+Format,Generic,,
+Protocol Name,BLAH,,
+Experiment Name,BLAH,,
+Scientist,bob,,
+Notebook,BLAH,,
+Page,,,
+Assay Date,2022-03-30,,
+Project,Global,,
+,,,
+,,,
+Calculated Results,,,
+Datatype,Number,Number,Number,Number,Number,Number,Number,Text,Number,Number,Number
+Corporate Batch ID,Integer,Decimal,Scientific Notation,StartsWithString,EndsWithString,ContainsString,IsString,NumberSavedAsStringOnPurpose,EmptyValue,GreaterThanOperator,LessThanOperator
+"CMPD-0000001-001",1,1.2,1.23e-10,Test1.0,1.0Test,Test1.0Test,Test,1.3,,>1.0,<1.0

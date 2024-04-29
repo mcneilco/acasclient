@@ -293,7 +293,7 @@ def delete_all_lots_and_experiments(self):
         if len(lots) > 0:
             # Delete any remaining lots not from bulk loads
             for lot in lots:
-                self.client.delete_lot(lot['lotCorpName'])
+                self.client.delete_lot(lot['lotCorpName'], raise_on_linked_data=False)
 
 def requires_basic_cmpd_reg_load(func):
     """
@@ -3314,13 +3314,13 @@ class TestCmpdReg(BaseAcasClientTest):
         acas_admin = self.create_and_connect_backdoor_user(prefix="acas-admin-", acas_user=True, acas_admin=True, creg_user=False, creg_admin=False)
         cmpdreg_admin = self.create_and_connect_backdoor_user(prefix="cmpdreg-admin-", acas_user=False, acas_admin=False, creg_user=True, creg_admin=True)
 
-        def can_delete_lot(self, user_client, lot_corp_name, set_owner_first=True):
+        def can_delete_lot(self, user_client, lot_corp_name, set_owner_first=True, raise_on_linked_data=False):
             if set_owner_first:
                 meta_lot = self.client.get_meta_lot(lot_corp_name)
                 meta_lot["lot"]["chemist"] = user_client.username
                 self.client.save_meta_lot(meta_lot)
             try:
-                response = user_client.delete_lot(lot_corp_name)
+                response = user_client.delete_lot(lot_corp_name, raise_on_linked_data=raise_on_linked_data)
             except requests.HTTPError:
                 return False
             self.assertIn("success", response)
@@ -3364,7 +3364,12 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertFalse(can_delete_lot(self, acas_admin, restricted_lot_corp_name, set_owner_first=True))
 
         # Allow rule: CregAdmin/ACASAdmin can delete the lot and assay data
-        self.assertTrue(can_delete_lot(self, self.client, restricted_lot_corp_name, set_owner_first=True))
+        # First verify that raise_on_linked_data=True will raise an error
+        with self.assertRaises(ValueError) as context:
+            can_delete_lot(self, self.client, restricted_lot_corp_name, set_owner_first=True, raise_on_linked_data=True)
+        self.assertIn('Refusing to delete lot', str(context.exception))
+        # Now actually delete the lot
+        self.assertTrue(can_delete_lot(self, self.client, restricted_lot_corp_name, set_owner_first=True, raise_on_linked_data=False))
 
         # Verify lot is actually deleted
         meta_lot = self.client.get_meta_lot(restricted_lot_corp_name)

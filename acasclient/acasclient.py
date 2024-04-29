@@ -2247,11 +2247,12 @@ en array of protocols
         resp.raise_for_status()
         return resp.json()
 
-    def delete_lot(self, lot_corp_name):
+    def delete_lot(self, lot_corp_name, raise_on_linked_data=True):
         """Delete a lot
 
         Args:
             lot_corp_name (str): Corp name of lot to delete
+            raise_on_linked_data (bool): Whether to raise an error if there is linked data, default True
 
         Returns:
             A dict with "success": true if successful. For example
@@ -2261,7 +2262,19 @@ en array of protocols
             Or None if there was an error
         Raises:
             HTTPError: If permission denied
+            ValueError: If there is linked data and raise_on_linked_data is True
         """
+
+        if raise_on_linked_data:
+            # Check for any lot dependencies
+            lot_dependencies_return = self.get_lot_dependencies(lot_corp_name, include_linked_lots=False, include_analysis_group_values=False)
+
+            # Only proceed if there is not any linked data
+            if lot_dependencies_return["linkedDataExists"]:
+                linked_experiments = lot_dependencies_return["linkedExperiments"]
+                error_message = f"Refusing to delete lot {lot_corp_name}. Re-run with raise_on_linked_data=False to delete lot and experimental data linked to lot (deletes assay data linked to lot data not full experiments). Linked experiments: {linked_experiments}."
+                raise ValueError(error_message)
+
         resp = self.session.delete("{}/cmpdReg/metalots/corpName/{}"
                                 .format(self.url, lot_corp_name))
         if resp.status_code == 500:

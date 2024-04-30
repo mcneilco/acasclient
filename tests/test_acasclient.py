@@ -4867,7 +4867,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         expected_messages = [
             {
                 "errorLevel": "warning",
-                "message": "The following Number values contain numerics but could not be parsed as Number so will be saved as Text: 'Test1.0Test', '1.0Test', 'Test1.0'. To avoid this warning set only non-numerics like 'Bad Solutibility', or use a correctly formatted Number. For example, 1, 1.2, 1.23e-10, >1, <1"
+                "message": "The following Number values contain numerals but could not be parsed as Number so will be saved as Text: 'Test1.0Test', '1.0Test', 'Test1.0'. To avoid this warning either remove all numerals from the text, or use a correctly formatted Number. For example, 1, 1.2, 1.23e-10, >1, <1"
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])

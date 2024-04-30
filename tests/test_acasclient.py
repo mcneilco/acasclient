@@ -4812,7 +4812,7 @@ class TestExperimentLoader(BaseAcasClientTest):
         self.experiment_load_test(data_file_to_upload, False, images_file_to_upload=image_file_path)
 
     @requires_basic_cmpd_reg_load
-    def test_19_project_restrictions(self):
+    def test_019_project_restrictions(self):
         """Check experiment loader project restrictions are working."""
 
         # Setup for tests
@@ -4857,3 +4857,17 @@ class TestExperimentLoader(BaseAcasClientTest):
         file_to_upload = get_basic_experiment_load_file(self.tempdir, project_code=None, corp_name=restricted_lot_corp_name_2, file_name='uniform-commas-with-quoted-text.csv')
         # Upload the file and expect it to succeed
         response = self.experiment_load_test(file_to_upload, False, expect_failure=False)
+
+    @requires_basic_cmpd_reg_load
+    def test_020_datatype_number_parsing(self):
+        """Test experiment loader number parsing."""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'datatype-number-parsing.csv')
+        response = self.experiment_load_test(data_file_to_upload, False, expect_failure=False)
+        expected_messages = [
+            {
+                "errorLevel": "warning",
+                "message": "The following Number values contain numerics but could not be parsed as Number so will be saved as Text: 'Test1.0Test', '1.0Test', 'Test1.0'. To avoid this warning set only non-numerics like 'Bad Solutibility', or use a correctly formatted Number. For example, 1, 1.2, 1.23e-10, >1, <1"
+            }
+        ]
+        self.check_expected_messages(expected_messages, response['errorMessages'])

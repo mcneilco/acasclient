@@ -2932,9 +2932,27 @@ class TestAcasclient(BaseAcasClientTest):
         # Verify the scientist is the same as we specified
         experiment = Experiment(experiment_dict)
         self.assertEqual(experiment.scientist, new_assay_scientist_code)
+    
+    @requires_basic_cmpd_reg_load
+    def test_057_get_protocol_expt_special_characters_in_names(self):
+        """Test getting protocols and experiments with special characters in their names."""
+        protocol_name = "test/protocol.name !@#$%^&*(special/chars)"
+        experiment_name = "test/experiment.name !@#$%^&*(special/chars)"
+        file_to_upload = get_basic_experiment_load_file(self.tempdir, protocol_name=protocol_name, experiment_name=experiment_name)
+        response = self.client.\
+            experiment_loader(file_to_upload, "bob", False)
+        # Search for the protocol by name
+        res = self.client.protocol_search(protocol_name)
+        self.assertEqual(len(res), 1)
+        # Get the protocol by name
+        res = self.client.get_protocols_by_label(protocol_name)
+        self.assertEqual(len(res), 1)
+        # Get the experiment by name
+        expt = self.client.get_experiment_by_name(experiment_name)
+        self.assertIsNotNone(expt)
 
 
-def get_basic_experiment_load_file(tempdir, project_code=None, corp_name=None, file_name=None, scientist=None):
+def get_basic_experiment_load_file(tempdir, project_code=None, corp_name=None, file_name=None, scientist=None, protocol_name=None, experiment_name=None):
     if file_name is None:
         file_name = 'uniform-commas-with-quoted-text.csv'
     data_file_to_upload = Path(__file__).resolve()\
@@ -2954,6 +2972,14 @@ def get_basic_experiment_load_file(tempdir, project_code=None, corp_name=None, f
     # If scientist is specified, replace the scientist
     if scientist is not None:
         data_file_contents = data_file_contents.replace('bob', scientist)
+    
+    # If protocol name is specified, replace the protocol name
+    if protocol_name is not None:
+        data_file_contents = data_file_contents.replace('PROTOCOL_BLAH', protocol_name)
+    
+    # If experiment name is specified, replace the experiment name
+    if experiment_name is not None:
+        data_file_contents = data_file_contents.replace('EXPERIMENT_BLAH', experiment_name)
 
     # Write the data file to the temp dir
     file_name = f'basic-experiment-{ str(uuid.uuid4())}.csv'
@@ -3067,7 +3093,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)
         protocol = meta_lot_dependencies['linkedExperiments'][0]['protocol']
         self.assertIn('code', protocol)
-        self.assertEqual(protocol['name'], 'BLAH')
+        self.assertEqual(protocol['name'], 'PROTOCOL_BLAH')
 
         # Verify the analysis group information
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)

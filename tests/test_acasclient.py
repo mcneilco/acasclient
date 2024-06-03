@@ -2947,6 +2947,9 @@ class TestAcasclient(BaseAcasClientTest):
         # Get the protocol by name
         res = self.client.get_protocols_by_label(protocol_name)
         self.assertEqual(len(res), 1)
+        # Search for the experiment by name
+        res = self.client.experiment_search(experiment_name)
+        self.assertEqual(len(res), 1)
         # Get the experiment by name
         expt = self.client.get_experiment_by_name(experiment_name)
         self.assertIsNotNone(expt)

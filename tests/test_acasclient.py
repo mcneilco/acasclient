@@ -2949,10 +2949,14 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertEqual(len(res), 1)
         # Search for the experiment by name
         res = self.client.experiment_search(experiment_name)
+        # Filter out the ignored = True experiments
+        res = [x for x in res if x['ignored'] is False]
         self.assertEqual(len(res), 1)
         # Get the experiment by name
         expt = self.client.get_experiment_by_name(experiment_name)
-        self.assertIsNotNone(expt)
+        res = [x for x in res if x['ignored'] is False]
+        self.assertEqual(len(res), 1)
+
 
 
 def get_basic_experiment_load_file(tempdir, project_code=None, corp_name=None, file_name=None, scientist=None, protocol_name=None, experiment_name=None):

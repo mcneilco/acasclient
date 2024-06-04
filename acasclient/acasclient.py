@@ -13,7 +13,7 @@ import base64
 import hashlib
 from io import StringIO, IOBase
 from typing import Dict, List, Tuple
-
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -942,7 +942,7 @@ class client():
         Returns: Returns an array of protocols
         """
         resp = self.session.get("{}/api/protocols/genericSearch/{}"
-                                .format(self.url, search_term))
+                                .format(self.url, quote(search_term, safe='')))
         resp.raise_for_status()
         return resp.json()
 
@@ -957,7 +957,7 @@ class client():
         Returns: Returns an array of experiments
         """
         resp = self.session.get("{}/api/getProtocolByLabel/{}"
-                                .format(self.url, label))
+                                .format(self.url, quote(label, safe='')))
         resp.raise_for_status()
         return resp.json()
 
@@ -991,7 +991,7 @@ class client():
         """
 
         resp = self.session.get("{}/api/experiments/experimentName/{}".
-                                format(self.url, experiment_name))
+                                format(self.url, quote(experiment_name, safe='')))
         if resp.status_code == 500:
             return None
         resp.raise_for_status()
@@ -1292,7 +1292,7 @@ en array of protocols
             params['projectCodes'] = ','.join(project_codes)
 
         resp = self.session.get("{}/api/experiments/genericSearch/{}/"
-                                .format(self.url, query),
+                                .format(self.url, quote(query, safe='')),
                                 params=params)
 
         resp.raise_for_status()

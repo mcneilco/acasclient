@@ -37,7 +37,8 @@ M  END
 
 ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 
-BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "BLAH"
+BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "EXPERIMENT_BLAH"
+BASIC_EXPERIMENT_LOAD_PROTOCOL_NAME = "PROTOCOL_BLAH"
 STEREO_CATEGORY="Unknown"
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
@@ -2982,11 +2983,11 @@ def get_basic_experiment_load_file(tempdir, project_code=None, corp_name=None, f
     
     # If protocol name is specified, replace the protocol name
     if protocol_name is not None:
-        data_file_contents = data_file_contents.replace('PROTOCOL_BLAH', protocol_name)
+        data_file_contents = data_file_contents.replace(BASIC_EXPERIMENT_LOAD_PROTOCOL_NAME, protocol_name)
     
     # If experiment name is specified, replace the experiment name
     if experiment_name is not None:
-        data_file_contents = data_file_contents.replace('EXPERIMENT_BLAH', experiment_name)
+        data_file_contents = data_file_contents.replace(BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME, experiment_name)
 
     # Write the data file to the temp dir
     file_name = f'basic-experiment-{ str(uuid.uuid4())}.csv'
@@ -3100,7 +3101,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)
         protocol = meta_lot_dependencies['linkedExperiments'][0]['protocol']
         self.assertIn('code', protocol)
-        self.assertEqual(protocol['name'], 'PROTOCOL_BLAH')
+        self.assertEqual(protocol['name'], BASIC_EXPERIMENT_LOAD_PROTOCOL_NAME)
 
         # Verify the analysis group information
         self.assertEqual(len(meta_lot_dependencies['linkedExperiments']), 1)

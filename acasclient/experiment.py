@@ -87,7 +87,7 @@ class Experiment(dict):
         return protocol_name["labelText"]
 
     @property
-    def ls_kinds(self) -> list:
+    def result_kinds(self) -> list:
         data = get_entity_values_by_state_type_kind_value_type(
                 entity=self,
                 state_type="metadata",

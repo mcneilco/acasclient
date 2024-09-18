@@ -43,11 +43,11 @@ jobs:
           repository: mcneilco/acas
           path: acas
           ref: ${{ env.ACAS_REF }}
-      - name: Run docker-compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
+      - name: Run docker compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
         id: dockerComposeUp
         working-directory: acas
         run: |
-          docker-compose -f "docker-compose.yml" up -d
+          docker compose -f "docker-compose.yml" up -d
       - name: Wait for startup then create docker bob
         run: bash docker_bob_setup.sh
         working-directory: acas

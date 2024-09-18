@@ -19,6 +19,7 @@ from acasclient.experiment import Experiment
 from acasclient.acasclient import (get_entity_value_by_state_type_kind_value_type_kind)
 import zipfile
 from acasclient.selfile import Generic
+from collections import Counter
 
 # Import project ls thing
 from datetime import datetime
@@ -487,6 +488,16 @@ class BaseAcasClientTest(unittest.TestCase):
             source_file = experiment.get_source_file()
             self.verify_file_and_content_equal(data_file_to_upload, source_file['content'])
 
+            # Ensure that column_information exists and is a list
+            self.assertIsInstance(experiment.column_information, list)
+
+            # Ensure that specific entries exist in column_information
+            lsKind_counts = Counter(col_info['lsKind'] for col_info in experiment.column_information)
+            self.assertEqual(lsKind_counts['condition column'], lsKind_counts['column type'])
+            self.assertEqual(lsKind_counts['condition column'], lsKind_counts['column name'])
+            self.assertEqual(lsKind_counts['condition column'], lsKind_counts['column units'])
+            self.assertEqual(lsKind_counts['condition column'], lsKind_counts['hide column'])
+
             if report_file_to_upload is not None:
                 report_file = experiment.get_report_file()
 
@@ -505,6 +516,12 @@ class BaseAcasClientTest(unittest.TestCase):
                 # Use simple experiment to read the file we uploaded
                 simple_experiment = Generic()
                 simple_experiment.loadFile(data_file_to_upload)
+
+                # Make sure is_images_file_experiment is set to True
+                self.assertTrue(experiment.is_images_file_experiment)
+
+                # Make sure that inlineFileValue in result_types
+                self.assertIn("inlineFileValue", experiment.result_types)
                 
                 # Loop through the simple_experiment._datatype  and if the value is "Image File" then get the key of the image file (lsType)
                 image_file_kinds = [k for k, v in simple_experiment._datatype.items() if v == "Image File"]

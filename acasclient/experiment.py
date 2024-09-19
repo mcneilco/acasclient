@@ -123,11 +123,6 @@ class Experiment(dict):
 
     @property
     def result_kinds(self) -> list:
-        data = get_entity_values_by_state_type_kind_value_type(
-                entity=self,
-                state_type="metadata",
-                state_kind="data column order",
-                value_type="codeValue")
         return [d['codeValue'] for d in self.column_information if d['codeKind'] == 'column name']
 
     @property

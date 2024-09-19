@@ -26,6 +26,7 @@ SOURCE_FILE_KEY = "source file"
 REPORT_FILE_KEY = "annotation file"
 DELETED_STATUS = "deleted"
 ANALYSIS_GROUPS_KEY = "analysisGroups"
+IMAGES_FILE_RESULT_TYPE = "inlineFileValue"
 ################################################################################
 # Classes
 ################################################################################
@@ -36,10 +37,35 @@ def fetch_analysis_groups_if_missing(func):
     """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
+        # Check if 'client' is in kwargs
+        aclient = kwargs.get('client', None)
+        
+        # If 'client' is not in kwargs, check if it's in args
+        if aclient is None:
+            for arg in args:
+                if isinstance(arg, client):
+                    aclient = arg
+                    break
+        
+        if aclient is None:
+            if self.client is None:
+                raise Exception("No client provided and no client found in the experiment")
+            aclient = self.client
+        
         if ANALYSIS_GROUPS_KEY not in self:
-            experiment_dict = self.client.get_experiment_by_code(self.code, full=True)
-            self.__init__(experiment_dict, client=self.client)
-        return func(self)
+            experiment_dict = aclient.get_experiment_by_code(self.code, full=True)
+            self[ANALYSIS_GROUPS_KEY] = experiment_dict[ANALYSIS_GROUPS_KEY]
+        return func(self, *args, **kwargs)
+    return wrapper
+
+def fetch_analysis_groups_if_images_experiment(func):
+    """Decorator to fetch analysis groups if they are missing from the experiment dict
+    """
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.is_images_file_experiment:
+            return fetch_analysis_groups_if_missing(func)(self, *args, **kwargs)
+        return func(self, *args, **kwargs)
     return wrapper
 
 class Experiment(dict):
@@ -87,13 +113,21 @@ class Experiment(dict):
         return protocol_name["labelText"]
 
     @property
-    def result_kinds(self) -> list:
+    def column_information(self) -> list:
         data = get_entity_values_by_state_type_kind_value_type(
                 entity=self,
                 state_type="metadata",
                 state_kind="data column order",
                 value_type="codeValue")
-        return [d['codeValue'] for d in data if d['codeKind'] == 'column name']
+        return data
+
+    @property
+    def result_kinds(self) -> list:
+        return [d['codeValue'] for d in self.column_information if d['codeKind'] == 'column name']
+
+    @property
+    def result_types(self) -> list:
+        return [d['codeValue'] for d in self.column_information if d['codeKind'] == 'column type']
 
     @property
     def project(self) -> None:
@@ -127,7 +161,11 @@ class Experiment(dict):
                         .format(source_file))
         return file
     
-    @fetch_analysis_groups_if_missing
+    @property
+    def is_images_file_experiment(self) -> bool:
+        return IMAGES_FILE_RESULT_TYPE in self.result_types
+
+    @fetch_analysis_groups_if_images_experiment
     def get_images_file(self, client: client = None) -> str:
         """Get a zip file of all the image (inline file values) in the experiment
         The zip image file isn't saved as a file in the experiment, but rather each image file is saved as an analysis group value. This method fetches all the image files and creates a zip file with them.
@@ -136,17 +174,27 @@ class Experiment(dict):
             str: The path to the zip file or None if there are no images in the experiment
         """
 
+        if not self.is_images_file_experiment:
+            return None
+
         # Loop through all the analysis groups and get the inline file values and add them to a set
-        analysisGroups = self["analysisGroups"]
+        analysisGroups = self[ANALYSIS_GROUPS_KEY]
         inlineFilePaths = set()
         for ag in analysisGroups:
-            inlineFileValues = get_entity_values_by_state_type_kind_value_type(ag, "data", "results", "inlineFileValue")
+            inlineFileValues = get_entity_values_by_state_type_kind_value_type(ag, "data", "results", IMAGES_FILE_RESULT_TYPE)
             for inlineFileValue in inlineFileValues:
-                inlineFilePaths.add(inlineFileValue['fileValue'])
+                if 'fileValue' in inlineFileValue:
+                    inlineFilePaths.add(inlineFileValue['fileValue'])
 
         # If there are no inline file values, return None
         if len(inlineFilePaths) == 0:
             return None
+
+        # Check if there is a client and fall back to self.client or raise an exception
+        if client is None:
+            if self.client is None:
+                raise Exception("No client provided and no client found in the experiment")
+            client = self.client
         
         # Create a unique zip file name
         images_file_to_upload = tempfile.NamedTemporaryFile(suffix=".zip").name
@@ -155,7 +203,7 @@ class Experiment(dict):
         with zipfile.ZipFile(images_file_to_upload, 'w') as zip_ref:
             for inlineFilePath in inlineFilePaths:
                 # Fetch the file from the API
-                file = self.client.get_file("/dataFiles/{}"
+                file = client.get_file("/dataFiles/{}"
                                     .format(inlineFilePath))
                 # Write the file to base directory of the zip
                 zip_ref.writestr(file["name"], file["content"])

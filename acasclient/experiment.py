@@ -58,7 +58,7 @@ def fetch_analysis_groups_if_missing(func):
         return func(self, *args, **kwargs)
     return wrapper
 
-def fetch_analysis_groups_if_images_expertiment(func):
+def fetch_analysis_groups_if_images_experiment(func):
     """Decorator to fetch analysis groups if they are missing from the experiment dict
     """
     @wraps(func)
@@ -170,7 +170,7 @@ class Experiment(dict):
     def is_images_file_experiment(self) -> bool:
         return IMAGES_FILE_RESULT_TYPE in self.result_types
 
-    @fetch_analysis_groups_if_images_expertiment
+    @fetch_analysis_groups_if_images_experiment
     def get_images_file(self, client: client = None) -> str:
         """Get a zip file of all the image (inline file values) in the experiment
         The zip image file isn't saved as a file in the experiment, but rather each image file is saved as an analysis group value. This method fetches all the image files and creates a zip file with them.

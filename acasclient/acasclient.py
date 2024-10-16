@@ -960,7 +960,90 @@ class client():
                                 .format(self.url, label))
         resp.raise_for_status()
         return resp.json()
+    
+    def get_protocol_by_code(self, protocol_code):
+        """Get a protocol from a protocol code
 
+        Get a protocol given a protocol code
+
+        Args:
+            protocol_code (str): A protocol code
+
+        Returns: Returns a protocol object
+        """
+        resp = self.session.get("{}/api/protocols/codename/{}"
+                                .format(self.url, protocol_code))
+        if resp.status_code == 500:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_all_protocols(self):
+        """Get all protocols
+
+        Get an array of all protocols
+
+        Args:
+            None
+
+        Returns: Returns an array of protocols
+        """
+        resp = self.session.get("{}/api/protocolCodes"
+                                .format(self.url))
+        resp.raise_for_status()
+        protocols = resp.json()
+        # Remove any dupes using the id (BUG in ACAS)
+        return [dict(t) for t in {tuple(d.items()) for d in protocols}]
+    
+    def save_protocol(self, protocol):
+        """Save a protocol
+
+        Save a protocol to ACAS
+
+        Args:
+            protocol (dict): A protocol object
+
+        Returns: Returns a protocol object
+        """
+        if protocol.get("id") and protocol.get("codeName"):
+            resp_dict = self.update_protocol(protocol)
+        else:
+            resp_dict = self.create_protocol(protocol)
+        return resp_dict
+    
+    def update_protocol(self, protocol):
+        """Update a protocol
+
+        Update a protocol in ACAS
+
+        Args:
+            protocol (dict): A protocol object
+
+        Returns: Returns a protocol object
+        """
+        resp = self.session.put("{}/api/protocols/{}".format(self.url, protocol.get('id')),
+                                headers={'Content-Type': "application/json"},
+                                data=json.dumps(protocol))
+        resp.raise_for_status()
+        return resp.json()
+    
+    def create_protocol(self, protocol):
+        """Create a protocol
+
+        Create a protocol in ACAS
+
+        Args:
+            protocol (dict): A protocol object
+
+        Returns: Returns a protocol object
+        """
+        resp = self.session.post("{}/api/protocols".format(self.url),
+                                 headers={'Content-Type': "application/json"},
+                                 data=json.dumps(protocol))
+        resp.raise_for_status()
+        return resp.json()
+
+    
     def get_experiments_by_protocol_code(self, protocol_code):
         """Get all experiments for a protocol from a protocol code
 

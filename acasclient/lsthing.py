@@ -812,15 +812,21 @@ class BlobValue(object):
 class BaseModel(object):
     """Base class for attributes shared by all levels of ACAS objects (thing, label, state, value)
     """
-    _fields = ['id', 'ls_type', 'ls_kind', 'deleted', 'ignored', 'version']
+    _fields = ['id', 'ls_type', 'ls_kind', 'deleted', 'ignored', 'version', 'recorded_by', 'recorded_date', 'modified_by', 'modified_date', 'ls_transaction']
 
-    def __init__(self, id=None, ls_type=None, ls_kind=None, deleted=False, ignored=False, version=None):
+    def __init__(self, id=None, ls_type=None, ls_kind=None, deleted=False, ignored=False, version=None, recorded_by=None, recorded_date=None, modified_by=None, modified_date=None, ls_transaction=None):
         self.id = id
         self.ls_type = ls_type
         self.ls_kind = ls_kind
         self.deleted = deleted
         self.ignored = ignored
         self.version = version
+        self.recorded_by = recorded_by
+        self.recorded_date = datetime_to_ts(
+            datetime.now()) if recorded_date is None else recorded_date
+        self.modified_by = modified_by
+        self.modified_date = modified_date
+        self.ls_transaction = ls_transaction
 
     def as_dict(self):
         """Serialize instance as a dict
@@ -1040,100 +1046,45 @@ class AbstractThing(BaseModel):
     """Base class for LsThing and ItxLsThingLsThing ACAS objects
     """
 
-    _fields = BaseModel._fields + ['code_name', 'ls_transaction',
-                                   'modified_by', 'modified_date', 'recorded_by', 'recorded_date']
+    _fields = BaseModel._fields + ['code_name']
 
-    def __init__(self,
-                 id=None,
-                 code_name=None,
-                 deleted=False,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 modified_by=None,
-                 modified_date=None,
-                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
-                 recorded_date=None,
-                 version=None):
-        super(AbstractThing, self).__init__(id=id, deleted=deleted,
-                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+    def __init__(self, code_name=None, **kwargs):
+        super().__init__(**kwargs)
         self.code_name = code_name
-        self.ls_transaction = ls_transaction
-        self.modified_by = modified_by
-        self.modified_date = modified_date
-        self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(
-            datetime.now()) if recorded_date is None else recorded_date
 
 
 class AbstractLabel(BaseModel):
     """Base class for ACAS LsLabel objects such as LsThingLabel and ItxLsThingLsThingLabel
     """
 
-    _fields = BaseModel._fields + ['image_file', 'label_text', 'ls_transaction', 'modified_date', 'physically_labled',
-                                   'preferred', 'recorded_by', 'recorded_date', 'version']
+    _fields = BaseModel._fields + ['image_file', 'label_text',  'physically_labled', 'preferred']
 
     def __init__(self,
-                 id=None,
-                 deleted=False,
-                 ignored=False,
                  image_file=None,
                  label_text=None,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 modified_date=None,
                  physically_labled=False,
-                 preferred=False,
-                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
-                 recorded_date=None,
-                 version=None):
-        super(AbstractLabel, self).__init__(id=id, deleted=deleted,
-                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 preferred=False, **kwargs):
+        super().__init__(**kwargs)        
         self.image_file = image_file
         if len(label_text) > 255:
             raise ValueError('Label text "{}" exceeds max length of 255 characters. It is {} characters'.format(
                 label_text, len(label_text)))
         self.label_text = label_text
-        self.ls_transaction = ls_transaction
-        self.modified_date = modified_date
         self.physically_labled = physically_labled
         self.preferred = preferred
-        self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(
-            datetime.now()) if recorded_date is None else recorded_date
 
 
 class AbstractState(BaseModel):
     """Base class for ACAS LsState objects
     """
 
-    _fields = BaseModel._fields + ['comments', 'ls_transaction',
-                                   'modified_by', 'modified_date', 'recorded_by', 'recorded_date']
+    _fields = BaseModel._fields + ['comments']
 
     def __init__(self,
-                 id=None,
                  comments=None,
-                 deleted=False,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 modified_by=None,
-                 modified_date=None,
-                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
-                 recorded_date=None,
-                 version=None):
-        super(AbstractState, self).__init__(id=id, deleted=deleted,
-                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 **kwargs):
+        super().__init__(**kwargs)
         self.comments = comments
-        self.ls_transaction = ls_transaction
-        self.modified_by = modified_by
-        self.modified_date = modified_date
-        self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(
-            datetime.now()) if recorded_date is None else recorded_date
 
 
 class AbstractValue(BaseModel):
@@ -1141,13 +1092,11 @@ class AbstractValue(BaseModel):
     """
 
     _fields = BaseModel._fields + ['blob_value', 'clob_value', 'code_kind', 'code_origin', 'code_type', 'code_value', 'comments',
-                                   'conc_unit', 'concentration', 'date_value', 'file_value', 'ls_transaction', 'modified_by',
-                                   'modified_date', 'number_of_replicates', 'numeric_value', 'operator_kind', 'operator_type',
-                                   'public_data', 'recorded_by', 'recorded_date', 'sig_figs', 'string_value', 'uncertainty',
+                                   'conc_unit', 'concentration', 'date_value', 'file_value', 'number_of_replicates', 'numeric_value', 'operator_kind', 'operator_type',
+                                   'public_data', 'sig_figs', 'string_value', 'uncertainty',
                                    'uncertainty_type', 'unit_kind', 'unit_type', 'url_value']
 
     def __init__(self,
-                 id=None,
                  blob_value=None,
                  clob_value=None,
                  code_kind=None,
@@ -1158,21 +1107,12 @@ class AbstractValue(BaseModel):
                  conc_unit=None,
                  concentration=None,
                  date_value=None,
-                 deleted=False,
                  file_value=None,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 modified_by=None,
-                 modified_date=None,
                  number_of_replicates=None,
                  numeric_value=None,
                  operator_kind=None,
                  operator_type=None,
                  public_data=True,
-                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
-                 recorded_date=None,
                  sig_figs=None,
                  string_value=None,
                  uncertainty=None,
@@ -1180,9 +1120,8 @@ class AbstractValue(BaseModel):
                  unit_kind=None,
                  unit_type=None,
                  url_value=None,
-                 version=None):
-        super(AbstractValue, self).__init__(id=id, deleted=deleted,
-                                            ignored=ignored, ls_type=ls_type, ls_kind=ls_kind, version=version)
+                 **kwargs):
+        super().__init__(**kwargs)
         self.blob_value = blob_value
         self.clob_value = clob_value
         self.code_kind = code_kind
@@ -1194,17 +1133,11 @@ class AbstractValue(BaseModel):
         self.concentration = concentration
         self.date_value = date_value
         self.file_value = file_value
-        self.ls_transaction = ls_transaction
-        self.modified_by = modified_by
-        self.modified_date = modified_date
         self.number_of_replicates = number_of_replicates
         self.numeric_value = numeric_value
         self.operator_kind = operator_kind
         self.operator_type = operator_type
         self.public_data = public_data
-        self.recorded_by = recorded_by
-        self.recorded_date = datetime_to_ts(
-            datetime.now()) if recorded_date is None else recorded_date
         self.sig_figs = sig_figs
         self.string_value = string_value
         self.uncertainty = uncertainty
@@ -1223,25 +1156,12 @@ class LsThing(AbstractThing):
         ['ls_states', 'ls_labels', 'first_ls_things', 'second_ls_things']
 
     def __init__(self,
-                 id=None,
-                 code_name=None,
-                 deleted=False,
                  first_ls_things=None,
-                 ignored=False,
                  ls_labels=None,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
                  ls_states=None,
-                 modified_by=None,
-                 modified_date=None,
-                 recorded_by=None,
-                 recorded_date=None,
                  second_ls_things=None,
-                 version=None):
-        super(LsThing, self).__init__(id=id, code_name=code_name, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                                      ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
-                                      recorded_by=recorded_by, recorded_date=recorded_date, version=version)
+                 **kwargs):
+        super().__init__(**kwargs)
         self.ls_states = ls_states or []
         self.ls_labels = ls_labels or []
         self.first_ls_things = first_ls_things or []
@@ -1338,24 +1258,8 @@ class LsThingLabel(AbstractLabel):
     _fields = AbstractLabel._fields + ['ls_thing']
 
     def __init__(self,
-                 id=None,
-                 deleted=False,
-                 ignored=False,
-                 image_file=None,
-                 label_text=None,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_thing=None,
-                 ls_transaction=None,
-                 modified_date=None,
-                 physically_labled=False,
-                 preferred=False,
-                 recorded_by=None,  # Should this and recorded_date be auto-filled-in here?
-                 recorded_date=None,
-                 version=None):
-        super(LsThingLabel, self).__init__(id=id, deleted=deleted, image_file=image_file, ignored=ignored, label_text=label_text, ls_type=ls_type,
-                                           ls_kind=ls_kind, ls_transaction=ls_transaction, modified_date=modified_date, physically_labled=physically_labled,
-                                           preferred=preferred, recorded_by=recorded_by, recorded_date=recorded_date, version=version)
+                 ls_thing=None, **kwargs):
+        super().__init__(**kwargs)
         self.ls_thing = ls_thing
 
 
@@ -1365,24 +1269,15 @@ class LsThingState(AbstractState):
 
     _fields = AbstractState._fields + ['ls_values', 'ls_thing']
 
-    def __init__(self,
-                 id=None,
-                 comments=None,
-                 deleted=False,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 ls_values=None,
-                 ls_thing=None,
-                 modified_by=None,
-                 modified_date=None,
-                 recorded_by=None,
-                 recorded_date=None,
-                 version=None):
-        super(LsThingState, self).__init__(id=id, comments=comments, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                                           ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
-                                           recorded_by=recorded_by, recorded_date=recorded_date, version=None)
+    def __init__(self, ls_values=None, ls_thing=None, **kwargs):
+        """ Initialize an LsThingState instance.
+        
+        Args:
+            ls_values (list): The LsThingValues associated with the state.
+            ls_thing (object): The LsThing associated with the state.
+            **kwargs: Additional keyword arguments passed to the AbstractState initializer.
+        """
+        super().__init__(**kwargs)
         self.ls_values = ls_values or []
         self.ls_thing = ls_thing
 
@@ -1414,51 +1309,15 @@ class LsThingValue(AbstractValue):
 
     _fields = AbstractValue._fields + ['ls_state']
 
-    def __init__(self,
-                 id=None,
-                 blob_value=None,
-                 clob_value=None,
-                 code_kind=None,
-                 code_origin=None,
-                 code_type=None,
-                 code_value=None,
-                 comments=None,
-                 conc_unit=None,
-                 concentration=None,
-                 date_value=None,
-                 deleted=False,
-                 file_value=None,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_state=None,
-                 ls_transaction=None,
-                 modified_by=None,
-                 modified_date=None,
-                 number_of_replicates=None,
-                 numeric_value=None,
-                 operator_kind=None,
-                 operator_type=None,
-                 public_data=True,
-                 recorded_by=None,
-                 recorded_date=None,
-                 sig_figs=None,
-                 string_value=None,
-                 uncertainty=None,
-                 uncertainty_type=None,
-                 unit_kind=None,
-                 unit_type=None,
-                 url_value=None,
-                 version=None):
-        super(LsThingValue, self).__init__(id=id, blob_value=blob_value, clob_value=clob_value, code_kind=code_kind, code_origin=code_origin,
-                                           code_type=code_type, code_value=code_value, comments=comments, conc_unit=conc_unit,
-                                           concentration=concentration, date_value=date_value, deleted=deleted, file_value=file_value, ignored=ignored,
-                                           ls_type=ls_type, ls_kind=ls_kind, ls_transaction=ls_transaction, modified_by=modified_by,
-                                           modified_date=modified_date, number_of_replicates=number_of_replicates, numeric_value=numeric_value,
-                                           operator_kind=operator_kind, operator_type=operator_type, public_data=public_data, recorded_by=recorded_by,
-                                           recorded_date=recorded_date, sig_figs=sig_figs, string_value=string_value, uncertainty=uncertainty,
-                                           uncertainty_type=uncertainty_type, unit_kind=unit_kind, unit_type=unit_type, url_value=url_value,
-                                           version=version)
+    def __init__(self, ls_state=None, **kwargs):
+        """
+        Initialize an LsThingValue instance.
+
+        Args:
+            ls_state (object): The LsState associated with the value.
+            **kwargs: Additional keyword arguments passed to the AbstractValue initializer.
+        """
+        super().__init__(**kwargs)
         self.ls_state = ls_state
 
 
@@ -1466,28 +1325,19 @@ class ItxLsThingLsThing(AbstractThing):
     """Class to manage ACAS ItxLsThingLsThings, which are rich "interactions" or links between LsThings.
     """
 
-    _fields = AbstractThing._fields + \
-        ['ls_states', 'first_ls_thing', 'second_ls_thing']
+    _fields = AbstractThing._fields + ['ls_states', 'first_ls_thing', 'second_ls_thing']
 
-    def __init__(self,
-                 id=None,
-                 code_name=None,
-                 deleted=False,
-                 first_ls_thing=None,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 ls_states=None,
-                 modified_by=None,
-                 modified_date=None,
-                 recorded_by=None,
-                 recorded_date=None,
-                 second_ls_thing=None,
-                 version=None):
-        super(ItxLsThingLsThing, self).__init__(id=id, code_name=code_name, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                                                ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
-                                                recorded_by=recorded_by, recorded_date=recorded_date, version=version)
+    def __init__(self, first_ls_thing=None, second_ls_thing=None, ls_states=None, **kwargs):
+        """
+        Initialize an ItxLsThingLsThing instance.
+
+        Args:
+            first_ls_thing (object): The first LsThing in the interaction.
+            second_ls_thing (object): The second LsThing in the interaction.
+            ls_states (list): List of states associated with the interaction.
+            **kwargs: Additional keyword arguments passed to the AbstractThing initializer.
+        """
+        super().__init__(**kwargs)
         self.ls_states = ls_states or []
         self.first_ls_thing = first_ls_thing
         self.second_ls_thing = second_ls_thing
@@ -1523,24 +1373,16 @@ class ItxLsThingLsThingState(AbstractState):
 
     _fields = AbstractState._fields + ['ls_values', 'itx_ls_thing_ls_thing']
 
-    def __init__(self,
-                 id=None,
-                 comments=None,
-                 deleted=False,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_transaction=None,
-                 ls_values=None,
-                 itx_ls_thing_ls_thing=None,
-                 modified_by=None,
-                 modified_date=None,
-                 recorded_by=None,
-                 recorded_date=None,
-                 version=None):
-        super(ItxLsThingLsThingState, self).__init__(id=id, comments=comments, deleted=deleted, ignored=ignored, ls_type=ls_type, ls_kind=ls_kind,
-                                                     ls_transaction=ls_transaction, modified_by=modified_by, modified_date=modified_date,
-                                                     recorded_by=recorded_by, recorded_date=recorded_date, version=None)
+    def __init__(self, ls_values=None, itx_ls_thing_ls_thing=None, **kwargs):
+        """
+        Initialize an ItxLsThingLsThingState instance.
+
+        Args:
+            ls_values (list): List of values associated with the state.
+            itx_ls_thing_ls_thing (object): The ItxLsThingLsThing associated with the state.
+            **kwargs: Additional keyword arguments passed to the AbstractState initializer.
+        """
+        super().__init__(**kwargs)
         self.ls_values = ls_values or []
         self.itx_ls_thing_ls_thing = itx_ls_thing_ls_thing
 
@@ -1562,57 +1404,22 @@ class ItxLsThingLsThingState(AbstractState):
         my_obj.ls_values = ls_values
         return my_obj
 
+class ItxLsThingLsThingState(AbstractState):
 
-class ItxLsThingLsThingValue(AbstractValue):
+    _fields = AbstractState._fields + ['ls_values', 'itx_ls_thing_ls_thing']
 
-    _fields = AbstractValue._fields + ['ls_state']
+    def __init__(self, ls_values=None, itx_ls_thing_ls_thing=None, **kwargs):
+        """
+        Initialize an ItxLsThingLsThingState instance.
 
-    def __init__(self,
-                 id=None,
-                 blob_value=None,
-                 clob_value=None,
-                 code_kind=None,
-                 code_origin=None,
-                 code_type=None,
-                 code_value=None,
-                 comments=None,
-                 conc_unit=None,
-                 concentration=None,
-                 date_value=None,
-                 deleted=False,
-                 file_value=None,
-                 ignored=False,
-                 ls_type=None,
-                 ls_kind=None,
-                 ls_state=None,
-                 ls_transaction=None,
-                 modified_by=None,
-                 modified_date=None,
-                 number_of_replicates=None,
-                 numeric_value=None,
-                 operator_kind=None,
-                 operator_type=None,
-                 public_data=True,
-                 recorded_by=None,
-                 recorded_date=None,
-                 sig_figs=None,
-                 string_value=None,
-                 uncertainty=None,
-                 uncertainty_type=None,
-                 unit_kind=None,
-                 unit_type=None,
-                 url_value=None,
-                 version=None):
-        super(ItxLsThingLsThingValue, self).__init__(id=id, blob_value=blob_value, clob_value=clob_value, code_kind=code_kind, code_origin=code_origin,
-                                                     code_type=code_type, code_value=code_value, comments=comments, conc_unit=conc_unit,
-                                                     concentration=concentration, date_value=date_value, deleted=deleted, file_value=file_value, ignored=ignored,
-                                                     ls_type=ls_type, ls_kind=ls_kind, ls_transaction=ls_transaction, modified_by=modified_by,
-                                                     modified_date=modified_date, number_of_replicates=number_of_replicates, numeric_value=numeric_value,
-                                                     operator_kind=operator_kind, operator_type=operator_type, public_data=public_data, recorded_by=recorded_by,
-                                                     recorded_date=recorded_date, sig_figs=sig_figs, string_value=string_value, uncertainty=uncertainty,
-                                                     uncertainty_type=uncertainty_type, unit_kind=unit_kind, unit_type=unit_type, url_value=url_value,
-                                                     version=version)
-        self.ls_state = ls_state
+        Args:
+            ls_values (list): List of values associated with the state.
+            itx_ls_thing_ls_thing (object): The ItxLsThingLsThing associated with the state.
+            **kwargs: Additional keyword arguments passed to the AbstractState initializer.
+        """
+        super().__init__(**kwargs)
+        self.ls_values = ls_values or []
+        self.itx_ls_thing_ls_thing = itx_ls_thing_ls_thing
 
 
 class SimpleLsThing(BaseModel):

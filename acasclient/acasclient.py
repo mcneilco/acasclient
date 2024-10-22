@@ -979,14 +979,23 @@ class client():
         return resp.json()
 
     def get_all_protocols(self):
-        """Get all protocols
+        """Get all protocol code stubs
 
         Get an array of all protocols
 
         Args:
             None
 
-        Returns: Returns an array of protocols
+        list of dict: Returns an array of protocol stubs in the format:
+            [
+                {
+                    'id': int,
+                    'code': str,
+                    'name': str,
+                    'ignored': str
+                },
+                ...
+            ]
         """
         resp = self.session.get("{}/api/protocolCodes"
                                 .format(self.url))

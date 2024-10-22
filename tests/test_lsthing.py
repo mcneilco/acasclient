@@ -1111,33 +1111,31 @@ class TestValidationResponse(BaseAcasClientTest):
         self.assertIn('<h4>Summary</h4>', html)
         self.assertIn(f"<li>{SUMM_1}</li>", html)
 
+
 class TestProtocol(BaseAcasClientTest):
-    
-        def test_001_create_protocol(self):
-            """
-            Test creating a protocol with a few different types of values.
-            """
-            # Create a protocol
-            name = str(uuid.uuid4())
-            scientist = self.client.username
-            recorded_by = scientist
-            protocol = Protocol(name=name, recorded_by=recorded_by, scientist=scientist)
-            protocol.save(self.client)
-            assert protocol.code_name
 
-            # Get the protocol by code name
-            protocol_dict = self.client.get_protocol_by_code(protocol.code_name)
-            
-            # Verify the protocol has code_name and recorded_by is correct
-            assert protocol_dict['codeName'] == protocol.code_name
-            assert protocol_dict['recordedBy'] == recorded_by
+    def test_001_create_protocol(self):
+        """
+        Test creating a protocol with a few different types of values.
+        """
+        # Create a protocol
+        name = str(uuid.uuid4())
+        scientist = self.client.username
+        recorded_by = scientist
+        protocol = Protocol(name=name, recorded_by=recorded_by, scientist=scientist)
+        protocol.save(self.client)
+        assert protocol.code_name
 
-            # Turn the protocol back into a Protocol
-            updated_protocol = Protocol(ls_thing=LsThing.from_camel_dict(data=protocol_dict))
-            updated_protocol.save(self.client)
+        # Get the protocol by code name
+        protocol_dict = self.client.get_protocol_by_code(protocol.code_name)
 
-            # Make sure the put worked by checking the version
-            protocol_dict['version'] + 1 == updated_protocol._ls_thing.version
-            
-            
-            
+        # Verify the protocol has code_name and recorded_by is correct
+        assert protocol_dict['codeName'] == protocol.code_name
+        assert protocol_dict['recordedBy'] == recorded_by
+
+        # Turn the protocol back into a Protocol
+        updated_protocol = Protocol(ls_thing=LsThing.from_camel_dict(data=protocol_dict))
+        updated_protocol.save(self.client)
+
+        # Make sure the put worked by checking the version
+        protocol_dict['version'] + 1 == updated_protocol._ls_thing.version

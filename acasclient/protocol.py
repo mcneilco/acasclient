@@ -1,4 +1,4 @@
-from acasclient.lsthing import (CodeValue, SimpleLsThing, clob, ACAS_DDICT, ACAS_AUTHOR)
+from acasclient.lsthing import (CodeValue, SimpleLsThing, LsThing, clob, ACAS_DDICT, ACAS_AUTHOR)
 
 from datetime import datetime
 
@@ -65,4 +65,6 @@ class Protocol(SimpleLsThing):
         # Persist
         protocol_dict = self._ls_thing.as_camel_dict()
         resp_dict = client.save_protocol(protocol_dict)
-        return resp_dict
+        self._ls_thing = LsThing.from_camel_dict(resp_dict)
+        self._cleanup_after_save()
+        return self

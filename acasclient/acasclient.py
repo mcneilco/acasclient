@@ -978,8 +978,8 @@ class client():
         resp.raise_for_status()
         return resp.json()
 
-    def get_all_protocols(self):
-        """Get all protocol code stubs
+    def get_all_protocol_stubs(self):
+        """Get all protocol stubs
 
         Get an array of all protocols
 

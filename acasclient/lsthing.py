@@ -851,6 +851,19 @@ class BaseModel(object):
         return camel_dict
     
     def __deepcopy__(self, memo):
+        """Create a deep copy of the instance.
+
+        The 'id' and 'version' fields are nulled out to ensure that the copied object
+        is treated as a new instance rather than a duplicate of the original. This is
+        particularly useful when the copied object needs to be saved as a new record
+        in a database or used in a context where unique identifiers are required.
+
+        Args:
+            memo (dict): A dictionary of objects already copied during the current copying pass.
+
+        Returns:
+            object: A deep copy of the instance with 'id' and 'version' fields set to None.
+        """
         # Create a deep copy of the instance first
         copied_obj = copy.copy(self)  # Shallow copy of self
         # Then deep copy the attributes individually

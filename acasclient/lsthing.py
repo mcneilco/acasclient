@@ -1655,7 +1655,456 @@ class ItxLsThingLsThingValue(AbstractValue):
         self.ls_state = ls_state
 
 
-class SimpleLsThing(BaseModel):
+class SimpleAbstractThing(BaseModel):
+    
+    _fields = ['ls_type', 'ls_kind', 'code_name', 'names', 'ids', 'aliases', 'metadata', 'results', 'links', 'recorded_by',
+               'state_tables']
+
+    ROW_NUM_KEY = 'row number'
+    ID_LS_TYPE = 'id'
+    NAME_LS_TYPE = 'name'
+    ALIAS_LS_TYPE = 'alias'
+    METADATA_LS_TYPE = 'metadata'
+    RESULTS_LS_TYPE = 'results'
+
+    THING_CLASS = AbstractThing
+
+    def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
+                 preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
+        self._client = client
+        self.preferred_label_kind = preferred_label_kind
+        # if ls_thing passed in, just parse from it and ignore the rest
+        if ls_thing:
+            self.populate_from_ls_thing(ls_thing)
+        # Instantiate objects if they don't already exist
+        else:
+            self.ls_type = ls_type
+            self.ls_kind = ls_kind
+            self.code_name = code_name
+            metadata = metadata or {}
+            self._init_metadata = copy.deepcopy(metadata)
+            self.recorded_by = recorded_by
+            self._ls_thing = self.THING_CLASS(ls_type=self.ls_type, ls_kind=self.ls_kind,
+                                     code_name=self.code_name, recorded_by=self.recorded_by)
+            self.names = names or {}
+            self.ids = ids or {}
+            self.aliases = aliases or {}
+            # Create empty dicts for LsLabels, LsStates, and LsValues
+            # These will be populated by the "_prepare_for_save" method
+            self._name_labels = {}
+            self._id_labels = {}
+            self._alias_labels = defaultdict(list)
+            self.metadata = metadata
+            self.results = results or {}
+            self._metadata_states = {}
+            self._metadata_values = {}
+            self._results_states = {}
+            self._results_values = {}
+            self.state_tables = state_tables or defaultdict(dict)
+            self._state_table_states = defaultdict(dict)
+            self._state_table_values = defaultdict(lambda: defaultdict(dict))
+
+    def populate_from_ls_thing(self, ls_thing):
+        """Translates an LsThing object into the "simple" dictionary
+
+        :param ls_thing: instance of class LsThing
+        :type ls_thing: LsThing
+        """
+        self.ls_type = ls_thing.ls_type
+        self.ls_kind = ls_thing.ls_kind
+        self.code_name = ls_thing.code_name
+        self.recorded_by = ls_thing.recorded_by
+        self._ls_thing = ls_thing
+        # Split out labels by ls_type into three categories
+        self._name_labels = {
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.NAME_LS_TYPE and label.ignored is False}
+        self._id_labels = {
+            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.ID_LS_TYPE and label.ignored is False}
+        self._alias_labels = defaultdict(list)
+        for label in ls_thing.ls_labels:
+            if label.ls_type == self.ALIAS_LS_TYPE and label.ignored is False:
+                self._alias_labels[label.ls_kind].append(label)
+        # Names and IDs are simple - only expect one label for each ls_kind
+        self.names = {ls_kind: label.label_text for ls_kind,
+                      label in self._name_labels.items()}
+        self.ids = {ls_kind: label.label_text for ls_kind,
+                    label in self._id_labels.items()}
+        # Aliases can have multiple labels with the same ls_kind
+        self.aliases = defaultdict(list)
+        for ls_kind, label_list in self._alias_labels.items():
+            self.aliases[ls_kind].extend(
+                [label.label_text for label in label_list])
+        # State Tables: Multiple non-ignored states with the same lsType and lsKind
+        all_states = {}
+        for ls_state in ls_thing.ls_states:
+            key = (ls_state.ls_type, ls_state.ls_kind)
+            if key in all_states:
+                all_states[key].append(ls_state)
+            else:
+                all_states[key] = [ls_state]
+        # Parse out state type/kind and "row number" to form key for states within state tables
+        self._state_table_states = defaultdict(dict)
+        self._state_table_values = defaultdict(lambda: defaultdict(dict))
+        self.state_tables = defaultdict(dict)
+        for key, state_list in all_states.items():
+            for state in state_list:
+                if state.ignored is False:
+                    vals_dict = parse_values_into_dict(state.ls_values)
+                    # Row number must be present to recognize as a state table
+                    if ROW_NUM_KEY in vals_dict:
+                        row_num = vals_dict[ROW_NUM_KEY]
+                        self._state_table_states[key][row_num] = state
+                        self.state_tables[key][row_num] = parse_values_into_dict(
+                            state.ls_values)
+                        self._state_table_values[key][row_num] = get_lsKind_to_lsvalue(
+                            state.ls_values)
+        # "Normal" states, which are unique by type + kind
+        single_states = [state for state_list in all_states.values()
+                         for state in state_list if len(state_list) == 1]
+        # metadata
+        self._metadata_states = {
+            state.ls_kind: state for state in single_states if state.ls_type == self.METADATA_LS_TYPE and state.ignored is False}
+        self._metadata_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
+                                              value for value in state.ls_values if value.ignored is False} for state_kind, state in self._metadata_states.items()}
+        self.metadata = parse_states_into_dict(self._metadata_states)
+        self._init_metadata = copy.deepcopy(self.metadata)
+        # results
+        self._results_states = {
+            state.ls_kind: state for state in single_states if state.ls_type == self.RESULTS_LS_TYPE and state.ignored is False}
+        self._results_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
+                                             value for value in state.ls_values if value.ignored is False} for state_kind, state in self._results_states.items()}
+        self.results = parse_states_into_dict(self._results_states)
+        self._init_results = copy.deepcopy(self.results)
+
+    def set_client(self, client):
+        """
+        Set ACAS database client.
+        :param client: ACAS database client.
+        :type client: acasclient.client
+        """
+        self._client = client
+
+    def _convert_values_to_objects(self, values_dict, state):
+        values_obj_dict = {}
+        ls_values = []
+        for val_kind, val_value in values_dict.items():
+            if val_value is not None:
+                # Handle lists within the value dict
+                if isinstance(val_value, list):
+                    new_ls_val = [make_ls_value(
+                        self.THING_CLASS.STATE_CLASS.VALUE_CLASS, val_kind, val, self.recorded_by) for val in val_value]
+                    ls_values.extend(new_ls_val)
+                else:
+                    new_ls_val = make_ls_value(
+                        self.THING_CLASS.STATE_CLASS.VALUE_CLASS, val_kind, val_value, self.recorded_by)
+                    ls_values.append(new_ls_val)
+                values_obj_dict[val_kind] = new_ls_val
+        state.ls_values = ls_values
+        return state, values_obj_dict
+
+    def as_dict(self):
+        my_dict = super(SimpleAbstractThing, self).as_dict()
+        # Check metadata for CodeValues/BlobValue and convert them to dicts
+        metadata = {}
+        for key, val in self.metadata.items():
+            metadata[key] = {}
+            for k, v in val.items():
+                if isinstance(v, CodeValue) or isinstance(v, BlobValue):
+                    v = v.as_dict()
+                metadata[key][k] = v
+        my_dict[self.METADATA_LS_TYPE] = metadata
+
+        # Check results for CodeValues/BlobValue and convert them to dicts
+        results = {}
+        for key, val in self.results.items():
+            results[key] = {}
+            for k, v in val.items():
+                if isinstance(v, CodeValue) or isinstance(v, BlobValue):
+                    v = v.as_dict()
+                results[key][k] = v
+        my_dict[self.RESULTS_LS_TYPE] = results
+
+        return my_dict
+
+    def get_preferred_label(self):
+        return self._ls_thing.get_preferred_label()
+
+    def pretty_print(self):
+        my_dict = {}
+        # Check metadata for CodeValues and convert them to dicts
+        for key, val in self.metadata.items():
+            my_dict[key] = {}
+            for k, v in val.items():
+                if isinstance(v, CodeValue):
+                    v = v.code
+                my_dict[key][k] = v
+
+        # Check results for CodeValues and convert them to dicts
+        for key, val in self.results.items():
+            my_dict[key] = {}
+            for k, v in val.items():
+                if isinstance(v, CodeValue):
+                    v = v.code
+                my_dict[key][k] = v
+
+        return my_dict
+
+    def _prepare_for_save(self, client, user=None, upload_files=True):
+        """Translates all changes made to the "simple dict" attributes of this object
+        into the underlying LsThing / LsState / LsValue / LsLabel data models, to prepare
+        for saving updates to the ACAS server.
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param user: Username to record as having made these changes, defaults to self.recorded_by
+        :type user: str, optional
+        :param upload_files: Whether or not to automatically upload files to ACAS for new FileValues, defaults to True.
+        :type upload_files: bool
+        """
+        # TODO redo recorded_by logic to allow passing in of an updater
+        if not user:
+            user = self.recorded_by
+        # Detect value updates, apply ignored / modified by /modified date and create new value
+        metadata_ls_states = update_ls_states_from_dict(
+            self.THING_CLASS.STATE_CLASS, self.METADATA_LS_TYPE, self.THING_CLASS.STATE_CLASS.VALUE_CLASS, self.metadata, self._metadata_states, self._metadata_values, user,
+            client, upload_files)
+        results_ls_states = update_ls_states_from_dict(
+            self.THING_CLASS.STATE_CLASS, self.RESULTS_LS_TYPE, self.THING_CLASS.STATE_CLASS.VALUE_CLASS, self.results, self._results_states, self._results_values, user,
+            client, upload_files)
+        state_tables_ls_states = update_state_table_states_from_dict(
+            self.THING_CLASS.STATE_CLASS, self.THING_CLASS.STATE_CLASS.VALUE_CLASS, self.state_tables, self._state_table_states, self._state_table_values, user,
+            client, upload_files)
+        self._ls_thing.ls_states = metadata_ls_states + \
+            results_ls_states + state_tables_ls_states
+        # Same thing for labels
+        id_ls_labels = update_ls_labels_from_dict(
+            self.THING_CLASS.LABEL_CLASS, self.ID_LS_TYPE, self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
+        names_ls_labels = update_ls_labels_from_dict(
+            self.THING_CLASS.LABEL_CLASS, self.NAME_LS_TYPE, self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
+        alias_ls_labels = update_ls_labels_from_dict(
+            self.THING_CLASS.LABEL_CLASS, self.ALIAS_LS_TYPE, self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
+        self._ls_thing.ls_labels = id_ls_labels + names_ls_labels + alias_ls_labels
+
+    def _cleanup_after_save(self):
+        self.populate_from_ls_thing(self._ls_thing)
+
+    def save(self, client, skip_validation=False):
+        """Persist changes to the ACAS server.
+
+        :param client: Authenticated instances of acasclient.client
+        :type client: acasclient.client
+        """
+        # Run validation
+        if not skip_validation:
+            self.validate(client)
+        self._prepare_for_save(client)
+        # Persist
+        self._ls_thing = self._ls_thing.save(client)
+        self._cleanup_after_save()
+
+    @classmethod
+    def get_by_code(cls, code_name, client=None, ls_type=None, ls_kind=None):
+        """Fetch a SimpleLsThing object from the ACAS server by ls_type + ls_kind + code_name
+
+        :param code_name: code_name of LsThing to fetch
+        :type code_name: str
+        :param client: Authenticated instance of acasclient.client, defaults to None
+        :type client: acasclient.client, optional
+        :param ls_type: ls_type of LsThing to fetch, defaults to None
+        :type ls_type: str, optional
+        :param ls_kind: ls_kind of LsThing to fetch, defaults to None
+        :type ls_kind: str, optional
+        :return: SimpleLsThing object with latest data fetched frm the ACAS server
+        :rtype: SimpleLsThing
+        :raises KeyError: If no lsthing is found for the given options.
+        """
+        if not ls_type:
+            ls_type = cls.ls_type
+        if not ls_kind:
+            ls_kind = cls.ls_kind
+        camel_case_dict = client.get_ls_thing(ls_type, ls_kind, code_name)
+        if camel_case_dict is None:
+            msg = f'No lsthing found for {ls_type=}, {ls_kind=}, {code_name=}'
+            raise KeyError(msg)
+        simple_ls_thing = cls(ls_thing=cls.THING_CLASS.from_camel_dict(data=camel_case_dict))
+        simple_ls_thing.set_client(client=client)
+        return simple_ls_thing
+    
+    @classmethod
+    @validation_result
+    def validate_list(cls, client, models):
+        """Validate a list of SimpleLsThing objects
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param models: List of SimpleLsThing objects to validate
+        :type models: list[SimpleLsThing]
+        :return: List of SimpleLsThing objects with validation errors
+        :rtype: list[SimpleLsThing]
+        """
+        result = ValidationResult(True, [])
+        ddicts = {}
+        # Collect a list of DDicts
+        for model in models:
+            ddicts.update(model._get_ddicts())
+        # Fetch the valid values from ACAS for each DDict once
+        for ddict in ddicts.values():
+            ddict.update_valid_values(client)
+        # Validate each model
+        for model in models:
+            result += model._validate_codevalues(ddicts)
+        return result
+
+    @classmethod
+    def save_list(cls, client, models, skip_validation=False):
+        """Persist a list of new SimpleLsThing objects to the ACAS server
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param models: List of SimpleLsThing objects to save
+        :type models: list
+        :return: Updated list of SimpleLsThing objects after save
+        :rtype: list
+        """
+        if len(models) == 0:
+            return []
+        # Run validation
+        if not skip_validation:
+            cls.validate_list(client, models)
+        for model in models:
+            model._prepare_for_save(client)
+        things_to_save = [model._ls_thing for model in models]
+        camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
+        saved_ls_things = client.save_ls_thing_list(camel_dict)
+        return [cls(ls_thing=cls.THING_CLASS.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
+
+    @classmethod
+    def update_list(cls, client, models, clear_links=False):
+        """Persist updates for a list of existing SimpleLsThing objects to the ACAS server
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :param models: List of SimpleLsThing objects to update
+        :type models: list
+        :return: Updated list of SimpleLsThing objects after update
+        :rtype: list
+        """
+        if len(models) == 0:
+            return []
+
+        for model in models:
+            if clear_links:
+                # clear out the links (interactions) to avoid updating the same linked `LsThing`
+                # multiple times if two or more `model`s contain links to the same `LsThing`
+                model.links = []
+            model._prepare_for_save(client)
+        things_to_save = [model._ls_thing for model in models]
+        camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
+        saved_ls_things = client.update_ls_thing_list(camel_dict)
+        return [cls(ls_thing=cls.THING_CLASS.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
+
+    def get_file_hash(self, file_path):
+        BLOCKSIZE = 65536
+        hasher = hashlib.sha1()
+        with open(file_path, "rb") as file_ref:
+            buf = file_ref.read(BLOCKSIZE)
+            while len(buf) > 0:
+                hasher.update(buf)
+                buf = file_ref.read(BLOCKSIZE)
+        return(hasher.hexdigest())
+
+    def upload_file_values(self, client):
+        """Loop through the values for file values and check if the value is a base64 string or
+        a dict object.  If its either, then upload the file and replace the value
+        with the relative path on the server (just the file name), required for the
+        service route to properly handle the file on save of the LsThing.
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        """
+        def isBase64(s):
+            return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
+
+        def _upload_file_values_from_state_dict(state_dict):
+            for state_kind, values_dict in state_dict.items():
+                for value_kind, file_val in values_dict.items():
+                    if isinstance(file_val, FileValue):
+                        if file_val and file_val.value:
+                            file_val = _upload_file_value(file_val, client)
+                            state_dict[state_kind][value_kind] = file_val
+            return state_dict
+        self.metadata = _upload_file_values_from_state_dict(self.metadata)
+        self.results = _upload_file_values_from_state_dict(self.results)
+    
+    def _get_ddicts(self):
+        """Extract a unique list of DDict objects from the CodeValue attributes of a SimpleThing
+        :return: dictionary of { (code_type, code_kind, code_origin): DDict }
+        """
+        ddicts = {}
+        state_dicts = [self.metadata, self.results]
+        for state_dict in state_dicts:
+            for values_dict in state_dict.values():
+                for value in values_dict.values():
+                    if isinstance(value, CodeValue):
+                        ddict = None
+                        if value.code_origin.upper() == ACAS_DDICT:
+                            ddict = ACASDDict(value.code_type, value.code_kind)
+                        elif value.code_origin.upper() == ACAS_LSTHING:
+                            ddict = ACASLsThingDDict(value.code_type, value.code_kind)
+                        elif value.code_origin.upper() == ACAS_AUTHOR:
+                            ddict = ACASAuthorDDict(value.code_type, value.code_kind)
+                        else:
+                            raise ValueError(f'Unsupported code_origin: {value.code_origin}')
+                        ddicts[(ddict.code_type, ddict.code_kind, ddict.code_origin.upper())] = ddict
+        return ddicts
+    
+    @validation_result
+    def _validate_codevalues(self, ddicts):
+        """Confirm all CodeValues have valid values.
+
+        :param ddicts: dict of (code_type, code_kind, code_origin): DDict. Should come from _get_ddicts()
+        :type ddicts: dict
+        """
+        result = ValidationResult(True, [])
+        state_dicts = [self.metadata, self.results]
+        for state_dict in state_dicts:
+            for values_dict in state_dict.values():
+                for value in values_dict.values():
+                    if isinstance(value, CodeValue):
+                        if value.code:
+                            # Get the corresponding DDict
+                            ddict = ddicts.get((value.code_type, value.code_kind, value.code_origin.upper()), None)
+                            if ddict:
+                                # Confirm this CodeValue's code exists in the DDict
+                                result += ddict.check_value(value.code)
+                            else:
+                                result += ValidationResult(True, f"Cannot locate DDict with code_type={value.code_type}, code_kind={value.code_kind}, code_origin={value.code_origin}")
+        return result
+    
+    @validation_result
+    def validate(self, client):
+        """Validate SimpleLsThing dictionary. Currently only checks that all CodeValues that reference ACAS DDicts
+        have known/valid values
+
+        :param client: Authenticated instance of acasclient.client
+        :type client: acasclient.client
+        :return: ValidationResult
+        """
+        result = ValidationResult(True, [])
+        # Check if recorded_by is populated
+        if not self.recorded_by:
+            result += ValidationResult(False, "recorded_by is required")
+        # Extract a unique dictionary of (code_type, code_kind, code_origin) to DDict objects
+        ddicts = self._get_ddicts()
+        # Fetch the valid values from ACAS for each dictionary once
+        for ddict in ddicts.values():
+            ddict.update_valid_values(client)
+        # Validate the CodeValues are valid
+        result += self._validate_codevalues(ddicts)
+        return result
+
+
+class SimpleLsThing(SimpleAbstractThing):
     """The SimpleLsThing class is meant to vastly simplify how a programmer interacts with ACAS LsThing objects.
     This class buries the complexities of LsThings, LsStates, LsValues, LsLabels, and interactions into a simplified interface,
     and handles the conversions and updates to underlying ACAS LsThing classes to allow a python programmer to stick to editing
@@ -1749,123 +2198,23 @@ class SimpleLsThing(BaseModel):
     }
     ```
     """
-    _fields = ['ls_type', 'ls_kind', 'code_name', 'names', 'ids', 'aliases', 'metadata', 'results', 'links', 'recorded_by',
-               'state_tables']
 
-    ROW_NUM_KEY = 'row number'
-    ID_LS_TYPE = 'id'
-    NAME_LS_TYPE = 'name'
-    ALIAS_LS_TYPE = 'alias'
-    METADATA_LS_TYPE = 'metadata'
-    RESULTS_LS_TYPE = 'results'
-
+    THING_CLASS = LsThing
+    
     def __init__(self, ls_type=None, ls_kind=None, code_name=None, names=None, ids=None, aliases=None, metadata=None, results=None, links=None, recorded_by=None,
                  preferred_label_kind=None, state_tables=None, ls_thing=None, client=None):
-        self._client = client
-        self.preferred_label_kind = preferred_label_kind
-        # if ls_thing passed in, just parse from it and ignore the rest
-        if ls_thing:
-            self.populate_from_ls_thing(ls_thing)
-        # Instantiate objects if they don't already exist
-        else:
-            self.ls_type = ls_type
-            self.ls_kind = ls_kind
-            self.code_name = code_name
+        super(SimpleLsThing, self).__init__( ls_type=ls_type, ls_kind=ls_kind, code_name=code_name, names=names, ids=ids, aliases=aliases, metadata=metadata, results=results, recorded_by=recorded_by,
+                 preferred_label_kind=preferred_label_kind, state_tables=state_tables, ls_thing=ls_thing, client=client)
+        if not ls_thing:
             self.links = links or []
-            metadata = metadata or {}
-            self._init_metadata = copy.deepcopy(metadata)
-            self.recorded_by = recorded_by
-            self._ls_thing = LsThing(ls_type=self.ls_type, ls_kind=self.ls_kind,
-                                     code_name=self.code_name, recorded_by=self.recorded_by)
-            self.names = names or {}
-            self.ids = ids or {}
-            self.aliases = aliases or {}
-            # Create empty dicts for LsLabels, LsStates, and LsValues
-            # These will be populated by the "_prepare_for_save" method
-            self._name_labels = {}
-            self._id_labels = {}
-            self._alias_labels = defaultdict(list)
-            self.metadata = metadata
-            self.results = results or {}
-            self._metadata_states = {}
-            self._metadata_values = {}
-            self._results_states = {}
-            self._results_values = {}
-            self.state_tables = state_tables or defaultdict(dict)
-            self._state_table_states = defaultdict(dict)
-            self._state_table_values = defaultdict(lambda: defaultdict(dict))
-
+    
     def populate_from_ls_thing(self, ls_thing):
         """Translates an LsThing object into the "simple" dictionary
 
         :param ls_thing: instance of class LsThing
         :type ls_thing: LsThing
         """
-        self.ls_type = ls_thing.ls_type
-        self.ls_kind = ls_thing.ls_kind
-        self.code_name = ls_thing.code_name
-        self.recorded_by = ls_thing.recorded_by
-        self._ls_thing = ls_thing
-        # Split out labels by ls_type into three categories
-        self._name_labels = {
-            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.NAME_LS_TYPE and label.ignored is False}
-        self._id_labels = {
-            label.ls_kind: label for label in ls_thing.ls_labels if label.ls_type == self.ID_LS_TYPE and label.ignored is False}
-        self._alias_labels = defaultdict(list)
-        for label in ls_thing.ls_labels:
-            if label.ls_type == self.ALIAS_LS_TYPE and label.ignored is False:
-                self._alias_labels[label.ls_kind].append(label)
-        # Names and IDs are simple - only expect one label for each ls_kind
-        self.names = {ls_kind: label.label_text for ls_kind,
-                      label in self._name_labels.items()}
-        self.ids = {ls_kind: label.label_text for ls_kind,
-                    label in self._id_labels.items()}
-        # Aliases can have multiple labels with the same ls_kind
-        self.aliases = defaultdict(list)
-        for ls_kind, label_list in self._alias_labels.items():
-            self.aliases[ls_kind].extend(
-                [label.label_text for label in label_list])
-        # State Tables: Multiple non-ignored states with the same lsType and lsKind
-        all_states = {}
-        for ls_state in ls_thing.ls_states:
-            key = (ls_state.ls_type, ls_state.ls_kind)
-            if key in all_states:
-                all_states[key].append(ls_state)
-            else:
-                all_states[key] = [ls_state]
-        # Parse out state type/kind and "row number" to form key for states within state tables
-        self._state_table_states = defaultdict(dict)
-        self._state_table_values = defaultdict(lambda: defaultdict(dict))
-        self.state_tables = defaultdict(dict)
-        for key, state_list in all_states.items():
-            for state in state_list:
-                if state.ignored is False:
-                    vals_dict = parse_values_into_dict(state.ls_values)
-                    # Row number must be present to recognize as a state table
-                    if ROW_NUM_KEY in vals_dict:
-                        row_num = vals_dict[ROW_NUM_KEY]
-                        self._state_table_states[key][row_num] = state
-                        self.state_tables[key][row_num] = parse_values_into_dict(
-                            state.ls_values)
-                        self._state_table_values[key][row_num] = get_lsKind_to_lsvalue(
-                            state.ls_values)
-        # "Normal" states, which are unique by type + kind
-        single_states = [state for state_list in all_states.values()
-                         for state in state_list if len(state_list) == 1]
-        # metadata
-        self._metadata_states = {
-            state.ls_kind: state for state in single_states if state.ls_type == self.METADATA_LS_TYPE and state.ignored is False}
-        self._metadata_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
-                                              value for value in state.ls_values if value.ignored is False} for state_kind, state in self._metadata_states.items()}
-        self.metadata = parse_states_into_dict(self._metadata_states)
-        self._init_metadata = copy.deepcopy(self.metadata)
-        # results
-        self._results_states = {
-            state.ls_kind: state for state in single_states if state.ls_type == self.RESULTS_LS_TYPE and state.ignored is False}
-        self._results_values = {state_kind: {value.ls_kind if (value.unit_kind is None or value.unit_kind == "") else f"{value.ls_kind} ({value.unit_kind})":
-                                             value for value in state.ls_values if value.ignored is False} for state_kind, state in self._results_states.items()}
-        self.results = parse_states_into_dict(self._results_states)
-        self._init_results = copy.deepcopy(self.results)
+        super(SimpleLsThing, self).populate_from_ls_thing(ls_thing)
         # Parse interactions into Links
         parsed_links = []
         for itx in ls_thing.first_ls_things:
@@ -1877,67 +2226,17 @@ class SimpleLsThing(BaseModel):
                 link = SimpleLink(itx_ls_thing_ls_thing=itx)
                 parsed_links.append(link)
         self.links = parsed_links
-
-    def set_client(self, client):
-        """
-        Set ACAS database client.
-        :param client: ACAS database client.
-        :type client: acasclient.client
-        """
-        self._client = client
-
-    def _convert_values_to_objects(self, values_dict, state):
-        values_obj_dict = {}
-        ls_values = []
-        for val_kind, val_value in values_dict.items():
-            if val_value is not None:
-                # Handle lists within the value dict
-                if isinstance(val_value, list):
-                    new_ls_val = [make_ls_value(
-                        LsThingValue, val_kind, val, self.recorded_by) for val in val_value]
-                    ls_values.extend(new_ls_val)
-                else:
-                    new_ls_val = make_ls_value(
-                        LsThingValue, val_kind, val_value, self.recorded_by)
-                    ls_values.append(new_ls_val)
-                values_obj_dict[val_kind] = new_ls_val
-        state.ls_values = ls_values
-        return state, values_obj_dict
-
+    
     def as_dict(self):
         my_dict = super(SimpleLsThing, self).as_dict()
         link_dicts = []
         for link in self.links:
             link_dicts.append(link.as_dict())
         my_dict['links'] = link_dicts
-
-        # Check metadata for CodeValues/BlobValue and convert them to dicts
-        metadata = {}
-        for key, val in self.metadata.items():
-            metadata[key] = {}
-            for k, v in val.items():
-                if isinstance(v, CodeValue) or isinstance(v, BlobValue):
-                    v = v.as_dict()
-                metadata[key][k] = v
-        my_dict[self.METADATA_LS_TYPE] = metadata
-
-        # Check results for CodeValues/BlobValue and convert them to dicts
-        results = {}
-        for key, val in self.results.items():
-            results[key] = {}
-            for k, v in val.items():
-                if isinstance(v, CodeValue) or isinstance(v, BlobValue):
-                    v = v.as_dict()
-                results[key][k] = v
-        my_dict[self.RESULTS_LS_TYPE] = results
-
         return my_dict
-
-    def get_preferred_label(self):
-        return self._ls_thing.get_preferred_label()
-
+    
     def pretty_print(self):
-        my_dict = {}
+        my_dict = super(SimpleLsThing, self).pretty_print()
         my_dict['Links'] = {}
         for link in self.links:
             my_dict['Links'][link.verb] = None
@@ -1945,25 +2244,8 @@ class SimpleLsThing(BaseModel):
             if preferredLabel:
                 if preferredLabel.label_text:
                     my_dict['Links'][link.verb] = preferredLabel.label_text
-
-        # Check metadata for CodeValues and convert them to dicts
-        for key, val in self.metadata.items():
-            my_dict[key] = {}
-            for k, v in val.items():
-                if isinstance(v, CodeValue):
-                    v = v.code
-                my_dict[key][k] = v
-
-        # Check results for CodeValues and convert them to dicts
-        for key, val in self.results.items():
-            my_dict[key] = {}
-            for k, v in val.items():
-                if isinstance(v, CodeValue):
-                    v = v.code
-                my_dict[key][k] = v
-
         return my_dict
-
+    
     def _prepare_for_save(self, client, user=None, upload_files=True):
         """Translates all changes made to the "simple dict" attributes of this object
         into the underlying LsThing / LsState / LsValue / LsLabel data models, to prepare
@@ -1976,29 +2258,7 @@ class SimpleLsThing(BaseModel):
         :param upload_files: Whether or not to automatically upload files to ACAS for new FileValues, defaults to True.
         :type upload_files: bool
         """
-        # TODO redo recorded_by logic to allow passing in of an updater
-        if not user:
-            user = self.recorded_by
-        # Detect value updates, apply ignored / modified by /modified date and create new value
-        metadata_ls_states = update_ls_states_from_dict(
-            LsThingState, self.METADATA_LS_TYPE, LsThingValue, self.metadata, self._metadata_states, self._metadata_values, user,
-            client, upload_files)
-        results_ls_states = update_ls_states_from_dict(
-            LsThingState, self.RESULTS_LS_TYPE, LsThingValue, self.results, self._results_states, self._results_values, user,
-            client, upload_files)
-        state_tables_ls_states = update_state_table_states_from_dict(
-            LsThingState, LsThingValue, self.state_tables, self._state_table_states, self._state_table_values, user,
-            client, upload_files)
-        self._ls_thing.ls_states = metadata_ls_states + \
-            results_ls_states + state_tables_ls_states
-        # Same thing for labels
-        id_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, self.ID_LS_TYPE, self.ids, self._id_labels, user, preferred_label_kind=self.preferred_label_kind)
-        names_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, self.NAME_LS_TYPE, self.names, self._name_labels, user, preferred_label_kind=self.preferred_label_kind)
-        alias_ls_labels = update_ls_labels_from_dict(
-            LsThingLabel, self.ALIAS_LS_TYPE, self.aliases, self._alias_labels, user, preferred_label_kind=self.preferred_label_kind)
-        self._ls_thing.ls_labels = id_ls_labels + names_ls_labels + alias_ls_labels
+        super(SimpleLsThing, self)._prepare_for_save(client, user, upload_files)
         # Transform links into interactions
         first_ls_things = []
         second_ls_things = []
@@ -2011,135 +2271,7 @@ class SimpleLsThing(BaseModel):
                 first_ls_things.append(link._itx_ls_thing_ls_thing)
         self._ls_thing.first_ls_things = first_ls_things
         self._ls_thing.second_ls_things = second_ls_things
-
-    def _cleanup_after_save(self):
-        self.populate_from_ls_thing(self._ls_thing)
-
-    def save(self, client, skip_validation=False):
-        """Persist changes to the ACAS server.
-
-        :param client: Authenticated instances of acasclient.client
-        :type client: acasclient.client
-        """
-        # Run validation
-        if not skip_validation:
-            self.validate(client)
-        self._prepare_for_save(client)
-        # Persist
-        self._ls_thing = self._ls_thing.save(client)
-        self._cleanup_after_save()
-
-    @classmethod
-    def get_by_code(cls, code_name, client=None, ls_type=None, ls_kind=None):
-        """Fetch a SimpleLsThing object from the ACAS server by ls_type + ls_kind + code_name
-
-        :param code_name: code_name of LsThing to fetch
-        :type code_name: str
-        :param client: Authenticated instance of acasclient.client, defaults to None
-        :type client: acasclient.client, optional
-        :param ls_type: ls_type of LsThing to fetch, defaults to None
-        :type ls_type: str, optional
-        :param ls_kind: ls_kind of LsThing to fetch, defaults to None
-        :type ls_kind: str, optional
-        :return: SimpleLsThing object with latest data fetched frm the ACAS server
-        :rtype: SimpleLsThing
-        :raises KeyError: If no lsthing is found for the given options.
-        """
-        if not ls_type:
-            ls_type = cls.ls_type
-        if not ls_kind:
-            ls_kind = cls.ls_kind
-        camel_case_dict = client.get_ls_thing(ls_type, ls_kind, code_name)
-        if camel_case_dict is None:
-            msg = f'No lsthing found for {ls_type=}, {ls_kind=}, {code_name=}'
-            raise KeyError(msg)
-        simple_ls_thing = cls(ls_thing=LsThing.from_camel_dict(data=camel_case_dict))
-        simple_ls_thing.set_client(client=client)
-        return simple_ls_thing
     
-    @classmethod
-    @validation_result
-    def validate_list(cls, client, models):
-        """Validate a list of SimpleLsThing objects
-
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
-        :param models: List of SimpleLsThing objects to validate
-        :type models: list[SimpleLsThing]
-        :return: List of SimpleLsThing objects with validation errors
-        :rtype: list[SimpleLsThing]
-        """
-        result = ValidationResult(True, [])
-        ddicts = {}
-        # Collect a list of DDicts
-        for model in models:
-            ddicts.update(model._get_ddicts())
-        # Fetch the valid values from ACAS for each DDict once
-        for ddict in ddicts.values():
-            ddict.update_valid_values(client)
-        # Validate each model
-        for model in models:
-            result += model._validate_codevalues(ddicts)
-        return result
-
-    @classmethod
-    def save_list(cls, client, models, skip_validation=False):
-        """Persist a list of new SimpleLsThing objects to the ACAS server
-
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
-        :param models: List of SimpleLsThing objects to save
-        :type models: list
-        :return: Updated list of SimpleLsThing objects after save
-        :rtype: list
-        """
-        if len(models) == 0:
-            return []
-        # Run validation
-        if not skip_validation:
-            cls.validate_list(client, models)
-        for model in models:
-            model._prepare_for_save(client)
-        things_to_save = [model._ls_thing for model in models]
-        camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
-        saved_ls_things = client.save_ls_thing_list(camel_dict)
-        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
-
-    @classmethod
-    def update_list(cls, client, models, clear_links=False):
-        """Persist updates for a list of existing SimpleLsThing objects to the ACAS server
-
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
-        :param models: List of SimpleLsThing objects to update
-        :type models: list
-        :return: Updated list of SimpleLsThing objects after update
-        :rtype: list
-        """
-        if len(models) == 0:
-            return []
-
-        for model in models:
-            if clear_links:
-                # clear out the links (interactions) to avoid updating the same linked `LsThing`
-                # multiple times if two or more `model`s contain links to the same `LsThing`
-                model.links = []
-            model._prepare_for_save(client)
-        things_to_save = [model._ls_thing for model in models]
-        camel_dict = [ls_thing.as_camel_dict() for ls_thing in things_to_save]
-        saved_ls_things = client.update_ls_thing_list(camel_dict)
-        return [cls(ls_thing=LsThing.from_camel_dict(ls_thing)) for ls_thing in saved_ls_things]
-
-    def get_file_hash(self, file_path):
-        BLOCKSIZE = 65536
-        hasher = hashlib.sha1()
-        with open(file_path, "rb") as file_ref:
-            buf = file_ref.read(BLOCKSIZE)
-            while len(buf) > 0:
-                hasher.update(buf)
-                buf = file_ref.read(BLOCKSIZE)
-        return(hasher.hexdigest())
-
     def add_link(self, verb=None, linked_thing=None, recorded_by=None, metadata=None, results=None, subject_type=None, **kwargs):
         """Create a new link between this SimpleLsThing and another SimpleLsThing `linked_thing`
 
@@ -2160,98 +2292,6 @@ class SimpleLsThing(BaseModel):
             subject_type = self.ls_type
         self.links.append(SimpleLink(verb=verb, object=linked_thing, recorded_by=recorded_by, metadata=metadata or {},
                           subject_type=subject_type, results=results or {}, **kwargs))
-
-    def upload_file_values(self, client):
-        """Loop through the values for file values and check if the value is a base64 string or
-        a dict object.  If its either, then upload the file and replace the value
-        with the relative path on the server (just the file name), required for the
-        service route to properly handle the file on save of the LsThing.
-
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
-        """
-        def isBase64(s):
-            return (len(s) % 4 == 0) and re.match('^[A-Za-z0-9+/]+[=]{0,2}$', s)
-
-        def _upload_file_values_from_state_dict(state_dict):
-            for state_kind, values_dict in state_dict.items():
-                for value_kind, file_val in values_dict.items():
-                    if isinstance(file_val, FileValue):
-                        if file_val and file_val.value:
-                            file_val = _upload_file_value(file_val, client)
-                            state_dict[state_kind][value_kind] = file_val
-            return state_dict
-        self.metadata = _upload_file_values_from_state_dict(self.metadata)
-        self.results = _upload_file_values_from_state_dict(self.results)
-    
-    def _get_ddicts(self):
-        """Extract a unique list of DDict objects from the CodeValue attributes of a SimpleThing
-        :return: dictionary of { (code_type, code_kind, code_origin): DDict }
-        """
-        ddicts = {}
-        state_dicts = [self.metadata, self.results]
-        for state_dict in state_dicts:
-            for values_dict in state_dict.values():
-                for value in values_dict.values():
-                    if isinstance(value, CodeValue):
-                        ddict = None
-                        if value.code_origin.upper() == ACAS_DDICT:
-                            ddict = ACASDDict(value.code_type, value.code_kind)
-                        elif value.code_origin.upper() == ACAS_LSTHING:
-                            ddict = ACASLsThingDDict(value.code_type, value.code_kind)
-                        elif value.code_origin.upper() == ACAS_AUTHOR:
-                            ddict = ACASAuthorDDict(value.code_type, value.code_kind)
-                        else:
-                            raise ValueError(f'Unsupported code_origin: {value.code_origin}')
-                        ddicts[(ddict.code_type, ddict.code_kind, ddict.code_origin.upper())] = ddict
-        return ddicts
-    
-    @validation_result
-    def _validate_codevalues(self, ddicts):
-        """Confirm all CodeValues have valid values.
-
-        :param ddicts: dict of (code_type, code_kind, code_origin): DDict. Should come from _get_ddicts()
-        :type ddicts: dict
-        """
-        result = ValidationResult(True, [])
-        state_dicts = [self.metadata, self.results]
-        for state_dict in state_dicts:
-            for values_dict in state_dict.values():
-                for value in values_dict.values():
-                    if isinstance(value, CodeValue):
-                        if value.code:
-                            # Get the corresponding DDict
-                            ddict = ddicts.get((value.code_type, value.code_kind, value.code_origin.upper()), None)
-                            if ddict:
-                                # Confirm this CodeValue's code exists in the DDict
-                                result += ddict.check_value(value.code)
-                            else:
-                                result += ValidationResult(True, f"Cannot locate DDict with code_type={value.code_type}, code_kind={value.code_kind}, code_origin={value.code_origin}")
-        return result
-    
-    @validation_result
-    def validate(self, client):
-        """Validate SimpleLsThing dictionary. Currently only checks that all CodeValues that reference ACAS DDicts
-        have known/valid values
-
-        :param client: Authenticated instance of acasclient.client
-        :type client: acasclient.client
-        :return: ValidationResult
-        """
-        result = ValidationResult(True, [])
-        # Check if recorded_by is populated
-        if not self.recorded_by:
-            result += ValidationResult(False, "recorded_by is required")
-        # Extract a unique dictionary of (code_type, code_kind, code_origin) to DDict objects
-        ddicts = self._get_ddicts()
-        # Fetch the valid values from ACAS for each dictionary once
-        for ddict in ddicts.values():
-            ddict.update_valid_values(client)
-        # Validate the CodeValues are valid
-        result += self._validate_codevalues(ddicts)
-        return result
-
-
 
 class SimpleLink(BaseModel):
     """The SimpleLink class is used to save directional relationships between SimpleLsThings. ACAS's LsThing data model is conceptually made

@@ -1404,22 +1404,21 @@ class ItxLsThingLsThingState(AbstractState):
         my_obj.ls_values = ls_values
         return my_obj
 
-class ItxLsThingLsThingState(AbstractState):
 
-    _fields = AbstractState._fields + ['ls_values', 'itx_ls_thing_ls_thing']
+class ItxLsThingLsThingValue(AbstractValue):
 
-    def __init__(self, ls_values=None, itx_ls_thing_ls_thing=None, **kwargs):
-        """
-        Initialize an ItxLsThingLsThingState instance.
+    _fields = AbstractValue._fields + ['ls_state']
+
+    def __init__(self, ls_state=None, **kwargs):
+        """Initialize an ItxLsThingLsThingValue instance.
 
         Args:
-            ls_values (list): List of values associated with the state.
-            itx_ls_thing_ls_thing (object): The ItxLsThingLsThing associated with the state.
-            **kwargs: Additional keyword arguments passed to the AbstractState initializer.
+            ls_state (object): The LsState associated with the value.
+            **kwargs: Additional keyword arguments passed to the AbstractValue initializer.
+
         """
         super().__init__(**kwargs)
-        self.ls_values = ls_values or []
-        self.itx_ls_thing_ls_thing = itx_ls_thing_ls_thing
+        self.ls_state = ls_state
 
 
 class SimpleLsThing(BaseModel):

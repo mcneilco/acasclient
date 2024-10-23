@@ -4,8 +4,6 @@ from .validation import validation_result
 import logging
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
 
 class DDict(object):
     """The DDict class is meant as a generic interface for any implementation of a Data Dictionary that
@@ -71,3 +69,20 @@ class ACASLsThingDDict(DDict):
         self.valid_values = [val_dict['code'] for val_dict in valid_codetables]
         if not self.valid_values:
             self.raise_empty_dict_error()
+
+class ACASAuthorDDict(DDict):
+    """DDict implementation for built-in ACAS DDicts """
+
+    CODE_ORIGIN = 'ACAS authors'
+
+    def __init__(self, code_type, code_kind):
+        super(ACASAuthorDDict, self).__init__(code_type, code_kind, self.CODE_ORIGIN)
+
+    def update_valid_values(self, client):
+        """Get the valid values for the DDict."""
+        valid_authors = client.get_authors()
+        # Raise error if author does not match name
+        self.valid_values = [val_dict['code'] for val_dict in valid_authors]
+        if not self.valid_values:
+            self.raise_empty_dict_error()
+

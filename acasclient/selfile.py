@@ -61,8 +61,11 @@ REG_LEVEL = 'Registration Level'
 ################################################################################
 # Logging
 ################################################################################
-logger = logging.getLogger(__name__).addHandler(logging.NullHandler())
+# Initialize the logger
+logger = logging.getLogger(__name__)
 
+# Add a NullHandler to avoid errors if no other handlers are configured
+logger.addHandler(logging.NullHandler())
 
 ################################################################################
 # Functions

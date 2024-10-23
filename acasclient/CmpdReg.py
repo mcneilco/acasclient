@@ -4,10 +4,56 @@ from enum import Enum
 import types
 import logging
 from .acasclient import client
+from .lsthing import convert_json, camel_to_underscore
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
+
+
+class Salt():
+    """Salt class."""
+    def __init__(self, abbrev: str, name: str, mol_structure: str, id: int = None, **kwargs):
+        self.id = id
+        self.abbrev = abbrev
+        self.name = name
+        self.mol_structure = mol_structure
+
+    def save(self, client: client) -> Salt:
+        """Save the salt to the server."""
+        resp = client.create_salt(self.abbrev, self.name, self.mol_structure)
+        self.id = resp['id']
+        return self
+    
+    @classmethod
+    def from_camel_dict(cls, data):
+        """Construct an AbstractModel object from a camelCase dict
+
+        :param data: dict of attributes
+        :type data: dict
+        :return: instance of class AbstractModel
+        :rtype: AbstractModel
+        """
+        snake_case_dict = convert_json(data, camel_to_underscore)
+        return cls.from_dict(snake_case_dict)
+    
+    @classmethod
+    def from_dict(cls, data):
+        """Construct an AbstractModel object from a dict
+
+        :param data: dict of attributes
+        :type data: dict
+        :return: instance of class AbstractModel
+        :rtype: AbstractModel
+        """
+        return cls(**data)
+    
+    def as_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'abbrev': self.abbrev,
+            'name': self.name,
+            'mol_structure': self.mol_structure
+        }
 
 class AdditionalScientistType(Enum):
     """Enum for additional scientist types."""
@@ -62,7 +108,7 @@ def meta_lots_to_dict_array(meta_lots: list[dict]) -> list[dict]:
     return [meta_lot_to_dict(meta_lot) for meta_lot in meta_lots]
 
 
-def meta_lot_to_dict(meta_lot: dict) -> dict:
+def meta_lot_to_dict(meta_lot: dict, use_parent_mol=True) -> dict:
     """Converts a meta lot to a dictionary into a flat dictionary of specific fields."""
     parent_common_names = [parent_alias["aliasName"] for parent_alias in meta_lot["lot"]["saltForm"]["parent"]["parentAliases"] if parent_alias["lsKind"] == "Common Name"]
 
@@ -80,8 +126,13 @@ def meta_lot_to_dict(meta_lot: dict) -> dict:
     # If lot amount is filled in, then we need to fill in lot barcode with the lot corp name
     lot_barcode = meta_lot["lot"]["corpName"] if meta_lot["lot"]["amount"] is not None else None
 
+    if use_parent_mol:
+        mol = meta_lot["lot"]["parent"]["molStructure"]
+    else:
+        mol = meta_lot["lot"]['asDrawnStruct'] if meta_lot["lot"]['asDrawnStruct'] is not None else meta_lot["lot"]["parent"]["molStructure"]
+
     return_dict = {
-        'mol': meta_lot["lot"]['asDrawnStruct'] if meta_lot["lot"]['asDrawnStruct'] is not None else meta_lot["lot"]["parent"]["molStructure"],
+        'mol': mol,
         "id": meta_lot["lot"]["id"],
         "name": meta_lot["lot"]["corpName"],
         "parent_common_name": '; '.join(parent_common_names) if len(parent_common_names) > 0 else None,

@@ -3,7 +3,6 @@ from acasclient.lsthing import (CodeValue, SimpleLsThing, LsThing, clob, ACAS_DD
 from datetime import datetime
 
 # Constants
-ACAS_LSTHING = 'ACAS LsThing'
 META_DATA = 'protocol metadata'
 LS_TYPE = 'default'
 LS_KIND = 'default'

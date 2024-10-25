@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from typing import Any, Dict
 
-from .ddict import ACASDDict, ACASLsThingDDict, DDict
+from .ddict import ACASDDict, ACASLsThingDDict, DDict, ACASAuthorDDict
 from .interactions import INTERACTION_VERBS_DICT, opposite
 from .validation import validation_result, ValidationResult
 
@@ -18,12 +18,11 @@ import pandas as pd
 from six import text_type as str
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
 
 ROW_NUM_KEY = 'row number'
 ACAS_DDICT = ACASDDict.CODE_ORIGIN.upper()
 ACAS_LSTHING = ACASLsThingDDict.CODE_ORIGIN.upper()
+ACAS_AUTHOR = ACASAuthorDDict.CODE_ORIGIN.upper()
 
 # JSON encoding / decoding
 
@@ -850,7 +849,31 @@ class BaseModel(object):
         snake_case_dict = self.as_dict()
         camel_dict = convert_json(snake_case_dict, underscore_to_camel)
         return camel_dict
+    
+    def __deepcopy__(self, memo):
+        """Create a deep copy of the instance.
 
+        The 'id' and 'version' fields are nulled out to ensure that the copied object
+        is treated as a new instance rather than a duplicate of the original. This is
+        particularly useful when the copied object needs to be saved as a new record
+        in a database or used in a context where unique identifiers are required.
+
+        Args:
+            memo (dict): A dictionary of objects already copied during the current copying pass.
+
+        Returns:
+            object: A deep copy of the instance with 'id' and 'version' fields set to None.
+        """
+        # Create a deep copy of the instance first
+        copied_obj = copy.copy(self)  # Shallow copy of self
+        # Then deep copy the attributes individually
+        copied_obj.__dict__ = copy.deepcopy(self.__dict__, memo)
+        # Set the 'id' attribute to None
+        copied_obj.id = None
+        copied_obj.version = None
+        return copied_obj
+
+    
     def as_json(self, **kwargs):
         """Serialize instance into a JSON string with camelCase keys
 
@@ -2136,6 +2159,8 @@ class SimpleLsThing(BaseModel):
                             ddict = ACASDDict(value.code_type, value.code_kind)
                         elif value.code_origin.upper() == ACAS_LSTHING:
                             ddict = ACASLsThingDDict(value.code_type, value.code_kind)
+                        elif value.code_origin.upper() == ACAS_AUTHOR:
+                            ddict = ACASAuthorDDict(value.code_type, value.code_kind)
                         else:
                             raise ValueError(f'Unsupported code_origin: {value.code_origin}')
                         ddicts[(ddict.code_type, ddict.code_kind, ddict.code_origin.upper())] = ddict

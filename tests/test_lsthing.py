@@ -10,21 +10,22 @@ from pathlib import Path
 
 from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
-                                SimpleLsThing, get_lsKind_to_lsvalue, datetime_to_ts)
+                                SimpleLsThing, get_lsKind_to_lsvalue, datetime_to_ts, LsThing)
 from acasclient.validation import ValidationResult, get_validation_response
+from acasclient.protocol import Protocol
 from tests.test_acasclient import BaseAcasClientTest
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 # Constants
 from tests.project_thing import (
-    PROJECT_METADATA, PROJECT, STATUS, PROJECT_STATUS,PROCEDURE_DOCUMENT,PDF_DOCUMENT, 
+    PROJECT_METADATA, PROJECT, STATUS, PROJECT_STATUS, PROCEDURE_DOCUMENT, PDF_DOCUMENT, 
     NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, DESCRIPTION_KEY, PROJECT_NAME,
     START_DATE, PDF_DOCUMENT_KEY, PROCEDURE_DOCUMENT_KEY, PARENT_PROJECT_KEY, ACTIVE, INACTIVE,
     PROJECT_NUMBER_KEY, PROJECT_NUMBER, Project
 )
+
 
 FWD_ITX = 'relates to'
 BACK_ITX = 'is related to'
@@ -1109,3 +1110,32 @@ class TestValidationResponse(BaseAcasClientTest):
         self.assertNotIn('<h4>Warnings:', html)
         self.assertIn('<h4>Summary</h4>', html)
         self.assertIn(f"<li>{SUMM_1}</li>", html)
+
+
+class TestProtocol(BaseAcasClientTest):
+
+    def test_001_create_protocol(self):
+        """
+        Test creating a protocol with a few different types of values.
+        """
+        # Create a protocol
+        name = str(uuid.uuid4())
+        scientist = self.client.username
+        recorded_by = scientist
+        protocol = Protocol(name=name, recorded_by=recorded_by, scientist=scientist)
+        protocol.save(self.client)
+        assert protocol.code_name
+
+        # Get the protocol by code name
+        protocol_dict = self.client.get_protocol_by_code(protocol.code_name)
+
+        # Verify the protocol has code_name and recorded_by is correct
+        assert protocol_dict['codeName'] == protocol.code_name
+        assert protocol_dict['recordedBy'] == recorded_by
+
+        # Turn the protocol back into a Protocol
+        updated_protocol = Protocol(ls_thing=LsThing.from_camel_dict(data=protocol_dict))
+        updated_protocol.save(self.client)
+
+        # Make sure the put worked by checking the version
+        protocol_dict['version'] + 1 == updated_protocol._ls_thing.version

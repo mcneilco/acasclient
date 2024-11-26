@@ -10,7 +10,7 @@ from pathlib import Path
 
 from acasclient.ddict import ACASDDict, ACASLsThingDDict
 from acasclient.lsthing import (BlobValue, CodeValue, FileValue, LsThingValue,
-                                SimpleLsThing, get_lsKind_to_lsvalue, datetime_to_ts, LsThing)
+                                SimpleLsThing, get_lsKind_to_lsvalue, datetime_to_ts, LsThing, ACAS_DDICT)
 from acasclient.validation import ValidationResult, get_validation_response
 from acasclient.protocol import Protocol
 from tests.test_acasclient import BaseAcasClientTest
@@ -969,6 +969,17 @@ class TestBlobValue(BaseAcasClientTest):
         assert blob_value_dict['value'] == value
         assert blob_value_dict['comments'] == comments
         assert blob_value_dict['id'] == id
+
+class TestCodeValue(BaseAcasClientTest):
+
+    def test_instantiation_without_code_origin(self):
+        """
+        Verify that CodeValue can be instantiated without a code_origin.
+        """
+        code = "1234"
+        code_value = CodeValue(code=code, code_type=None, code_kind=None, code_origin=None)
+        assert code_value.code == code
+        assert code_value.code_origin is None
 
 class TestValidationResponse(BaseAcasClientTest):
 

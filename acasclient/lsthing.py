@@ -1001,10 +1001,11 @@ class CodeValue(object):
             self.code_kind = code_kind
             self.code_origin = code_origin
             # Auto-recognize some code origin:
-            if self.code_origin.upper() == ACAS_DDICT:
-                self.ddict = ACASDDict(code_type, code_kind)
-            elif self.code_origin.upper() == ACAS_LSTHING:
-                self.ddict = ACASLsThingDDict(code_type, code_kind)
+            if self.code_origin:
+                if self.code_origin.upper() == ACAS_DDICT:
+                    self.ddict = ACASDDict(code_type, code_kind)
+                elif self.code_origin.upper() == ACAS_LSTHING:
+                    self.ddict = ACASLsThingDDict(code_type, code_kind)
 
     def __hash__(self):
         return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'

@@ -1001,10 +1001,11 @@ class CodeValue(object):
             self.code_kind = code_kind
             self.code_origin = code_origin
             # Auto-recognize some code origin:
-            if self.code_origin.upper() == ACAS_DDICT:
-                self.ddict = ACASDDict(code_type, code_kind)
-            elif self.code_origin.upper() == ACAS_LSTHING:
-                self.ddict = ACASLsThingDDict(code_type, code_kind)
+            if self.code_origin:
+                if self.code_origin.upper() == ACAS_DDICT:
+                    self.ddict = ACASDDict(code_type, code_kind)
+                elif self.code_origin.upper() == ACAS_LSTHING:
+                    self.ddict = ACASLsThingDDict(code_type, code_kind)
 
     def __hash__(self):
         return hash(f'{self.code}-{self.code_type}-{self.code_kind}-'
@@ -2153,7 +2154,7 @@ class SimpleLsThing(BaseModel):
         for state_dict in state_dicts:
             for values_dict in state_dict.values():
                 for value in values_dict.values():
-                    if isinstance(value, CodeValue):
+                    if isinstance(value, CodeValue) and value.code_origin:
                         ddict = None
                         if value.code_origin.upper() == ACAS_DDICT:
                             ddict = ACASDDict(value.code_type, value.code_kind)
@@ -2169,6 +2170,7 @@ class SimpleLsThing(BaseModel):
     @validation_result
     def _validate_codevalues(self, ddicts):
         """Confirm all CodeValues have valid values.
+        Note: validation is skipped if a CodeValue's code_origin is None
 
         :param ddicts: dict of (code_type, code_kind, code_origin): DDict. Should come from _get_ddicts()
         :type ddicts: dict
@@ -2179,7 +2181,7 @@ class SimpleLsThing(BaseModel):
             for values_dict in state_dict.values():
                 for value in values_dict.values():
                     if isinstance(value, CodeValue):
-                        if value.code:
+                        if value.code and value.code_origin:
                             # Get the corresponding DDict
                             ddict = ddicts.get((value.code_type, value.code_kind, value.code_origin.upper()), None)
                             if ddict:

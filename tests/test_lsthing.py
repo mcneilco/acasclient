@@ -980,6 +980,23 @@ class TestCodeValue(BaseAcasClientTest):
         code_value = CodeValue(code=code, code_type=None, code_kind=None, code_origin=None)
         assert code_value.code == code
         assert code_value.code_origin is None
+        # Construct a basic SimpleLsThing object and save it
+        name = str(uuid.uuid4())
+        meta_dict = {
+            NAME_KEY: name,
+            IS_RESTRICTED_KEY: True,
+            STATUS_KEY: ACTIVE,
+            START_DATE_KEY: datetime.now()
+        }
+        newProject = Project(recorded_by=self.client.username, **meta_dict)
+        # Override the status with the CodeValue with null code_origin
+        # Confirm this bypasses CodeValue validation
+        newProject.metadata[PROJECT_METADATA][PROJECT_STATUS] = code_value
+        newProject.save(self.client)
+        # Fetch the project and confirm the CodeValue is as expected (code_origin should be None)
+        fresh_project = Project.get_by_code(newProject.code_name, self.client, Project.ls_type, Project.ls_kind)
+        assert fresh_project.metadata[PROJECT_METADATA][PROJECT_STATUS].code == code
+        assert fresh_project.metadata[PROJECT_METADATA][PROJECT_STATUS].code_origin is None
 
 class TestValidationResponse(BaseAcasClientTest):
 

@@ -12,6 +12,8 @@ Custom Experiment Meta Data,,
 CRO,Pharmaron,Select List
 Jira Link,https://mycompany.jira.com/browse/JIRA-1,URL
 Jira Issue,JIRA-1,Text
+Priority,High,Text
+Comment,BlahBlah,Text
 ,,
 Calculated Results,,
 Datatype,Number,Number

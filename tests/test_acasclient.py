@@ -4922,3 +4922,15 @@ class TestExperimentLoader(BaseAcasClientTest):
             }
         ]
         self.check_expected_messages(expected_messages, response['errorMessages'])
+        
+    @requires_basic_cmpd_reg_load
+    def test_021_experiment_with_custom_metadata(self):
+        """Test experiment loader number with custom experiment metadata"""
+        data_file_to_upload = Path(__file__).resolve()\
+            .parent.joinpath('test_acasclient', 'experiment_with_custom_meta_data.csv')
+        response = self.experiment_load_test(data_file_to_upload, False, expect_failure=False)
+        assert response['results']['experimentCode'] is not None
+        experiment = self.client.\
+            get_experiment_by_code(response['results']['experimentCode'], full = True)
+        self.assertIsNotNone(experiment)
+        self.assertIn("analysisGroups", experiment)

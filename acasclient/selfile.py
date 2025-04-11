@@ -173,7 +173,7 @@ class AbstractExperiment():
     VALID_DATATYPES = set(VALID_DATATYPES)
 
     blank = ""
-    _meta_rows = 15  # Scan this many rows for the end of meta/start of payload.
+    _meta_rows = 50  # Scan this many rows for the end of meta/start of payload.
 
     def __init__(self, file_name=None):
         """

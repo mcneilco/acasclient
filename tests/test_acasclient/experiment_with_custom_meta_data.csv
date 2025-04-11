@@ -1,0 +1,21 @@
+Experiment Meta Data,,
+Format,Generic,
+Protocol Name,Toxicity,
+Experiment Name,Toxicity Screen 1,
+Scientist,bob,
+Notebook,Main Experimental Notebook,
+Page,Main Experimental Notebook Page 1,
+Assay Date,2025-02-01,
+Project,Global,
+,,
+Custom Experiment Meta Data,,
+CRO,Pharmaron,Select List
+Jira Link,https://mycompany.jira.com/browse/JIRA-1,URL
+Jira Issue,JIRA-1,Text
+Priority,High,Text
+Comment,BlahBlah,Text
+,,
+Calculated Results,,
+Datatype,Number,Number
+Corporate Batch ID,t1/2 (min),In vitro Clint (µL/min/mg protein)
+CMPD-0000001-001,2.67,42.8

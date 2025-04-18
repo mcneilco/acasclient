@@ -4934,6 +4934,6 @@ class TestExperimentLoader(BaseAcasClientTest):
         experiment.saveAs(temp_file_path)
         response = self.experiment_load_test(temp_file_path, False, expect_failure=False)
         assert response['hasError'] is False
-        experiment = self.client.get_experiment_by_name(experiment.name)
+        experiment = self.client.get_experiment_by_code(response['results']['experimentCode'], full = True)
         self.assertIsNotNone(experiment)
         self.assertIn("analysisGroups", experiment)

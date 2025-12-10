@@ -8,12 +8,14 @@ import configparser
 import json
 from pathlib import Path
 from pathlib import PurePath
+from requests.adapters import HTTPAdapter, Retry
 import re
 import base64
 import hashlib
 from io import StringIO, IOBase
 from typing import Dict, List, Tuple
 from urllib.parse import quote
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,6 +26,13 @@ VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
                         "similarity", "full"}
 
 CORPORATE_BATCH_ID = "Corporate Batch ID"
+
+# The requests.adapters.Retry class comes with DEFAULT_ALLOWED_METHODS which
+# are safe methods that should generally be idempotent.
+# ACAS contains some POST endpoints that are idempotent so we define an "unsafe" method
+# list here to enable that.
+UNSAFE_HTTP_METHODS_LIST = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'TRACE', 'POST']
+HTTP_STATUSES_TO_RETRY = [429, 502, 503, 504]
 
 def isBase64(s):
     """Checks if a string is base64 encoded.
@@ -299,12 +308,56 @@ class client():
     def close(self):
         self.session.close()
 
+    @contextmanager
+    def _with_retry(self, allowed_methods=None):
+        """Context manager to temporarily add retry capability to the session.
+        
+        Args:
+            allowed_methods (list): HTTP methods to retry. Defaults to SAFE_HTTP_METHODS
+        """
+            
+        # Store original adapters
+        original_https_adapter = self.session.adapters.get('https://')
+        original_http_adapter = self.session.adapters.get('http://')
+        
+        # Create retry strategy
+        retry_strategy = Retry(
+            total=6,
+            status_forcelist=HTTP_STATUSES_TO_RETRY,
+            backoff_factor=2,
+            allowed_methods=allowed_methods
+        )
+        retry_adapter = HTTPAdapter(max_retries=retry_strategy)
+        
+        try:
+            # Temporarily mount retry adapters
+            self.session.mount("https://", retry_adapter)
+            self.session.mount("http://", retry_adapter)
+            
+            yield
+            
+        finally:
+            # Restore original adapters
+            if original_https_adapter:
+                self.session.mount("https://", original_https_adapter)
+            if original_http_adapter:
+                self.session.mount("http://", original_http_adapter)
+
     def getSession(self):
         data = {
             'username': self.username,
             'password': self.password
         }
         session = requests.Session()
+        # Add a retry strategy to make the session more robust
+        retry_strategy = Retry(
+            total=6,
+            status_forcelist=HTTP_STATUSES_TO_RETRY,
+            backoff_factor=2
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
         resp = session.post("{}/login".format(self.url),
                             headers={'Content-Type': 'application/json'},
                             data=json.dumps(data),
@@ -714,10 +767,11 @@ class client():
         if("projectCodes" in search_request and search_request["projectCodes"] is None):
             del search_request["projectCodes"]
 
-        resp = self.session.post("{}/cmpdreg/search/cmpds".
-                                 format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(search_request))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/cmpdreg/search/cmpds".
+                                     format(self.url),
+                                     headers={'Content-Type': "application/json"},
+                                     data=json.dumps(search_request))
         resp.raise_for_status()
         return resp.json()
 
@@ -727,10 +781,11 @@ class client():
         if("percentSimilarity" not in search_request):
             search_request["percentSimilarity"] = 90
 
-        resp = self.session.post("{}/cmpdreg/structuresearch/".
-                                 format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(search_request))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/cmpdreg/structuresearch/".
+                                    format(self.url),
+                                    headers={'Content-Type': "application/json"},
+                                    data=json.dumps(search_request))
         resp.raise_for_status()
         return resp.json()
 
@@ -797,10 +852,11 @@ class client():
 
         See the output of :func:`get_sdf_file_for_lots` for SDF details.
         """
-        resp = self.session.post("{}/cmpdReg/export/searchResults".
-                                 format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(search_results))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/cmpdReg/export/searchResults".
+                                     format(self.url),
+                                     headers={'Content-Type': "application/json"},
+                                     data=json.dumps(search_results))
         resp.raise_for_status()
         return resp.json()
 
@@ -1177,10 +1233,11 @@ class client():
         return resp.json()
     
     def _validate_sdf_request(self, data):
-        resp = self.session.post("{}/api/cmpdRegBulkLoader/validateCmpds"
-                                 .format(self.url),
-                                 headers={'Content-Type': 'application/json'},
-                                 data=json.dumps(data))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/api/cmpdRegBulkLoader/validateCmpds"
+                                     .format(self.url),
+                                     headers={'Content-Type': 'application/json'},
+                                     data=json.dumps(data))
         resp.raise_for_status()
         return resp.json()
 
@@ -1427,10 +1484,11 @@ en array of protocols
                 "id": id
             }
         }
-        resp = self.session.post("{}/api/cmpdRegBulkLoader/checkFileDependencies".
-                                 format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(request))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/api/cmpdRegBulkLoader/checkFileDependencies".
+                                     format(self.url),
+                                     headers={'Content-Type': "application/json"},
+                                     data=json.dumps(request))
         if resp.text == '"Error"':
             return None
         return resp.json()
@@ -1571,13 +1629,14 @@ en array of protocols
         params = {}
         if nestedfull:
             params = {**params, 'with': 'nestedfull'}
-        resp = self.session.post("{}/api/things/{}/{}/codeNames/jsonArray".
-                                 format(self.url,
-                                        ls_type,
-                                        ls_kind),
-                                 params=params,
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(code_name_list))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/api/things/{}/{}/codeNames/jsonArray".
+                                     format(self.url,
+                                            ls_type,
+                                            ls_kind),
+                                     params=params,
+                                     headers={'Content-Type': "application/json"},
+                                     data=json.dumps(code_name_list))
         if resp.status_code == 500:
             return None
         else:
@@ -1664,10 +1723,11 @@ en array of protocols
             ]
         }
 
-        resp = self.session.post("{}/api/getThingCodeByLabel".
-                                 format(self.url),
-                                 headers={'Content-Type': "application/json"},
-                                 data=json.dumps(request))
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post("{}/api/getThingCodeByLabel".
+                                     format(self.url),
+                                     headers={'Content-Type': "application/json"},
+                                     data=json.dumps(request))
         if resp.status_code == 500:
             return None
         else:
@@ -1798,13 +1858,14 @@ en array of protocols
         if codes_only:
             format = 'codetable'
         params['format'] = format
-        resp = self.session.post('{}/api/advancedSearch/things/{}/{}'.
-                                 format(self.url,
-                                        ls_type,
-                                        ls_kind),
-                                 data=json.dumps(request),
-                                 headers={'Content-Type': "application/json"},
-                                 params=params)
+        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
+            resp = self.session.post('{}/api/advancedSearch/things/{}/{}'.
+                                     format(self.url,
+                                            ls_type,
+                                            ls_kind),
+                                     data=json.dumps(request),
+                                     headers={'Content-Type': "application/json"},
+                                     params=params)
         result = resp.json()
         if type(result) is not dict:
             msg = 'Caught error response from {}: {}'.format(

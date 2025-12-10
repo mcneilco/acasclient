@@ -313,7 +313,7 @@ class client():
         """Context manager to temporarily add retry capability to the session.
         
         Args:
-            allowed_methods (list): HTTP methods to retry. Defaults to SAFE_HTTP_METHODS
+            allowed_methods (list): HTTP methods to retry. If None, defaults to Retry.DEFAULT_ALLOWED_METHODS.
         """
             
         # Store original adapters

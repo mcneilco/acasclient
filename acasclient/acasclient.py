@@ -319,9 +319,9 @@ class client():
         
         Args:
             creds: A dict of credentials with the following keys
-                'username': ACAS username
-                'password': ACAS password
-                'url': ACAS server URL
+                username: ACAS username
+                password: ACAS password
+                url: ACAS server URL
             enable_retries: Boolean to enable retry session
             retry_config: Optional requests.adapters.Retry object to configure retry behavior
             

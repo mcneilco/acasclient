@@ -27,12 +27,26 @@ VALID_STRUCTURE_SEARCH_TYPES = {"substructure", "duplicate",
 
 CORPORATE_BATCH_ID = "Corporate Batch ID"
 
+# Configure default Retry settings
+DEFAULT_RETRIES_TOTAL = 6
+DEFAULT_RETRY_BACKOFF_FACTOR = 2
+DEFAULT_HTTP_STATUSES_TO_RETRY = [429, 502, 503, 504]
+
+DEFAULT_RETRY_CONFIG = Retry(
+    total=DEFAULT_RETRIES_TOTAL,
+    backoff_factor=DEFAULT_RETRY_BACKOFF_FACTOR,
+    status_forcelist=DEFAULT_HTTP_STATUSES_TO_RETRY,
+)
 # The requests.adapters.Retry class comes with DEFAULT_ALLOWED_METHODS which
 # are safe methods that should generally be idempotent.
-# ACAS contains some POST endpoints that are idempotent so we define an "unsafe" method
-# list here to enable that.
-UNSAFE_HTTP_METHODS_LIST = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'TRACE', 'POST']
-HTTP_STATUSES_TO_RETRY = [429, 502, 503, 504]
+# ACAS contains some POST endpoints that are idempotent so we define an extended method
+# list for those special scenarios.
+DEFAULT_IDEMPOTENT_POST_RETRY_CONFIG = Retry(
+    total=DEFAULT_RETRIES_TOTAL,
+    backoff_factor=DEFAULT_RETRY_BACKOFF_FACTOR,
+    status_forcelist=DEFAULT_HTTP_STATUSES_TO_RETRY,
+    allowed_methods=['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'TRACE', 'POST']
+)
 
 def isBase64(s):
     """Checks if a string is base64 encoded.
@@ -299,68 +313,51 @@ def parse_sdf(file_content):
 
 class client():
 
-    def __init__(self, creds):
+    def __init__(self, creds, enable_retries=True, retry_config: Retry=None):
+        """ACAS Client
+        Initializes the ACAS client.
+        
+        Args:
+            creds: A dict of credentials with the following keys
+                'username': ACAS username
+                'password': ACAS password
+                'url': ACAS server URL
+            enable_retries: Boolean to enable retry session
+            retry_config: Optional requests.adapters.Retry object to configure retry behavior
+            
+            Returns:
+            An ACAS client object.
+        """
         self.username = creds['username']
         self.password = creds['password']
         self.url = creds['url']
-        self.session = self.getSession()
+        self.session = self._create_session(retry=enable_retries, retry_config=retry_config or DEFAULT_RETRY_CONFIG)
+        self.idempotent_post_session = self._create_session(retry=enable_retries, retry_config=retry_config or DEFAULT_IDEMPOTENT_POST_RETRY_CONFIG)
 
     def close(self):
         self.session.close()
-
-    @contextmanager
-    def _with_retry(self, allowed_methods=None):
-        """Context manager to temporarily add retry capability to the session.
-        
-        Args:
-            allowed_methods (list): HTTP methods to retry. If None, defaults to Retry.DEFAULT_ALLOWED_METHODS.
-        """
-            
-        # Store original adapters
-        original_https_adapter = self.session.adapters.get('https://')
-        original_http_adapter = self.session.adapters.get('http://')
-        
-        # Create retry strategy
-        retry_strategy = Retry(
-            total=6,
-            status_forcelist=HTTP_STATUSES_TO_RETRY,
-            backoff_factor=2,
-            allowed_methods=allowed_methods
-        )
-        retry_adapter = HTTPAdapter(max_retries=retry_strategy)
-        
-        try:
-            # Temporarily mount retry adapters
-            self.session.mount("https://", retry_adapter)
-            self.session.mount("http://", retry_adapter)
-            
-            yield
-            
-        finally:
-            # Restore original adapters
-            if original_https_adapter:
-                self.session.mount("https://", original_https_adapter)
-            if original_http_adapter:
-                self.session.mount("http://", original_http_adapter)
-
-    def getSession(self):
-        data = {
-            'username': self.username,
-            'password': self.password
-        }
+    
+    def _create_session(self, retry=False, retry_config: Retry=None):
         session = requests.Session()
-        # Add a retry strategy to make the session more robust
-        retry_strategy = Retry(
-            total=6,
-            status_forcelist=HTTP_STATUSES_TO_RETRY,
-            backoff_factor=2
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
+
+        if retry:
+            retry_obj = retry_config or Retry(
+                total=DEFAULT_RETRY_COUNT,
+                backoff_factor=DEFAULT_RETRY_BACKOFF_FACTOR,
+                status_forcelist=HTTP_STATUSES_TO_RETRY,
+                allowed_methods=None,
+            )
+            adapter = HTTPAdapter(max_retries=retry_obj)
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+        
+        # Login to ACAS
         resp = session.post("{}/login".format(self.url),
                             headers={'Content-Type': 'application/json'},
-                            data=json.dumps(data),
+                            data=json.dumps({
+                                'username': self.username,
+                                'password': self.password
+                            }),
                             allow_redirects=False)
         resp.raise_for_status()
         if resp.status_code == 302 and 'location' in resp.headers and resp.headers.get('location') == "/login":
@@ -767,11 +764,10 @@ class client():
         if("projectCodes" in search_request and search_request["projectCodes"] is None):
             del search_request["projectCodes"]
 
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/cmpdreg/search/cmpds".
-                                     format(self.url),
-                                     headers={'Content-Type': "application/json"},
-                                     data=json.dumps(search_request))
+        resp = self.idempotent_post_session.post("{}/cmpdreg/search/cmpds".
+                                                 format(self.url),
+                                                 headers={'Content-Type': "application/json"},
+                                                 data=json.dumps(search_request))
         resp.raise_for_status()
         return resp.json()
 
@@ -781,11 +777,10 @@ class client():
         if("percentSimilarity" not in search_request):
             search_request["percentSimilarity"] = 90
 
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/cmpdreg/structuresearch/".
-                                    format(self.url),
-                                    headers={'Content-Type': "application/json"},
-                                    data=json.dumps(search_request))
+        resp = self.idempotent_post_session.post("{}/cmpdreg/structuresearch/".
+                                                 format(self.url),
+                                                 headers={'Content-Type': "application/json"},
+                                                 data=json.dumps(search_request))
         resp.raise_for_status()
         return resp.json()
 
@@ -852,11 +847,10 @@ class client():
 
         See the output of :func:`get_sdf_file_for_lots` for SDF details.
         """
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/cmpdReg/export/searchResults".
-                                     format(self.url),
-                                     headers={'Content-Type': "application/json"},
-                                     data=json.dumps(search_results))
+        resp = self.idempotent_post_session.post("{}/cmpdReg/export/searchResults".
+                                                 format(self.url),
+                                                 headers={'Content-Type': "application/json"},
+                                                 data=json.dumps(search_results))
         resp.raise_for_status()
         return resp.json()
 
@@ -1233,11 +1227,10 @@ class client():
         return resp.json()
     
     def _validate_sdf_request(self, data):
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/api/cmpdRegBulkLoader/validateCmpds"
-                                     .format(self.url),
-                                     headers={'Content-Type': 'application/json'},
-                                     data=json.dumps(data))
+        resp = self.idempotent_post_session.post("{}/api/cmpdRegBulkLoader/validateCmpds"
+                                                 .format(self.url),
+                                                 headers={'Content-Type': 'application/json'},
+                                                 data=json.dumps(data))
         resp.raise_for_status()
         return resp.json()
 
@@ -1484,11 +1477,10 @@ en array of protocols
                 "id": id
             }
         }
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/api/cmpdRegBulkLoader/checkFileDependencies".
-                                     format(self.url),
-                                     headers={'Content-Type': "application/json"},
-                                     data=json.dumps(request))
+        resp = self.idempotent_post_session.post("{}/api/cmpdRegBulkLoader/checkFileDependencies".
+                                                 format(self.url),
+                                                 headers={'Content-Type': "application/json"},
+                                                 data=json.dumps(request))
         if resp.text == '"Error"':
             return None
         return resp.json()
@@ -1629,8 +1621,7 @@ en array of protocols
         params = {}
         if nestedfull:
             params = {**params, 'with': 'nestedfull'}
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/api/things/{}/{}/codeNames/jsonArray".
+        resp = self.idempotent_post_session.post("{}/api/things/{}/{}/codeNames/jsonArray".
                                      format(self.url,
                                             ls_type,
                                             ls_kind),
@@ -1723,11 +1714,10 @@ en array of protocols
             ]
         }
 
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post("{}/api/getThingCodeByLabel".
-                                     format(self.url),
-                                     headers={'Content-Type': "application/json"},
-                                     data=json.dumps(request))
+        resp = self.idempotent_post_session.post("{}/api/getThingCodeByLabel".
+                                                 format(self.url),
+                                                 headers={'Content-Type': "application/json"},
+                                                 data=json.dumps(request))
         if resp.status_code == 500:
             return None
         else:
@@ -1858,14 +1848,13 @@ en array of protocols
         if codes_only:
             format = 'codetable'
         params['format'] = format
-        with self._with_retry(UNSAFE_HTTP_METHODS_LIST):
-            resp = self.session.post('{}/api/advancedSearch/things/{}/{}'.
-                                     format(self.url,
-                                            ls_type,
-                                            ls_kind),
-                                     data=json.dumps(request),
-                                     headers={'Content-Type': "application/json"},
-                                     params=params)
+        resp = self.idempotent_post_session.post('{}/api/advancedSearch/things/{}/{}'.
+                                                 format(self.url,
+                                                        ls_type,
+                                                        ls_kind),
+                                                 data=json.dumps(request),
+                                                 headers={'Content-Type': "application/json"},
+                                                 params=params)
         result = resp.json()
         if type(result) is not dict:
             msg = 'Caught error response from {}: {}'.format(

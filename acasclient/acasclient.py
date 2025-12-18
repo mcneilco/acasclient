@@ -331,27 +331,29 @@ class client():
         self.username = creds['username']
         self.password = creds['password']
         self.url = creds['url']
-        self.session = self._create_session(retry=enable_retries, retry_config=retry_config or DEFAULT_RETRY_CONFIG)
-        self.idempotent_post_session = self._create_session(retry=enable_retries, retry_config=retry_config or DEFAULT_IDEMPOTENT_POST_RETRY_CONFIG)
+        self.session = requests.Session()
+        if enable_retries:
+            self._apply_retry_strategy_to_session(self.session, retry_config or DEFAULT_RETRY_CONFIG)
+        self._login_session(self.session)
+        self.idempotent_post_session = requests.Session()
+        self._copy_session_cookies(self.session, self.idempotent_post_session)
+        if enable_retries:
+            self._apply_retry_strategy_to_session(self.idempotent_post_session, retry_config or DEFAULT_IDEMPOTENT_POST_RETRY_CONFIG)
 
     def close(self):
         self.session.close()
+        self.idempotent_post_session.close()
     
-    def _create_session(self, retry=False, retry_config: Retry=None):
-        session = requests.Session()
-
-        if retry:
-            retry_obj = retry_config or Retry(
-                total=DEFAULT_RETRY_COUNT,
-                backoff_factor=DEFAULT_RETRY_BACKOFF_FACTOR,
-                status_forcelist=HTTP_STATUSES_TO_RETRY,
-                allowed_methods=None,
-            )
-            adapter = HTTPAdapter(max_retries=retry_obj)
-            session.mount("https://", adapter)
-            session.mount("http://", adapter)
-        
-        # Login to ACAS
+    def _copy_session_cookies(self, source_session: requests.Session, target_session: requests.Session):
+        for cookie in source_session.cookies:
+            target_session.cookies.set_cookie(cookie)
+    
+    def _apply_retry_strategy_to_session(self, session: requests.Session, retry_config: Retry):
+        adapter = HTTPAdapter(max_retries=retry_config)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+    
+    def _login_session(self, session: requests.Session):
         resp = session.post("{}/login".format(self.url),
                             headers={'Content-Type': 'application/json'},
                             data=json.dumps({
@@ -362,7 +364,6 @@ class client():
         resp.raise_for_status()
         if resp.status_code == 302 and 'location' in resp.headers and resp.headers.get('location') == "/login":
             raise RuntimeError("Failed to login. Please check credentials.")
-        return session
 
     def projects(self):
         """Get projects authorized to user.

@@ -889,6 +889,12 @@ class BaseAcasClientTest(unittest.TestCase):
         with self.assertRaises(requests.HTTPError) as context:
             resp = create_method(code=code, name=name)
         self.assertIn('409 Client Error: Conflict', str(context.exception))
+    
+    def _cleanup_codetable(self, get_method, delete_method, code):
+        codetables = get_method()
+        for ct in codetables:
+            if ct['code'].lower() == code.lower():
+                delete_method(ct['id'])
 
 
     def create_restricted_lot(self, project_code):
@@ -2314,127 +2320,133 @@ class TestAcasclient(BaseAcasClientTest):
         STEREO_CATEGORY = 'TestCategory'
         PHYSICAL_STATE = 'plasma'
         VENDOR = 'Test Vendor'
-        # Setup non-privileged test user
-        user_client =  self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
+        try:
+            # Setup non-privileged test user
+            user_client =  self.create_and_connect_backdoor_user(acas_user=False, acas_admin=False, creg_user=True, creg_admin=False)
 
-        # Create as unprivileged should fail
-        UNAUTH_ERROR = '401 Client Error: Unauthorized'
-        # TODO fix scientist
-        # with self.assertRaises(requests.HTTPError) as context:
-        #     user_client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
-        # self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-           user_client.create_cmpdreg_vendor(VENDOR, VENDOR)
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
+            # Create as unprivileged should fail
+            UNAUTH_ERROR = '401 Client Error: Unauthorized'
+            # TODO fix scientist
+            # with self.assertRaises(requests.HTTPError) as context:
+            #     user_client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
+            # self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.create_cmpdreg_vendor(VENDOR, VENDOR)
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
 
-        # Create as privileged should succeed
-        chemist = self.client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
-        self.assertIsNotNone(chemist.get('id'))
-        stereo_category = self.client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
-        self.assertIsNotNone(stereo_category.get('id'))
-        physical_state = self.client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
-        self.assertIsNotNone(physical_state.get('id'))
-        vendor = self.client.create_cmpdreg_vendor(VENDOR, VENDOR)
-        self.assertIsNotNone(vendor.get('id'))
+            # Create as privileged should succeed
+            chemist = self.client.create_cmpdreg_scientist(CHEMIST, CHEMIST_NAME)
+            self.assertIsNotNone(chemist.get('id'))
+            stereo_category = self.client.create_stereo_category(STEREO_CATEGORY, STEREO_CATEGORY)
+            self.assertIsNotNone(stereo_category.get('id'))
+            physical_state = self.client.create_physical_state(PHYSICAL_STATE, PHYSICAL_STATE)
+            self.assertIsNotNone(physical_state.get('id'))
+            vendor = self.client.create_cmpdreg_vendor(VENDOR, VENDOR)
+            self.assertIsNotNone(vendor.get('id'))
 
-        # Read as unprivileged should succeed
-        chemists = user_client.get_cmpdreg_scientists()
-        self.assertNotEqual(len(chemists), 0)
-        stereo_categories = user_client.get_stereo_categories()
-        self.assertNotEqual(len(stereo_categories), 0)
-        physical_states = user_client.get_physical_states()
-        self.assertNotEqual(len(physical_states), 0)
-        vendors = user_client.get_cmpdreg_vendors()
-        self.assertNotEqual(len(vendors), 0)
+            # Read as unprivileged should succeed
+            chemists = user_client.get_cmpdreg_scientists()
+            self.assertNotEqual(len(chemists), 0)
+            stereo_categories = user_client.get_stereo_categories()
+            self.assertNotEqual(len(stereo_categories), 0)
+            physical_states = user_client.get_physical_states()
+            self.assertNotEqual(len(physical_states), 0)
+            vendors = user_client.get_cmpdreg_vendors()
+            self.assertNotEqual(len(vendors), 0)
 
-        # Read as privileged should also work
-        chemists = self.client.get_cmpdreg_scientists()
-        self.assertIn(CHEMIST, [c['code'] for c in chemists])
-        stereo_categories = self.client.get_stereo_categories()
-        self.assertIn(STEREO_CATEGORY, [c['code'] for c in stereo_categories])
-        physical_states = self.client.get_physical_states()
-        self.assertIn(PHYSICAL_STATE, [s['code'] for s in physical_states])
-        vendors = self.client.get_cmpdreg_vendors()
-        self.assertIn(VENDOR, [v['code'] for v in vendors])
+            # Read as privileged should also work
+            chemists = self.client.get_cmpdreg_scientists()
+            self.assertIn(CHEMIST, [c['code'] for c in chemists])
+            stereo_categories = self.client.get_stereo_categories()
+            self.assertIn(STEREO_CATEGORY, [c['code'] for c in stereo_categories])
+            physical_states = self.client.get_physical_states()
+            self.assertIn(PHYSICAL_STATE, [s['code'] for s in physical_states])
+            vendors = self.client.get_cmpdreg_vendors()
+            self.assertIn(VENDOR, [v['code'] for v in vendors])
 
-        # Setup updated values
-        updated_chemist = chemist.copy()
-        updated_chemist['name'] = 'Updated Chemist'
-        updated_stereo_category = stereo_category.copy()
-        updated_stereo_category['name'] = 'Updated Category'
-        updated_physical_state = physical_state.copy()
-        updated_physical_state['name'] = 'Updated State'
-        updated_vendor = vendor.copy()
-        updated_vendor['name'] = 'Updated Vendor'
+            # Setup updated values
+            updated_chemist = chemist.copy()
+            updated_chemist['name'] = 'Updated Chemist'
+            updated_stereo_category = stereo_category.copy()
+            updated_stereo_category['name'] = 'Updated Category'
+            updated_physical_state = physical_state.copy()
+            updated_physical_state['name'] = 'Updated State'
+            updated_vendor = vendor.copy()
+            updated_vendor['name'] = 'Updated Vendor'
         
-        # Update as unprivileged should fail
-        # with self.assertRaises(requests.HTTPError) as context:
-        #     user_client.update_cmpdreg_scientist(updated_chemist)
-        # self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.update_stereo_category(updated_stereo_category)
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.update_physical_state(updated_physical_state)
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.update_cmpdreg_vendor(updated_vendor)
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
+            # Update as unprivileged should fail
+            # with self.assertRaises(requests.HTTPError) as context:
+            #     user_client.update_cmpdreg_scientist(updated_chemist)
+            # self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.update_stereo_category(updated_stereo_category)
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.update_physical_state(updated_physical_state)
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.update_cmpdreg_vendor(updated_vendor)
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
 
-        # update as privileged should succeed
-        self.client.update_cmpdreg_scientist(updated_chemist)
-        self.client.update_stereo_category(updated_stereo_category)
-        self.client.update_physical_state(updated_physical_state)
-        self.client.update_cmpdreg_vendor(updated_vendor)
-        # Read to confirm values were updated
-        chemists = self.client.get_cmpdreg_scientists()
-        chemist = [c for c in chemists if c['code'] == CHEMIST][0]
-        stereo_categories = self.client.get_stereo_categories()
-        stereo_category = [c for c in stereo_categories if c['code'] == STEREO_CATEGORY][0]
-        physical_states = self.client.get_physical_states()
-        physical_state = [s for s in physical_states if s['code'] == PHYSICAL_STATE][0]
-        vendors = self.client.get_cmpdreg_vendors()
-        vendor = [v for v in vendors if v['code'] == VENDOR][0]
-        self.assertEqual(chemist['name'], updated_chemist['name'])
-        self.assertEqual(stereo_category['name'], updated_stereo_category['name'])
-        self.assertEqual(physical_state['name'], updated_physical_state['name'])
-        self.assertEqual(vendor['name'], updated_vendor['name'])
+            # update as privileged should succeed
+            self.client.update_cmpdreg_scientist(updated_chemist)
+            self.client.update_stereo_category(updated_stereo_category)
+            self.client.update_physical_state(updated_physical_state)
+            self.client.update_cmpdreg_vendor(updated_vendor)
+            # Read to confirm values were updated
+            chemists = self.client.get_cmpdreg_scientists()
+            chemist = [c for c in chemists if c['code'] == CHEMIST][0]
+            stereo_categories = self.client.get_stereo_categories()
+            stereo_category = [c for c in stereo_categories if c['code'] == STEREO_CATEGORY][0]
+            physical_states = self.client.get_physical_states()
+            physical_state = [s for s in physical_states if s['code'] == PHYSICAL_STATE][0]
+            vendors = self.client.get_cmpdreg_vendors()
+            vendor = [v for v in vendors if v['code'] == VENDOR][0]
+            self.assertEqual(chemist['name'], updated_chemist['name'])
+            self.assertEqual(stereo_category['name'], updated_stereo_category['name'])
+            self.assertEqual(physical_state['name'], updated_physical_state['name'])
+            self.assertEqual(vendor['name'], updated_vendor['name'])
 
-        # Test creating duplicates with alternate case, confirm they're rejected
-        CHEMIST = 'Testchemist'
-        STEREO_CATEGORY = 'testcategory'
-        PHYSICAL_STATE = 'plaSma'
-        VENDOR = 'tesT Vendor'
-        self._create_dupe_codetable(self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
-        self._create_dupe_codetable(self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
-        self._create_dupe_codetable(self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
-        self._create_dupe_codetable(self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
+            # Test creating duplicates with alternate case, confirm they're rejected
+            CHEMIST = 'Testchemist'
+            STEREO_CATEGORY = 'testcategory'
+            PHYSICAL_STATE = 'plaSma'
+            VENDOR = 'tesT Vendor'
+            self._create_dupe_codetable(self.client.create_cmpdreg_scientist, CHEMIST, CHEMIST_NAME)
+            self._create_dupe_codetable(self.client.create_stereo_category, STEREO_CATEGORY, STEREO_CATEGORY)
+            self._create_dupe_codetable(self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
+            self._create_dupe_codetable(self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
 
-        # Delete as unprivileged should fail
-        # with self.assertRaises(requests.HTTPError) as context:
-        #    user_client.delete_cmpdreg_scientist(chemist['id'])
-        # self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.delete_stereo_category(stereo_category['id'])
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.delete_physical_state(physical_state['id'])
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
-        with self.assertRaises(requests.HTTPError) as context:
-            user_client.delete_cmpdreg_vendor(vendor['id'])
-        self.assertIn(UNAUTH_ERROR, str(context.exception))
+            # Delete as unprivileged should fail
+            # with self.assertRaises(requests.HTTPError) as context:
+            #    user_client.delete_cmpdreg_scientist(chemist['id'])
+            # self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.delete_stereo_category(stereo_category['id'])
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.delete_physical_state(physical_state['id'])
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
+            with self.assertRaises(requests.HTTPError) as context:
+                user_client.delete_cmpdreg_vendor(vendor['id'])
+            self.assertIn(UNAUTH_ERROR, str(context.exception))
 
-        # Delete as privileged should succeed
-        self.client.delete_cmpdreg_scientist(chemist['id'])
-        self.client.delete_stereo_category(stereo_category['id'])
-        self.client.delete_physical_state(physical_state['id'])
-        self.client.delete_cmpdreg_vendor(vendor['id'])
+            # Delete as privileged should succeed
+            self.client.delete_cmpdreg_scientist(chemist['id'])
+            self.client.delete_stereo_category(stereo_category['id'])
+            self.client.delete_physical_state(physical_state['id'])
+            self.client.delete_cmpdreg_vendor(vendor['id'])
+        finally:
+            self._cleanup_codetable(self.client.get_cmpdreg_scientists, self.client.delete_cmpdreg_scientist, CHEMIST)
+            self._cleanup_codetable(self.client.get_stereo_categories, self.client.delete_stereo_category, STEREO_CATEGORY)
+            self._cleanup_codetable(self.client.get_physical_states, self.client.delete_physical_state, PHYSICAL_STATE)
+            self._cleanup_codetable(self.client.get_cmpdreg_vendors, self.client.delete_cmpdreg_vendor, VENDOR)
   
     @requires_absent_basic_cmpd_reg_load
     def test_047_load_sdf_with_salts(self):

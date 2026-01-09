@@ -4576,34 +4576,6 @@ class TestExperimentLoader(BaseAcasClientTest):
                 "errorLevel": "warning",
                 "message": "A date is not in the proper format. Found: \"5/8/15\" This was interpreted as \"2015-08-05\". Please enter dates as YYYY-MM-DD."
             },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: '126915'. The following numeric parameters were not found: Slope, Min, Max, EC50. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: '126933','126934'. The following numeric parameters were not found: Slope, Max. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: '8788'. The following numeric parameters were not found: Slope. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: '8836'. The following numeric parameters were not found: Min. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: '9629'. The following numeric parameters were not found: EC50. Please provide numeric values for these parameters so that curves are drawn properly."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: 'a','b','c'. The R&#178; is < than the threshold value of 0.9."
-            },
-            {
-                "errorLevel": "warning",
-                "message": "For curve ids: 'f','8806'. The following numeric parameters were not found: Max. Please provide numeric values for these parameters so that curves are drawn properly."
-            }
         ]
         # Pretty json to print messages above if needed for updating tests
         #json.dumps(response['errorMessages'], sort_keys=True, indent=4)

@@ -4391,7 +4391,8 @@ class TestCmpdReg(BaseAcasClientTest):
         # Second response should be empty string returned
         self.assertEqual(preferred_lot_corp_names_response[1]["requestName"], "FAKE")
         self.assertEqual(preferred_lot_corp_names_response[1]["referenceCode"], "")
-    
+
+ 
     @requires_absent_basic_cmpd_reg_load
     def test_015_duplicate_structure_within_file(self):
         """Test loading an SDF with the same structure twice in one file - edge case for summary reporting"""

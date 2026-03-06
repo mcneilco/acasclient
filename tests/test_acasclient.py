@@ -4391,6 +4391,60 @@ class TestCmpdReg(BaseAcasClientTest):
         # Second response should be empty string returned
         self.assertEqual(preferred_lot_corp_names_response[1]["requestName"], "FAKE")
         self.assertEqual(preferred_lot_corp_names_response[1]["referenceCode"], "")
+    
+    @requires_absent_basic_cmpd_reg_load
+    def test_015_duplicate_structure_within_file(self):
+        """Test loading an SDF with the same structure twice in one file - edge case for summary reporting"""
+
+        # Use test file with duplicate structure
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_duplicate_structure_in_file.sdf')
+
+        project_code = self.global_project_code
+        mappings = [
+            {
+                "dbProperty": "Parent Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Parent Corp Name"
+            },
+            {
+                "dbProperty": "Lot Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Corp Name"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": project_code,
+                "required": True,
+                "sdfProperty": "Project Code Name"
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": STEREO_CATEGORY,
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+
+        # Load the SDF with duplicate structures in one session
+        # First structure creates new parent + lot
+        # Second identical structure should create new lot on the newly created parent
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 0", response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        # The second lot should be counted as "New lots of existing compounds"
+        # because the parent was created earlier in THIS SAME bulk load session
+        self.assertIn("New lots of existing compounds: 1", response['summary'])
+        self.assertEqual(0, len(response['results']))
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

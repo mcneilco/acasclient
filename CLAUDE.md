@@ -34,7 +34,7 @@ pip install -r requirements_dev.txt
 
 **CRITICAL**: The ACAS docker-compose stack MUST be running before executing tests.
 
-1. **Start ACAS services** (see [../acas/CLAUDE.md](../acas/CLAUDE.md)):
+1. **Start ACAS services** (see [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md)):
    ```bash
    cd ../acas
    docker-compose up -d
@@ -42,8 +42,8 @@ pip install -r requirements_dev.txt
 
 2. **Wait for services to be ready** (the acas container waits for roo to finish starting):
    ```bash
-   # Wait up to 120 seconds for ACAS API (one-liner)
-   counter=0 && wait=120 && until $(curl --output /dev/null --silent --head --fail http://localhost:3001/api/authors) || [ $counter == $wait ]; do sleep 1; counter=$((counter+1)); done && if [ $counter == $wait ]; then echo "ACAS failed to start" && exit 1; else echo "ACAS started!"; fi
+   # Wait up to 120 seconds for ACAS API (POSIX-safe one-liner)
+   counter=0; wait=120; while ! curl --output /dev/null --silent --head --fail http://localhost:3001/api/authors && [ "$counter" -lt "$wait" ]; do sleep 1; counter=$((counter+1)); done; if [ "$counter" -ge "$wait" ]; then echo "ACAS failed to start"; exit 1; else echo "ACAS started!"; fi
    ```
 
 3. **Activate virtual environment** (REQUIRED before running tests):
@@ -165,8 +165,8 @@ This is the typical workflow when you've modified Java code in acas-roo-server:
 
 4. **Wait for services to be ready**:
    ```bash
-   # Wait for ACAS API (one-liner, up to 120 seconds)
-   counter=0 && wait=120 && until $(curl --output /dev/null --silent --head --fail http://localhost:3001/api/authors) || [ $counter == $wait ]; do sleep 1; counter=$((counter+1)); done && if [ $counter == $wait ]; then echo "ACAS failed to start" && exit 1; else echo "ACAS started!"; fi
+   # Wait for ACAS API (POSIX-safe one-liner, up to 120 seconds)
+   counter=0; wait=120; while ! curl --output /dev/null --silent --head --fail http://localhost:3001/api/authors && [ "$counter" -lt "$wait" ]; do sleep 1; counter=$((counter+1)); done; if [ "$counter" -ge "$wait" ]; then echo "ACAS failed to start"; exit 1; else echo "ACAS started!"; fi
    ```
 
 5. **Activate virtual environment and run tests**:
@@ -276,8 +276,8 @@ docker-compose restart roo
 
 ## Related Documentation
 
-- **Roo Server Build**: [../acas-roo-server/CLAUDE.md](../acas-roo-server/CLAUDE.md)
-- **Docker Compose Setup**: [../acas/CLAUDE.md](../acas/CLAUDE.md)
+- **Roo Server Build**: [CLAUDE.md in acas-roo-server repo](https://github.com/mcneilco/acas-roo-server/blob/master/CLAUDE.md)
+- **Docker Compose Setup**: [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md)
 
 ## Development Tips
 
@@ -297,7 +297,7 @@ cd ../acas-roo-server && \
 
 # Terminal 3: Run tests
 cd ../acasclient && \
-  python -m unittest tests.test_acasclient.TestClient.test_YOUR_TEST -v
+  python -m unittest tests.test_acasclient.TestCmpdReg.test_YOUR_TEST -v
 ```
 
 ### Test Output Verbosity

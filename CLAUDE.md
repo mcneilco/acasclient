@@ -34,39 +34,16 @@ pip install -r requirements_dev.txt
 
 **CRITICAL**: The ACAS docker-compose stack MUST be running before executing tests.
 
-1. **Start ACAS services** (see [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md)):
-   ```bash
-   cd ../acas
-   docker-compose up -d
-   ```
+1. **Start and verify ACAS services** - See [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md) for complete setup instructions (starting services, waiting for readiness, troubleshooting)
 
-2. **Wait for services to be ready** (the acas container waits for roo to finish starting):
+2. **Activate virtual environment** (REQUIRED before running tests):
    ```bash
-   # Wait up to 120 seconds for ACAS API (POSIX-safe one-liner)
-   counter=0; wait=120; while ! curl --output /dev/null --silent --head --fail http://localhost:3001/api/authors && [ "$counter" -lt "$wait" ]; do sleep 1; counter=$((counter+1)); done; if [ "$counter" -ge "$wait" ]; then echo "ACAS failed to start"; exit 1; else echo "ACAS started!"; fi
-   ```
-
-3. **Activate virtual environment** (REQUIRED before running tests):
-   ```bash
-   cd ../acasclient
    source .venv/bin/activate  # On macOS/Linux
    # or
    .venv\Scripts\activate  # On Windows
    ```
 
-4. **Verify services are healthy** (optional):
-   ```bash
-   # Check all services are running
-   docker-compose ps
-
-   # Test Node API endpoint (default: http://localhost:3001)
-   curl http://localhost:3001/api/healthcheck
-
-   # Test Roo backend (default: http://localhost:8080)
-   curl http://localhost:8080/acas/api/healthcheck
-   ```
-
-5. **Configure credentials** (if needed):
+3. **Configure credentials** (if needed):
    - Tests use `tests/test_acasclient/test_000_creds_from_file_credentials`
    - Default credentials should work with fresh docker-compose stack
 
@@ -132,60 +109,18 @@ Tests connect to:
 
 ## Common Test Workflows
 
-### After Making Changes to Roo Server
+### After Making Changes to Backend Code
 
-This is the typical workflow when you've modified Java code in acas-roo-server:
+If you've modified code in acas-roo-server:
 
-1. **Build new roo Docker image**:
+1. **Rebuild and deploy** - See [CLAUDE.md in acas-roo-server repo](https://github.com/mcneilco/acas-roo-server/blob/master/CLAUDE.md) for build instructions and [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md) for docker-compose deployment
+
+2. **Run tests** to verify your changes:
    ```bash
-   cd ../acas-roo-server
-   docker build --build-arg CHEMISTRY_PACKAGE=indigo -t mcneilco/acas-roo-server-oss:dev -f Dockerfile-multistage .
-   ```
-
-   **Note**: The `--build-arg CHEMISTRY_PACKAGE=indigo` is required for local development to match docker-compose configuration.
-
-2. **Update docker-compose to use new image**:
-   ```bash
-   cd ../acas
-   # Edit docker-compose.yml to change roo service image to :dev
-   # OR create docker-compose.override.yml (preferred)
-   ```
-
-3. **Restart services**:
-   ```bash
-   # Quick restart (preserves database)
-   docker-compose restart roo
-
-   # Full restart (preserves database)
-   docker-compose down && docker-compose up -d
-
-   # Clean restart with fresh database (DESTRUCTIVE - loses all data)
-   docker-compose down -v && docker-compose up -d
-   ```
-
-4. **Wait for services to be ready**:
-   ```bash
-   # Wait for ACAS API (POSIX-safe one-liner, up to 120 seconds)
-   counter=0; wait=120; while ! curl --output /dev/null --silent --head --fail http://localhost:3001/api/authors && [ "$counter" -lt "$wait" ]; do sleep 1; counter=$((counter+1)); done; if [ "$counter" -ge "$wait" ]; then echo "ACAS failed to start"; exit 1; else echo "ACAS started!"; fi
-   ```
-
-5. **Activate virtual environment and run tests**:
-   ```bash
-   cd ../acasclient
+   cd acasclient
    source .venv/bin/activate  # Required before running tests
    python -m unittest discover -s . -p "test_*.py" -v
    ```
-
-### Testing Specific Bulk Loader Changes
-
-If you've changed bulk loader code (like the summary reporting):
-
-```bash
-# Run tests related to SDF registration and bulk loading
-python -m unittest tests.test_acasclient.TestAcasclient.test_006_register_sdf -v
-python -m unittest tests.test_acasclient.TestCmpdReg.test_013_unique_parent_alias_tests -v
-python -m unittest tests.test_acasclient.TestCmpdReg.test_015_duplicate_structure_within_file -v
-```
 
 ### Adding New Tests
 
@@ -213,66 +148,17 @@ The test suite covers:
 
 ## Troubleshooting
 
-### Tests Fail Immediately
+### Connection or Service Issues
 
-**Problem**: Connection refused or 404 errors
+**Problem**: Tests fail with connection errors, timeouts, or 404s
 
-**Solution**: Ensure docker-compose services are running
-```bash
-cd ../acas
-docker-compose ps  # All services should be "Up"
-docker-compose logs roo  # Check for startup errors
-```
-
-### Tests Timeout
-
-**Problem**: Tests hang or timeout after ~30 seconds
-
-**Solution**: Services may be overloaded or still starting
-```bash
-# Check service health
-curl http://localhost:3001/api/healthcheck
-curl http://localhost:8080/acas
-
-# Restart services with more memory
-docker-compose down
-# Edit docker-compose.yml to increase CATALINA_OPTS memory settings
-docker-compose up -d
-```
+**Solution**: See [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md) for troubleshooting docker-compose services
 
 ### Database State Issues
 
 **Problem**: Tests fail due to existing data or constraints
 
-**Solution**: Reset database (DESTRUCTIVE - loses all data)
-```bash
-cd ../acas
-docker-compose down -v  # Removes volumes
-docker-compose up -d
-# Wait for services to initialize
-cd ../acasclient
-python -m unittest discover -s . -p "test_*.py" -v
-```
-
-### Specific Test Failures
-
-**Problem**: Only certain tests fail (e.g., bulk loader tests)
-
-**Solution**: Check if your roo changes are properly deployed
-```bash
-# Verify you're using the correct image
-cd ../acas
-docker-compose images | grep roo
-
-# Check roo logs for Java exceptions
-docker-compose logs roo | grep -i exception
-
-# Rebuild and redeploy
-cd ../acas-roo-server
-docker build -t mcneilco/acas-roo-server-oss:dev -f Dockerfile-multistage .
-cd ../acas
-docker-compose restart roo
-```
+**Solution**: Reset database for clean test run (see [acas CLAUDE.md](https://github.com/mcneilco/acas/blob/master/CLAUDE.md) for `docker compose down -v` command)
 
 ## Related Documentation
 
@@ -280,25 +166,6 @@ docker-compose restart roo
 - **Docker Compose Setup**: [CLAUDE.md in acas repo](https://github.com/mcneilco/acas/blob/master/CLAUDE.md)
 
 ## Development Tips
-
-### Fast Iteration Loop
-
-For rapid testing during development:
-
-```bash
-# Terminal 1: Watch roo logs
-cd ../acas && docker-compose logs -f roo
-
-# Terminal 2: Rebuild and restart roo after code changes
-cd ../acas-roo-server && \
-  docker build --build-arg CHEMISTRY_PACKAGE=indigo -t mcneilco/acas-roo-server-oss:dev -f Dockerfile-multistage . && \
-  cd ../acas && \
-  docker-compose restart roo
-
-# Terminal 3: Run tests
-cd ../acasclient && \
-  python -m unittest tests.test_acasclient.TestCmpdReg.test_YOUR_TEST -v
-```
 
 ### Test Output Verbosity
 

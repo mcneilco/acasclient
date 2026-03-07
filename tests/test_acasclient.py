@@ -4394,18 +4394,11 @@ class TestCmpdReg(BaseAcasClientTest):
 
 
     @requires_absent_basic_cmpd_reg_load
-    def test_016_ACAS_890_duplicate_lot_with_matching_lot_number(self):
-        """Test ACAS-890: Duplicate lot with matching lot number should show informative error, not generic 'Internal error'"""
-
-        # This reproduces the exact scenario from ACAS-890:
-        # 1. First load creates parent + lot 1
-        # 2. Second load tries to create duplicate with same structure + stereo category AND same lot number
-        # Expected: informative error with Lot Corp Name
-        # Bug: generic "Internal error encountered. Please contact your administrator."
-
+    def test_016_duplicate_lot_with_matching_lot_number(self):
+        """Duplicate lot with matching lot number should show informative error, not generic 'Internal error'"""
+        
         file = Path(__file__).resolve().parent.joinpath(
             'test_acasclient', 'test_simple_mol.sdf')
-
         project_code = self.global_project_code
         mappings = [
             {
@@ -4436,50 +4429,37 @@ class TestCmpdReg(BaseAcasClientTest):
 
         # STEP 1: Load the SDF first time to create parent + lot 1
         response1 = self.client.register_sdf(file, "bob", mappings, dry_run=False)
-        self.assertEqual(0, len(response1.get('results', [])), "First load should succeed without errors")
-
-        # Get the lot corp name that was created
-        first_lot_corp_name = response1.get('summary', '').split('CMPD-')[1].split('<')[0] if 'CMPD-' in response1.get('summary', '') else None
-
+        # Parse the response to get the lot corp name that was created
+        first_lot_corp_name = None
+        registered_sdf = [f for f in response1['report_files'] if '_registered.sdf' in f['name']][0]
+        first_lot_corp_name = registered_sdf['parsed_content'][0].get('properties', {}).get('Registered Lot Corp Name')
+        self.assertIsNotNone(first_lot_corp_name, "Could not find Registered Lot Corp Name in response after first load")
         # STEP 2: Try to load the SAME structure with the SAME lot number AND SAME LOT CORP NAME
-        # This should trigger a database unique constraint violation during persist()
-        # which falls through to the generic error handler
-
-        # Add explicit Lot Corp Name to mappings to trigger database constraint violation
+        # Add explicit Lot Corp Name to mappings to trigger database constraint violation on lot corp name
         mappings_with_lot_corp_name = mappings.copy()
         mappings_with_lot_corp_name.append({
             "dbProperty": "Lot Corp Name",
-            "defaultVal": f"CMPD-{first_lot_corp_name}" if first_lot_corp_name else "CMPD-0000001-001",
+            "defaultVal": first_lot_corp_name,
             "required": False,
             "sdfProperty": None
         })
 
         response = self.client.register_sdf(file, "bob", mappings_with_lot_corp_name, dry_run=False)
-
-        # BEFORE FIX: This test should fail with generic "Internal error encountered. Please contact your administrator."
-        # AFTER FIX: Should show informative error like "Duplicate lot found: CMPD-0000001-001. Duplicate lot cannot be registered..."
-
         self.assertIn('results', response)
         self.assertGreater(len(response['results']), 0, "Expected error results for duplicate lot")
-
-        # Check that we got an informative error (not a generic "Internal error")
-        error_found = False
-        informative_error_found = False
-        for result in response['results']:
-            if result['level'] == 'error':
-                error_found = True
-                error_message = result['message'].lower()
-
-                # Check if error is the generic one (this is the BUG)
-                if 'internal error encountered' in error_message:
-                    self.fail(f"Got generic 'Internal error' instead of informative duplicate lot error. Full message: {result['message']}")
-
-                # Check if error is informative (mentions duplicate lot)
-                if 'duplicate lot' in error_message or 'duplicate' in error_message:
-                    informative_error_found = True
-
-        self.assertTrue(error_found, "Expected to find an error result")
-        self.assertTrue(informative_error_found, "Expected informative duplicate lot error message, not generic error")
+        # Check that the results have a "DupeLot" category error
+        err_result = response['results'][0]
+        self.assertEqual(err_result['level'], 'error', "Expected an error level result for duplicate lot")
+        self.assertEqual(err_result['categoryCode'], 'DupeLot', "Expected error categoryCode to be 'DupeLot' for duplicate lot error")
+        # errors.sdf should contain 'Error': 'Duplicate lot cannot be registered' and 'Lot Corp name in DB': first_lot_corp_name
+        errors_sdf = [f for f in response['report_files'] if '_errors.sdf' in f['name']][0]
+        error_sdf_content = errors_sdf['parsed_content']
+        self.assertGreater(len(error_sdf_content), 0, "Expected at least one entry in errors.sdf for duplicate lot")
+        error_entry = error_sdf_content[0]
+        self.assertIn('Error', error_entry['properties'], "Expected 'Error' property in errors.sdf entry for duplicate lot")
+        self.assertIn('Lot Corp Name in DB', error_entry['properties'], "Expected 'Lot Corp Name in DB' property in errors.sdf entry for duplicate lot")
+        self.assertIn('Duplicate lot cannot be registered', error_entry['properties']['Error'], "Expected error message to indicate duplicate lot cannot be registered")
+        self.assertEqual(error_entry['properties']['Lot Corp Name in DB'], first_lot_corp_name, "Expected 'Lot Corp Name in DB' in errors.sdf to match the corp name of the lot that caused the duplicate error")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

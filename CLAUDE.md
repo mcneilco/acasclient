@@ -8,7 +8,7 @@ This is the Python client library and test suite for ACAS. It provides a program
 
 - **Language**: Python 3.5+
 - **Test Framework**: unittest
-- **Dependencies**: requests, pandas, openpyxl, xlrd
+- **Dependencies**: requests, pandas, openpyxl, xlrd, six, decorator
 
 ## Installation
 
@@ -74,7 +74,7 @@ python -m unittest tests.test_acasclient.TestAcasclient.test_006_register_sdf -v
 make test
 
 # Run with coverage
-make test-all
+make coverage
 ```
 
 ## Test Structure

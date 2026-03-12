@@ -1,6 +1,7 @@
 """Main module."""
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime, timezone
 import requests
 import logging
 import os
@@ -1438,6 +1439,69 @@ en array of protocols
                                 .format(self.url, quote(query, safe='')),
                                 params=params)
 
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_experiments(self, page=None, page_size=None, sort_by=None,
+                        sort_order=None, recorded_by=None,
+                        protocol_code=None, date_from=None,
+                        date_to=None):
+        """Get experiments from the paginated endpoint.
+
+        This endpoint is always paginated by the server. All query arguments
+        in this method are optional filters/sort/pagination overrides.
+
+        Args:
+            page (int): Zero-based page index override
+            page_size (int): Number of records per page override
+            sort_by (str): Field to sort by
+            sort_order (str): Sort direction (for example: ``asc`` or ``desc``)
+            recorded_by (str): Username of experiment creator
+            protocol_code (str): Protocol code to filter experiments by
+            date_from (int | datetime.date | datetime.datetime | str):
+                Start date filter. Date/datetime inputs are converted to epoch
+                milliseconds.
+            date_to (int | datetime.date | datetime.datetime | str):
+                End date filter. Date/datetime inputs are converted to epoch
+                milliseconds.
+
+        Returns:
+            dict: Result payload from ACAS node API.
+        """
+
+        def normalize_query_date(value):
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                dt = value
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return int(dt.timestamp() * 1000)
+            if isinstance(value, date):
+                dt = datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+                return int(dt.timestamp() * 1000)
+            return value
+
+        params = {}
+        if page is not None:
+            params['page'] = page
+        if page_size is not None:
+            params['pageSize'] = page_size
+        if sort_by is not None:
+            params['sortBy'] = sort_by
+        if sort_order is not None:
+            params['sortOrder'] = sort_order
+        if recorded_by is not None:
+            params['recordedBy'] = recorded_by
+        if protocol_code is not None:
+            params['protocolCode'] = protocol_code
+        if date_from is not None:
+            params['dateFrom'] = normalize_query_date(date_from)
+        if date_to is not None:
+            params['dateTo'] = normalize_query_date(date_to)
+
+        resp = self.session.get("{}/api/experiments/paginated".format(self.url),
+                                params=params)
         resp.raise_for_status()
         return resp.json()
 

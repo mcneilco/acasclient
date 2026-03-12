@@ -22,7 +22,7 @@ from acasclient.selfile import Generic
 from collections import Counter
 
 # Import project ls thing
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 # Constants
 from tests.project_thing import (
     NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, ACTIVE, PROJECT_NAME,
@@ -302,7 +302,7 @@ def requires_basic_cmpd_reg_load(func):
     Decorator to load the basic cmpdreg data if it is not already loaded
     """
     @wraps(func)
-    def wrapper(self):
+    def wrapper(self, *args, **kwargs):
         if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
             # Delete everything to be safe
             delete_all_lots_and_experiments(self)
@@ -311,7 +311,7 @@ def requires_basic_cmpd_reg_load(func):
             self.assertIn('New compounds: 2', response['summary'])
             if self.client.get_meta_lot('CMPD-0000001-001') is None or self.client.get_meta_lot('CMPD-0000002-001') is None:
                 raise AssertionError(f"Expected compound lots were not found after basic_cmpd_reg_load. Something has gone seriously wrong! Bulk load response: {response}")
-        return func(self)
+        return func(self, *args, **kwargs)
     return wrapper
 
 def requires_absent_basic_cmpd_reg_load(func):
@@ -319,9 +319,9 @@ def requires_absent_basic_cmpd_reg_load(func):
     Decorator to load the basic cmpdreg data if it is not already loaded
     """
     @wraps(func)
-    def wrapper(self):
+    def wrapper(self, *args, **kwargs):
         delete_all_lots_and_experiments(self)
-        return func(self)   
+        return func(self, *args, **kwargs)
     return wrapper
 
 def requires_basic_experiment_load(func):
@@ -2978,6 +2978,162 @@ class TestAcasclient(BaseAcasClientTest):
         expt = self.client.get_experiment_by_name(experiment_name)
         res = [x for x in res if x['ignored'] is False]
         self.assertEqual(len(res), 1)
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def _setup_restricted_experiment_for_access_tests(self, project=None, protocol_name=None, experiment_name=None):
+        """Create one restricted-project experiment and return identifiers for ACL tests."""
+        if project is None:
+            project = self.create_basic_project_with_roles()
+
+        unique_suffix = str(uuid.uuid4())
+        if protocol_name is None:
+            protocol_name = f"Protocol-{unique_suffix}"
+        if experiment_name is None:
+            experiment_name = f"Experiment-{unique_suffix}"
+
+        file_to_upload = get_basic_experiment_load_file(
+            self.tempdir,
+            project_code=project.names[PROJECT_NAME],
+            protocol_name=protocol_name,
+            experiment_name=experiment_name,
+        )
+        response = self.client.experiment_loader(file_to_upload, "bob", False)
+        restricted_experiment_code = response['results']['experimentCode']
+        restricted_experiment = self.client.get_experiment_by_code(restricted_experiment_code)
+        restricted_protocol_code = restricted_experiment['protocol']['codeName']
+
+        return project, restricted_experiment_code, restricted_protocol_code, protocol_name
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_058_get_experiments(self):
+        """Test get_experiments visibility and filters with project ACLs."""
+        project, restricted_experiment_code_one, restricted_protocol_code, restricted_protocol_name = self._setup_restricted_experiment_for_access_tests()
+        _, restricted_experiment_code_two, _, _ = self._setup_restricted_experiment_for_access_tests(
+            project=project,
+            protocol_name=restricted_protocol_name,
+        )
+        expected_codes = {restricted_experiment_code_one, restricted_experiment_code_two}
+
+        def result_codes(response):
+            return [result['codeName'] for result in response.get('results', [])]
+
+        # Admin sees the experiment and can filter by protocol/recordedBy.
+        admin_results = self.client.get_experiments(page=0, page_size=100)
+        self.assertIn('results', admin_results)
+        self.assertIn('totalRecords', admin_results)
+        self.assertIn('totalPages', admin_results)
+        self.assertIn(restricted_experiment_code_one, result_codes(admin_results))
+        self.assertIn(restricted_experiment_code_two, result_codes(admin_results))
+
+        admin_protocol_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+        )
+        self.assertEqual(set(result_codes(admin_protocol_filtered)), expected_codes)
+
+        admin_recorded_by_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            recorded_by="bob",
+        )
+        self.assertIn(restricted_experiment_code_one, result_codes(admin_recorded_by_filtered))
+        self.assertIn(restricted_experiment_code_two, result_codes(admin_recorded_by_filtered))
+
+        admin_fake_recorded_by_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            recorded_by="FAKE_USER",
+        )
+        self.assertNotIn(restricted_experiment_code_one, result_codes(admin_fake_recorded_by_filtered))
+        self.assertNotIn(restricted_experiment_code_two, result_codes(admin_fake_recorded_by_filtered))
+
+        admin_no_match_protocol = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code="FAKE_PROTOCOL",
+        )
+        self.assertNotIn(restricted_experiment_code_one, result_codes(admin_no_match_protocol))
+        self.assertNotIn(restricted_experiment_code_two, result_codes(admin_no_match_protocol))
+
+        # Verify sort order and page size can produce different top results.
+        asc_page_one = self.client.get_experiments(
+            page=0,
+            page_size=1,
+            protocol_code=restricted_protocol_code,
+            sort_by="codeName",
+            sort_order="asc",
+        )
+        desc_page_one = self.client.get_experiments(
+            page=0,
+            page_size=1,
+            protocol_code=restricted_protocol_code,
+            sort_by="codeName",
+            sort_order="desc",
+        )
+        self.assertEqual(len(result_codes(asc_page_one)), 1)
+        self.assertEqual(len(result_codes(desc_page_one)), 1)
+        self.assertNotEqual(result_codes(asc_page_one)[0], result_codes(desc_page_one)[0])
+        self.assertIn(result_codes(asc_page_one)[0], expected_codes)
+        self.assertIn(result_codes(desc_page_one)[0], expected_codes)
+
+        # Verify broad datetime range includes both experiments.
+        admin_date_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            date_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+            date_to=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        self.assertIn(restricted_experiment_code_one, result_codes(admin_date_filtered))
+        self.assertIn(restricted_experiment_code_two, result_codes(admin_date_filtered))
+
+        # Verify precise date filtering against the actual experiment timestamps.
+        expt_one = self.client.get_experiment_by_code(restricted_experiment_code_one)
+        expt_one_ts = expt_one.get('modifiedDate') or expt_one.get('recordedDate')
+
+        self.assertIsNotNone(expt_one_ts)
+
+        expt_one_dt = datetime.fromtimestamp(expt_one_ts / 1000, tz=timezone.utc)
+        expt_one_only = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+            date_from=expt_one_dt,
+            date_to=expt_one_dt,
+        )
+        self.assertIn(restricted_experiment_code_one, result_codes(expt_one_only))
+        self.assertNotIn(restricted_experiment_code_two, result_codes(expt_one_only))
+
+        # User with no restricted-project access should not see it in results.
+        user_without_project_access = self.create_and_connect_backdoor_user(
+            acas_user=True,
+            acas_admin=False,
+            creg_user=False,
+            creg_admin=False,
+        )
+        no_access_results = user_without_project_access.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+        )
+        self.assertNotIn(restricted_experiment_code_one, result_codes(no_access_results))
+        self.assertNotIn(restricted_experiment_code_two, result_codes(no_access_results))
+
+        user_with_project_access = self.create_and_connect_backdoor_user(
+            acas_user=True,
+            acas_admin=False,
+            creg_user=False,
+            creg_admin=False,
+            project_names=[project.names[PROJECT_NAME]],
+        )
+        with_access_results = user_with_project_access.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+        )
+        self.assertEqual(set(result_codes(with_access_results)), expected_codes)
 
 
 

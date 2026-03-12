@@ -1505,20 +1505,6 @@ en array of protocols
         resp.raise_for_status()
         return resp.json()
 
-    def get_paginated_experiments(self, page=None, page_size=None, sort_by=None,
-                                  sort_order=None, recorded_by=None,
-                                  protocol_code=None, date_from=None,
-                                  date_to=None):
-        """Backward-compatible alias for :meth:`get_experiments`."""
-        return self.get_experiments(page=page,
-                                    page_size=page_size,
-                                    sort_by=sort_by,
-                                    sort_order=sort_order,
-                                    recorded_by=recorded_by,
-                                    protocol_code=protocol_code,
-                                    date_from=date_from,
-                                    date_to=date_to)
-
     def get_cmpdreg_bulk_load_files(self):
         """Get cmpdreg bulk load files
 

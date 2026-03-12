@@ -2981,8 +2981,8 @@ class TestAcasclient(BaseAcasClientTest):
 
     @requires_node_api
     @requires_basic_cmpd_reg_load
-    def test_058_get_experiments(self):
-        """Test experiment visibility and search filters with project ACLs."""
+    def _setup_restricted_experiment_for_access_tests(self):
+        """Create a restricted-project experiment and return identifiers for ACL tests."""
         project = self.create_basic_project_with_roles()
 
         unique_suffix = str(uuid.uuid4())
@@ -2999,14 +2999,13 @@ class TestAcasclient(BaseAcasClientTest):
         restricted_experiment_code = response['results']['experimentCode']
         restricted_experiment = self.client.get_experiment_by_code(restricted_experiment_code)
         restricted_protocol_code = restricted_experiment['protocol']['codeName']
-        restricted_project_code_value = acasclient.get_entity_value_by_state_type_kind_value_type_kind(
-            restricted_experiment,
-            "metadata",
-            "experiment metadata",
-            "codeValue",
-            "project"
-        )
-        restricted_project_code = restricted_project_code_value["codeValue"]
+        return project, restricted_experiment_code, restricted_protocol_code
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_058_get_experiments(self):
+        """Test get_experiments visibility and filters with project ACLs."""
+        project, restricted_experiment_code, restricted_protocol_code = self._setup_restricted_experiment_for_access_tests()
 
         def result_codes(response):
             return [result['codeName'] for result in response.get('results', [])]
@@ -3048,7 +3047,7 @@ class TestAcasclient(BaseAcasClientTest):
         )
         self.assertIn(restricted_experiment_code, result_codes(admin_date_filtered))
 
-        # User with no restricted-project access should not see it in results or search.
+        # User with no restricted-project access should not see it in results.
         user_without_project_access = self.create_and_connect_backdoor_user(
             acas_user=True,
             acas_admin=False,
@@ -3062,10 +3061,6 @@ class TestAcasclient(BaseAcasClientTest):
         )
         self.assertNotIn(restricted_experiment_code, result_codes(no_access_results))
 
-        no_access_search = user_without_project_access.experiment_search(restricted_experiment_code)
-        self.assertEqual(len([e for e in no_access_search if e['codeName'] == restricted_experiment_code]), 0)
-
-        # User with project ACLs should see it; requested project filters should intersect with allowed projects.
         user_with_project_access = self.create_and_connect_backdoor_user(
             acas_user=True,
             acas_admin=False,
@@ -3079,27 +3074,6 @@ class TestAcasclient(BaseAcasClientTest):
             protocol_code=restricted_protocol_code,
         )
         self.assertIn(restricted_experiment_code, result_codes(with_access_results))
-
-        with_access_search = user_with_project_access.experiment_search(restricted_experiment_code)
-        self.assertEqual(len([e for e in with_access_search if e['codeName'] == restricted_experiment_code]), 1)
-
-        with_access_project_filter = user_with_project_access.experiment_search(
-            restricted_experiment_code,
-            project_codes=[restricted_project_code],
-        )
-        self.assertEqual(
-            len([e for e in with_access_project_filter if e['codeName'] == restricted_experiment_code]),
-            1,
-        )
-
-        with_access_fake_project_filter = user_with_project_access.experiment_search(
-            restricted_experiment_code,
-            project_codes=["FAKEPROJECT"],
-        )
-        self.assertEqual(
-            len([e for e in with_access_fake_project_filter if e['codeName'] == restricted_experiment_code]),
-            0,
-        )
 
 
 

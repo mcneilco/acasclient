@@ -3042,6 +3042,14 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn(restricted_experiment_code_one, result_codes(admin_recorded_by_filtered))
         self.assertIn(restricted_experiment_code_two, result_codes(admin_recorded_by_filtered))
 
+        admin_fake_recorded_by_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            recorded_by="FAKE_USER",
+        )
+        self.assertNotIn(restricted_experiment_code_one, result_codes(admin_fake_recorded_by_filtered))
+        self.assertNotIn(restricted_experiment_code_two, result_codes(admin_fake_recorded_by_filtered))
+
         admin_no_match_protocol = self.client.get_experiments(
             page=0,
             page_size=100,

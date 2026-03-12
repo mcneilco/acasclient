@@ -22,7 +22,7 @@ from acasclient.selfile import Generic
 from collections import Counter
 
 # Import project ls thing
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 # Constants
 from tests.project_thing import (
     NAME_KEY, IS_RESTRICTED_KEY, STATUS_KEY, START_DATE_KEY, ACTIVE, PROJECT_NAME,
@@ -2978,6 +2978,128 @@ class TestAcasclient(BaseAcasClientTest):
         expt = self.client.get_experiment_by_name(experiment_name)
         res = [x for x in res if x['ignored'] is False]
         self.assertEqual(len(res), 1)
+
+    @requires_node_api
+    @requires_basic_cmpd_reg_load
+    def test_058_get_experiments(self):
+        """Test experiment visibility and search filters with project ACLs."""
+        project = self.create_basic_project_with_roles()
+
+        unique_suffix = str(uuid.uuid4())
+        protocol_name = f"Protocol-{unique_suffix}"
+        experiment_name = f"Experiment-{unique_suffix}"
+
+        file_to_upload = get_basic_experiment_load_file(
+            self.tempdir,
+            project_code=project.names[PROJECT_NAME],
+            protocol_name=protocol_name,
+            experiment_name=experiment_name,
+        )
+        response = self.client.experiment_loader(file_to_upload, "bob", False)
+        restricted_experiment_code = response['results']['experimentCode']
+        restricted_experiment = self.client.get_experiment_by_code(restricted_experiment_code)
+        restricted_protocol_code = restricted_experiment['protocol']['codeName']
+        restricted_project_code_value = acasclient.get_entity_value_by_state_type_kind_value_type_kind(
+            restricted_experiment,
+            "metadata",
+            "experiment metadata",
+            "codeValue",
+            "project"
+        )
+        restricted_project_code = restricted_project_code_value["codeValue"]
+
+        def result_codes(response):
+            return [result['codeName'] for result in response.get('results', [])]
+
+        # Admin sees the experiment and can filter by protocol/recordedBy.
+        admin_results = self.client.get_experiments(page=0, page_size=100)
+        self.assertIn('results', admin_results)
+        self.assertIn('totalRecords', admin_results)
+        self.assertIn('totalPages', admin_results)
+        self.assertIn(restricted_experiment_code, result_codes(admin_results))
+
+        admin_protocol_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+        )
+        self.assertIn(restricted_experiment_code, result_codes(admin_protocol_filtered))
+
+        admin_recorded_by_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            recorded_by="bob",
+        )
+        self.assertIn(restricted_experiment_code, result_codes(admin_recorded_by_filtered))
+
+        admin_no_match_protocol = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code="FAKE_PROTOCOL",
+        )
+        self.assertNotIn(restricted_experiment_code, result_codes(admin_no_match_protocol))
+
+        # Verify datetime inputs are accepted and converted for date filters.
+        admin_date_filtered = self.client.get_experiments(
+            page=0,
+            page_size=100,
+            date_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+            date_to=datetime.now(timezone.utc) + timedelta(days=1),
+        )
+        self.assertIn(restricted_experiment_code, result_codes(admin_date_filtered))
+
+        # User with no restricted-project access should not see it in results or search.
+        user_without_project_access = self.create_and_connect_backdoor_user(
+            acas_user=True,
+            acas_admin=False,
+            creg_user=False,
+            creg_admin=False,
+        )
+        no_access_results = user_without_project_access.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+        )
+        self.assertNotIn(restricted_experiment_code, result_codes(no_access_results))
+
+        no_access_search = user_without_project_access.experiment_search(restricted_experiment_code)
+        self.assertEqual(len([e for e in no_access_search if e['codeName'] == restricted_experiment_code]), 0)
+
+        # User with project ACLs should see it; requested project filters should intersect with allowed projects.
+        user_with_project_access = self.create_and_connect_backdoor_user(
+            acas_user=True,
+            acas_admin=False,
+            creg_user=False,
+            creg_admin=False,
+            project_names=[project.names[PROJECT_NAME]],
+        )
+        with_access_results = user_with_project_access.get_experiments(
+            page=0,
+            page_size=100,
+            protocol_code=restricted_protocol_code,
+        )
+        self.assertIn(restricted_experiment_code, result_codes(with_access_results))
+
+        with_access_search = user_with_project_access.experiment_search(restricted_experiment_code)
+        self.assertEqual(len([e for e in with_access_search if e['codeName'] == restricted_experiment_code]), 1)
+
+        with_access_project_filter = user_with_project_access.experiment_search(
+            restricted_experiment_code,
+            project_codes=[restricted_project_code],
+        )
+        self.assertEqual(
+            len([e for e in with_access_project_filter if e['codeName'] == restricted_experiment_code]),
+            1,
+        )
+
+        with_access_fake_project_filter = user_with_project_access.experiment_search(
+            restricted_experiment_code,
+            project_codes=["FAKEPROJECT"],
+        )
+        self.assertEqual(
+            len([e for e in with_access_fake_project_filter if e['codeName'] == restricted_experiment_code]),
+            0,
+        )
 
 
 

@@ -4548,6 +4548,138 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(preferred_lot_corp_names_response[1]["requestName"], "FAKE")
         self.assertEqual(preferred_lot_corp_names_response[1]["referenceCode"], "")
 
+ 
+    @requires_absent_basic_cmpd_reg_load
+    def test_015_duplicate_structure_within_file(self):
+        """Test loading an SDF with the same structure twice in one file - edge case for summary reporting"""
+
+        # Use test file with duplicate structure
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_duplicate_structure_in_file.sdf')
+
+        project_code = self.global_project_code
+        mappings = [
+            {
+                "dbProperty": "Parent Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Parent Corp Name"
+            },
+            {
+                "dbProperty": "Lot Corp Name",
+                "defaultVal": None,
+                "required": False,
+                "sdfProperty": "Lot Corp Name"
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": project_code,
+                "required": True,
+                "sdfProperty": "Project Code Name"
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": STEREO_CATEGORY,
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+
+        # Load the SDF with duplicate structures in one session
+        # First structure creates new parent + lot
+        # Second identical structure should create new lot on the newly created parent
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn("Number of entries processed: 2", response['summary'])
+        self.assertIn("Number of entries with error: 0", response['summary'])
+        self.assertIn('New compounds: 1', response['summary'])
+        # The second lot should be counted as "New lots of existing compounds"
+        # because the parent was created earlier in THIS SAME bulk load session
+        self.assertIn("New lots of existing compounds: 1", response['summary'])
+        self.assertEqual(0, len(response['results']))
+    
+    @requires_absent_basic_cmpd_reg_load
+    def test_016_duplicate_lot_in_same_file_with_matching_lot_number(self):
+        """ACAS-890: Duplicate lot with matching large lot number should show informative error, not generic 'Internal error'"""
+        
+        file = Path(__file__).resolve().parent.joinpath(
+            'test_acasclient', 'test_duplicate_structure_in_file.sdf')
+        project_code = self.global_project_code
+        mappings = [
+            {
+                "dbProperty": "Lot Number",
+                "defaultVal": "1001",  # Explicitly set lot number to large number
+                "required": False,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": project_code,
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": STEREO_CATEGORY,
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        self.assertIn('results', response)
+        self.assertGreater(len(response['results']), 0, "Expected error results for duplicate lot")
+        # Check that the results have a "DupeLot" category error
+        err_result = response['results'][0]
+        self.assertEqual(err_result['level'], 'error', "Expected an error level result for duplicate lot")
+        self.assertEqual(err_result['categoryCode'], 'DupeLot', "Expected error categoryCode to be 'DupeLot' for duplicate lot error")
+        # errors.sdf should contain 'Error': 'Duplicate lot cannot be registered' and 'Lot Corp name in DB': first_lot_corp_name
+        errors_sdf = [f for f in response['report_files'] if '_errors.sdf' in f['name']][0]
+        error_sdf_content = errors_sdf['parsed_content']
+        self.assertGreater(len(error_sdf_content), 0, "Expected at least one entry in errors.sdf for duplicate lot")
+        error_entry = error_sdf_content[0]
+        self.assertIn('Error', error_entry['properties'], "Expected 'Error' property in errors.sdf entry for duplicate lot")
+        self.assertIn('Lot Corp Name in DB', error_entry['properties'], "Expected 'Lot Corp Name in DB' property in errors.sdf entry for duplicate lot")
+        self.assertIn('Duplicate lot cannot be registered', error_entry['properties']['Error'], "Expected error message to indicate duplicate lot cannot be registered")
+
+    @requires_basic_cmpd_reg_load
+    def test_017_duplicate_lot_via_single_registration_api(self):
+        """ACAS-890: Test duplicate lot error via single registration (save_meta_lot) path"""
+
+        # Get an existing lot from basic load
+        search_results = self.client.cmpd_search(corpNameList='CMPD-0000001')
+        first_lot_corp_name = search_results['foundCompounds'][0]['lotIDs'][0]['corpName']
+        meta_lot = self.client.get_meta_lot(first_lot_corp_name)
+
+        # Try to create a duplicate lot on the same parent with the same lot number
+        meta_lot['lot']['id'] = None
+        meta_lot['lot']['corpName'] = None  # Let it auto-generate
+
+        # This should fail with a 409 Conflict error and informative message about duplicate lot
+        with self.assertRaises(requests.HTTPError) as context:
+            self.client.save_meta_lot(meta_lot)
+
+        # Verify it's a 409 error (not 500)
+        exception = context.exception
+        self.assertEqual(exception.response.status_code, 409,
+                        f"Should get 409 Conflict, got {exception.response.status_code}")
+
+        # Verify error message mentions duplicate lot in response body
+        response_text = exception.response.text
+        self.assertIn('Duplicate lot', response_text,
+                     "Error message should mention duplicate lot")
+
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

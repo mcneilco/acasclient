@@ -4497,6 +4497,30 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('Lot Corp Name in DB', error_entry['properties'], "Expected 'Lot Corp Name in DB' property in errors.sdf entry for duplicate lot")
         self.assertIn('Duplicate lot cannot be registered', error_entry['properties']['Error'], "Expected error message to indicate duplicate lot cannot be registered")
 
+    @requires_basic_cmpd_reg_load
+    def test_017_duplicate_lot_via_single_registration_api(self):
+        """ACAS-890: Test duplicate lot error via single registration (save_meta_lot) path"""
+
+        # Get an existing lot from basic load
+        search_results = self.client.cmpd_search(corpNameList='CMPD-0000001')
+        first_lot_corp_name = search_results['foundCompounds'][0]['lotIDs'][0]['corpName']
+        meta_lot = self.client.get_meta_lot(first_lot_corp_name)
+
+        # Try to create a duplicate lot on the same parent with the same lot number
+        meta_lot['lot']['id'] = None
+        meta_lot['lot']['corpName'] = None  # Let it auto-generate
+
+        # This should fail with a 409 Conflict error and informative message about duplicate lot
+        with self.assertRaises(requests.HTTPError) as context:
+            self.client.save_meta_lot(meta_lot)
+
+        # Verify it's a 409 error (not 500)
+        print(context.exception)
+        self.assertIn('409', str(context.exception), "Should get 409 Conflict, not 500 Internal Server Error")
+
+        # Verify error message mentions duplicate lot
+        self.assertIn('Duplicate lot', str(context.exception), "Error message should mention duplicate lot")
+
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
     

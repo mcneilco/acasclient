@@ -4448,16 +4448,16 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertEqual(0, len(response['results']))
     
     @requires_absent_basic_cmpd_reg_load
-    def test_016_duplicate_lot_with_matching_lot_number(self):
-        """Duplicate lot with matching lot number should show informative error, not generic 'Internal error'"""
+    def test_016_duplicate_lot_in_same_file_with_matching_lot_number(self):
+        """ACAS-890: Duplicate lot with matching large lot number should show informative error, not generic 'Internal error'"""
         
         file = Path(__file__).resolve().parent.joinpath(
-            'test_acasclient', 'test_simple_mol.sdf')
+            'test_acasclient', 'test_duplicate_structure_in_file.sdf')
         project_code = self.global_project_code
         mappings = [
             {
                 "dbProperty": "Lot Number",
-                "defaultVal": "1",  # Explicitly set lot number to 1
+                "defaultVal": "1001",  # Explicitly set lot number to large number
                 "required": False,
                 "sdfProperty": None
             },
@@ -4481,24 +4481,7 @@ class TestCmpdReg(BaseAcasClientTest):
             },
         ]
 
-        # STEP 1: Load the SDF first time to create parent + lot 1
-        response1 = self.client.register_sdf(file, "bob", mappings, dry_run=False)
-        # Parse the response to get the lot corp name that was created
-        first_lot_corp_name = None
-        registered_sdf = [f for f in response1['report_files'] if '_registered.sdf' in f['name']][0]
-        first_lot_corp_name = registered_sdf['parsed_content'][0].get('properties', {}).get('Registered Lot Corp Name')
-        self.assertIsNotNone(first_lot_corp_name, "Could not find Registered Lot Corp Name in response after first load")
-        # STEP 2: Try to load the SAME structure with the SAME lot number AND SAME LOT CORP NAME
-        # Add explicit Lot Corp Name to mappings to trigger database constraint violation on lot corp name
-        mappings_with_lot_corp_name = mappings.copy()
-        mappings_with_lot_corp_name.append({
-            "dbProperty": "Lot Corp Name",
-            "defaultVal": first_lot_corp_name,
-            "required": False,
-            "sdfProperty": None
-        })
-
-        response = self.client.register_sdf(file, "bob", mappings_with_lot_corp_name, dry_run=False)
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
         self.assertIn('results', response)
         self.assertGreater(len(response['results']), 0, "Expected error results for duplicate lot")
         # Check that the results have a "DupeLot" category error
@@ -4513,7 +4496,6 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertIn('Error', error_entry['properties'], "Expected 'Error' property in errors.sdf entry for duplicate lot")
         self.assertIn('Lot Corp Name in DB', error_entry['properties'], "Expected 'Lot Corp Name in DB' property in errors.sdf entry for duplicate lot")
         self.assertIn('Duplicate lot cannot be registered', error_entry['properties']['Error'], "Expected error message to indicate duplicate lot cannot be registered")
-        self.assertEqual(error_entry['properties']['Lot Corp Name in DB'], first_lot_corp_name, "Expected 'Lot Corp Name in DB' in errors.sdf to match the corp name of the lot that caused the duplicate error")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

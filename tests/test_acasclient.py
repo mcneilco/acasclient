@@ -4515,11 +4515,14 @@ class TestCmpdReg(BaseAcasClientTest):
             self.client.save_meta_lot(meta_lot)
 
         # Verify it's a 409 error (not 500)
-        print(context.exception)
-        self.assertIn('409', str(context.exception), "Should get 409 Conflict, not 500 Internal Server Error")
+        exception = context.exception
+        self.assertEqual(exception.response.status_code, 409,
+                        f"Should get 409 Conflict, got {exception.response.status_code}")
 
-        # Verify error message mentions duplicate lot
-        self.assertIn('Duplicate lot', str(context.exception), "Error message should mention duplicate lot")
+        # Verify error message mentions duplicate lot in response body
+        response_text = exception.response.text
+        self.assertIn('Duplicate lot', response_text,
+                     "Error message should mention duplicate lot")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

@@ -2299,6 +2299,23 @@ en array of protocols
         resp.raise_for_status()
         return resp.json()
     
+    def update_salt(self, salt: dict, dry_run=True):
+        """
+        Update a salt.
+        Warning: Editing salts can modify corporate IDs and molecular weights. Use with caution.
+        """
+        if 'id' not in salt:
+            raise ValueError("id attribute of salt dict is required")
+        resp = self.session.put("{}/api/cmpdRegAdmin/salts/edit/{}".format(self.url, salt['id']), json=salt, params={'dryrun': dry_run})
+        resp.raise_for_status()
+        return resp.json()
+    
+    def delete_salt(self, id: int):
+        """Delete a salt. """
+        resp = self.session.delete("{}/api/cmpdRegAdmin/salts/{}".format(self.url, id))
+        resp.raise_for_status()
+        return True
+    
     def get_physical_states(self):
         """
         Get all physical states

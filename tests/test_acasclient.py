@@ -666,16 +666,29 @@ class BaseAcasClientTest(unittest.TestCase):
     def delete_all_salts(self):
         """ Deletes all salts """
         salts = self.client.get_salts()
+        failures = []
         for salt in salts:
-            self.client.delete_salt(salt['id'])
+            try:
+                self.client.delete_salt(salt['id'])
+            except requests.HTTPError as exc:
+                failures.append(
+                    {
+                        "id": salt.get("id"),
+                        "codeName": salt.get("codeName"),
+                        "error": str(exc),
+                    }
+                )
 
         # Verify all salts are now gone
         salts = self.client.get_salts()
-        if len(salts) > 0:
-            # Get the ids of all the salts
-            codes = [salt['codeName'] for salt in salts]
-            # Throw exception not failure
-            raise ValueError(f"Failed to delete some salts: {codes}")
+        if len(salts) > 0 or failures:
+            # Get the codes of all the remaining salts
+            codes = [salt.get('codeName') for salt in salts]
+            # Throw exception not failure, with summary of failures
+            raise ValueError(
+                f"Failed to delete some salts. Remaining salts: {codes}; "
+                f"per-salt errors: {failures}"
+            )
 
     def create_basic_project_with_roles(self):
         """ Creates a basic project with roles """
@@ -966,7 +979,7 @@ class BaseAcasClientTest(unittest.TestCase):
                     self.assertEqual(len(expected_result), expected_message['count'])
                 else:
                     # If count is -1, then we don't care about the number of results, just as long as it has the message
-                    self.assertGreaterThan(len(expected_result), 0, f"Expected message not found: {expected_message}. Full messages: {messages}")
+                    self.assertGreater(len(expected_result), 0, f"Expected message not found: {expected_message}. Full messages: {messages}")
             else:
                 # Should return 1 and only 1 match
                 self.assertEqual(len(expected_result), 1, f"Expected message not found: {expected_message}. Full messages: {messages}")

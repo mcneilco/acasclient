@@ -4,6 +4,7 @@
 
 from functools import wraps
 import unittest
+import pytest
 from acasclient import acasclient
 from pathlib import Path
 import tempfile
@@ -750,169 +751,34 @@ class BaseAcasClientTest(unittest.TestCase):
 
 
         mappings = [
-                {
-                    "dbProperty": "Parent Common Name",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Parent Common Name"
-                },
-                {
-                    "dbProperty": "Parent Corp Name",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Parent Corp Name"
-                },
-                {
-                    "dbProperty": "Lot Barcode",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Barcode"
-                },
-                {
-                    "dbProperty": "Lot Amount",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Amount"
-                },
-                {
-                    "dbProperty": "Lot Amount Units",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Amount Units"
-                },
-                {
-                    "dbProperty": "Lot Color",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Appearance"
-                },
-                {
-                    "dbProperty": "Lot Synthesis Date",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Date Prepared"
-                },
-                {
-                    "dbProperty": "Lot Notebook Page",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Notebook"
-                },
-                {
-                    "dbProperty": "Lot Corp Name",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Corp Name"
-                },
-                {
-                    "dbProperty": "Lot Number",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Number"
-                },
-                {
-                    "dbProperty": "Lot Purity",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Purity"
-                },
-                {
-                    "dbProperty": "Lot Comments",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Register Comment"
-                },
-                {
-                    "dbProperty": "Lot Chemist",
-                    "defaultVal": "bob",
-                    "required": True,
-                    "sdfProperty": "Lot Scientist"
-                },
-                {
-                    "dbProperty": "Lot Solution Amount",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Solution Amount"
-                },
-                {
-                    "dbProperty": "Lot Solution Amount Units",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Solution Amount Units"
-                },
-                {
-                    "dbProperty": "Lot Supplier",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Source"
-                },
-                {
-                    "dbProperty": "Lot Supplier ID",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Source ID"
-                },
-                {
-                    "dbProperty": "CAS Number",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "CAS"
-                },
-                {
-                    "dbProperty": "Project",
-                    "defaultVal": project_code,
-                    "required": True,
-                    "sdfProperty": "Project Code Name"
-                },
-                {
-                    "dbProperty": "Parent Common Name",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Name"
-                },
-                {
-                    "dbProperty": "Parent Stereo Category",
-                    "defaultVal": STEREO_CATEGORY,
-                    "required": True,
-                    "sdfProperty": "Parent Stereo Category"
-                },
-                {
-                    "dbProperty": "Parent Stereo Comment",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Parent Stereo Comment"
-                },
-                {
-                    "dbProperty": "Lot Is Virtual",
-                    "defaultVal": "False",
-                    "required": False,
-                    "sdfProperty": "Lot Is Virtual"
-                },
-                {
-                    "dbProperty": "Lot Supplier Lot",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Sample ID2"
-                },
-                {
-                    "dbProperty": "Lot Salt Abbrev",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Salt Name"
-                },
-                {
-                    "dbProperty": "Lot Salt Equivalents",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Lot Salt Equivalents"
-                },
-                {
-                    "dbProperty": "Parent Alias",
-                    "defaultVal": None,
-                    "required": False,
-                    "sdfProperty": "Parent Alias"
-                }
-            ]
+            mapping("Parent Common Name", sdfProperty="Parent Common Name"),
+            mapping("Parent Corp Name", sdfProperty="Parent Corp Name"),
+            mapping("Lot Barcode", sdfProperty="Lot Barcode"),
+            mapping("Lot Amount", sdfProperty="Lot Amount"),
+            mapping("Lot Amount Units", sdfProperty="Lot Amount Units"),
+            mapping("Lot Color", sdfProperty="Lot Appearance"),
+            mapping("Lot Synthesis Date", sdfProperty="Lot Date Prepared"),
+            mapping("Lot Notebook Page", sdfProperty="Lot Notebook"),
+            mapping("Lot Corp Name", sdfProperty="Lot Corp Name"),
+            mapping("Lot Number", sdfProperty="Lot Number"),
+            mapping("Lot Purity", sdfProperty="Lot Purity"),
+            mapping("Lot Comments", sdfProperty="Lot Register Comment"),
+            mapping("Lot Chemist", defaultVal="bob", required=True, sdfProperty="Lot Scientist"),
+            mapping("Lot Solution Amount", sdfProperty="Lot Solution Amount"),
+            mapping("Lot Solution Amount Units", sdfProperty="Lot Solution Amount Units"),
+            mapping("Lot Supplier", sdfProperty="Lot Source"),
+            mapping("Lot Supplier ID", sdfProperty="Source ID"),
+            mapping("CAS Number", sdfProperty="CAS"),
+            mapping("Project", defaultVal=project_code, required=True, sdfProperty="Project Code Name"),
+            mapping("Parent Common Name", sdfProperty="Name"),
+            mapping("Parent Stereo Category", defaultVal=STEREO_CATEGORY, required=True, sdfProperty="Parent Stereo Category"),
+            mapping("Parent Stereo Comment", sdfProperty="Parent Stereo Comment"),
+            mapping("Lot Is Virtual", defaultVal="False", sdfProperty="Lot Is Virtual"),
+            mapping("Lot Supplier Lot", sdfProperty="Sample ID2"),
+            mapping("Lot Salt Abbrev", sdfProperty="Lot Salt Name"),
+            mapping("Lot Salt Equivalents", sdfProperty="Lot Salt Equivalents"),
+            mapping("Parent Alias", sdfProperty="Parent Alias"),
+        ]
 
         response = self.client.register_sdf(file, "bob",
                                             mappings)
@@ -4836,6 +4702,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.assertNotEqual(original_meta_lot['lot']['lotMolWeight'], updated_meta_lot['lot']['lotMolWeight'], "Updating the salt should change the lot molecular weight")
     
     @requires_absent_basic_cmpd_reg_load
+    @pytest.mark.requires_config(**{'cmpdreg.serverSettings.uniqueNotebook': True})
     def test_019_duplicate_notebook_page(self):
         NB_PAGE_1 = "NB-1234"
         NB_PAGE_2 = "NB-5678"

@@ -8,6 +8,14 @@ on:
 jobs:
   acas:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config-profile: default
+            compose-files: docker-compose.yml
+          - config-profile: unique-notebook
+            compose-files: docker-compose.yml -f docker-compose.test-unique-notebook.yml
     steps:
       - name: Checkout acasclient
         uses: actions/checkout@v3
@@ -49,11 +57,11 @@ jobs:
           repository: mcneilco/acas
           path: acas
           ref: ${{ env.ACAS_REF }}
-      - name: Run docker compose up - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
+      - name: Run docker compose up (${{ matrix.config-profile }}) - assumes racas-oss:${{ env.ACAS_TAG }} and acas-roo-server-oss:${{ env.ACAS_TAG }}-indigo exist and are up to date
         id: dockerComposeUp
         working-directory: acas
         run: |
-          docker compose -f "docker-compose.yml" up -d
+          docker compose -f ${{ matrix.compose-files }} up -d
       - name: Wait for startup then create docker bob
         run: bash docker_bob_setup.sh
         working-directory: acas
@@ -64,5 +72,5 @@ jobs:
           echo "username=bob" >> ~/.acas/credentials
           echo "password=secret" >> ~/.acas/credentials
           echo "url=http://localhost:3000" >> ~/.acas/credentials
-      - name: Run tests
-        run: python -m unittest discover -s ./acasclient -p "test_*.py" -v
+      - name: Run tests (${{ matrix.config-profile }})
+        run: pytest ./acasclient/tests -v

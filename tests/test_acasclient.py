@@ -41,6 +41,7 @@ ACAS_NODEAPI_BASE_URL = "http://localhost:3001"
 BASIC_EXPERIMENT_LOAD_EXPERIMENT_NAME = "EXPERIMENT_BLAH"
 BASIC_EXPERIMENT_LOAD_PROTOCOL_NAME = "PROTOCOL_BLAH"
 STEREO_CATEGORY="Unknown"
+GLOBAL_PROJECT_CODE="PROJ-00000001"
 class Timeout:
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
@@ -421,6 +422,12 @@ class BaseAcasClientTest(unittest.TestCase):
             print("Successfully deleted all cmpdreg bulk load files")
         except Exception as e:
             print("Error deleting bulkloaded files in tear down: " + str(e))
+        
+        try:
+            self.delete_all_salts(self)
+            print("Successfully deleted all salts")
+        except Exception as e:
+            print("Error deleting salts in tear down: " + str(e))
 
         try:
             self.delete_all_projects(self)
@@ -639,7 +646,7 @@ class BaseAcasClientTest(unittest.TestCase):
         projects = self.client.get_ls_things_by_type_and_kind('project', 'project')
         projects_to_delete =  []
         for project in projects:
-            if project['codeName'] != "PROJ-00000001" and project['deleted'] == False and project['ignored'] == False:
+            if project['codeName'] != GLOBAL_PROJECT_CODE and project['deleted'] == False and project['ignored'] == False:
                 project['deleted'] = True
                 project['ignored'] = True
                 projects_to_delete.append(project)
@@ -650,11 +657,38 @@ class BaseAcasClientTest(unittest.TestCase):
         projects = self.client.get_ls_things_by_type_and_kind('project', 'project')
         not_deleted_projects = []
         for project in projects:
-            if project['codeName'] != "PROJ-00000001" and project['deleted'] == False and project['ignored'] == False:
+            if project['codeName'] != GLOBAL_PROJECT_CODE and project['deleted'] == False and project['ignored'] == False:
                 not_deleted_projects.append(project['codeName'])
         
         if len(not_deleted_projects) > 0:
             raise Exception("Failed to delete all projects: " + str(not_deleted_projects))
+    
+    def delete_all_salts(self):
+        """ Deletes all salts """
+        salts = self.client.get_salts()
+        failures = []
+        for salt in salts:
+            try:
+                self.client.delete_salt(salt['id'])
+            except requests.HTTPError as exc:
+                failures.append(
+                    {
+                        "id": salt.get("id"),
+                        "codeName": salt.get("codeName"),
+                        "error": str(exc),
+                    }
+                )
+
+        # Verify all salts are now gone
+        salts = self.client.get_salts()
+        if len(salts) > 0 or failures:
+            # Get the codes of all the remaining salts
+            codes = [salt.get('codeName') for salt in salts]
+            # Throw exception not failure, with summary of failures
+            raise ValueError(
+                f"Failed to delete some salts. Remaining salts: {codes}; "
+                f"per-salt errors: {failures}"
+            )
 
     def create_basic_project_with_roles(self):
         """ Creates a basic project with roles """
@@ -889,6 +923,20 @@ class BaseAcasClientTest(unittest.TestCase):
         with self.assertRaises(requests.HTTPError) as context:
             resp = create_method(code=code, name=name)
         self.assertIn('409 Client Error: Conflict', str(context.exception))
+    
+    def _get_or_create_salt(self, abbrev=None, mol=None):
+        SALT_ABBREV = 'HCl'
+        SALT_MOL = "\n  Ketcher 03162615032D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    5.4250   -5.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
+        abbrev = abbrev or SALT_ABBREV
+        mol = mol or SALT_MOL
+        # Get salts
+        salts = self.client.get_salts()
+        # Find the salt by abbrev
+        salt = next((s for s in salts if s['abbrev'].lower() == abbrev.lower()), None)
+        if salt is None:
+            salt = self.client.create_salt(abbrev=abbrev, name=abbrev, mol_structure=mol)
+        self.assertIsNotNone(salt.get('id'))
+        return salt
 
 
     def create_restricted_lot(self, project_code):
@@ -919,6 +967,22 @@ class BaseAcasClientTest(unittest.TestCase):
                     if value["lsKind"] == "batch code" and value["codeValue"] == lot_corp_name:
                         return True
         return False
+    
+    # Test to check if expected messages are in messages from experiment loader
+    def check_expected_messages(self, expected_messages, messages, error_level_key = 'errorLevel', message_key = 'message'):
+        for expected_message in expected_messages:
+            # This matches the response error message and level to the expected message and level
+            expected_result = [m for m in messages if m[error_level_key] == expected_message[error_level_key] and m[message_key] == expected_message[message_key]]
+            if 'count' in expected_message:
+                if expected_message['count'] > -1:
+                    # If count is present and not -1, then we expect the number of results to be equal to the count
+                    self.assertEqual(len(expected_result), expected_message['count'])
+                else:
+                    # If count is -1, then we don't care about the number of results, just as long as it has the message
+                    self.assertGreater(len(expected_result), 0, f"Expected message not found: {expected_message}. Full messages: {messages}")
+            else:
+                # Should return 1 and only 1 match
+                self.assertEqual(len(expected_result), 1, f"Expected message not found: {expected_message}. Full messages: {messages}")
 
 class TestAcasclient(BaseAcasClientTest):
     """Tests for `acasclient` package."""
@@ -2202,8 +2266,6 @@ class TestAcasclient(BaseAcasClientTest):
         CHEMIST = 'bob'
         CHEMIST_NAME = 'Bob Roberts'
         STEREO_CATEGORY = 'Unknown'
-        SALT_ABBREV = 'HCl'
-        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
         PHYSICAL_STATE = 'solid'
         VENDOR = 'ThermoFisher'
         # Do a "get or create" to ensure the expected values are there
@@ -2214,12 +2276,8 @@ class TestAcasclient(BaseAcasClientTest):
         self._get_or_create_codetable(self.client.get_physical_states, self.client.create_physical_state, PHYSICAL_STATE, PHYSICAL_STATE)
         # Vendors
         self._get_or_create_codetable(self.client.get_cmpdreg_vendors, self.client.create_cmpdreg_vendor, VENDOR, VENDOR)
-        # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
-        salts = self.client.get_salts()
-        # Create Salt Abbrev
-        if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
-            self.assertIsNotNone(salt.get('id'))
+        # Salt
+        self._get_or_create_salt()
         
         # Setup SDF registration with a file containing wrong-case lookups for above values
         upload_file_file = Path(__file__).resolve().parent.\
@@ -2458,7 +2516,7 @@ class TestAcasclient(BaseAcasClientTest):
             },
             {
                 "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
+                "defaultVal": GLOBAL_PROJECT_CODE,
                 "required": True,
                 "sdfProperty": "Project Code Name"
             },
@@ -2483,14 +2541,7 @@ class TestAcasclient(BaseAcasClientTest):
         ]
         # Ensuring HCl is registered as a salt since this test assumes that the salt parent structure
         # is already registered in CReg
-        SALT_ABBREV = 'HCl'
-        SALT_MOL = "\n  Ketcher 05182214202D 1   1.00000     0.00000     0\n\n  1  0  0     1  0            999 V2000\n    6.9500   -4.3250    0.0000 Cl  0  0  0  0  0  0  0  0  0  0  0  0\nM  END\n"
-        # Get Salt Abbrevs. Treat salts separately since they are not a standard codetable
-        salts = self.client.get_salts()
-        # Create Salt Abbrev
-        if SALT_ABBREV.lower() not in [s['abbrev'].lower() for s in salts]:
-            salt = self.client.create_salt(abbrev=SALT_ABBREV, name=SALT_ABBREV, mol_structure=SALT_MOL)
-            self.assertIsNotNone(salt.get('id'))
+        self._get_or_create_salt()
 
         response = self.client.register_sdf(test_047_load_sdf_with_salts_file, "bob",
                                             mappings)
@@ -2527,7 +2578,7 @@ class TestAcasclient(BaseAcasClientTest):
             },
             {
                 "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
+                "defaultVal": GLOBAL_PROJECT_CODE,
                 "required": True,
                 "sdfProperty": "Project Code Name"
             },
@@ -2563,7 +2614,7 @@ class TestAcasclient(BaseAcasClientTest):
             },
             {
                 "dbProperty": "Project",
-                "defaultVal": "PROJ-00000001",
+                "defaultVal": GLOBAL_PROJECT_CODE,
                 "required": True,
                 "sdfProperty": "Project Code Name"
             },
@@ -4679,6 +4730,94 @@ class TestCmpdReg(BaseAcasClientTest):
         response_text = exception.response.text
         self.assertIn('Duplicate lot', response_text,
                      "Error message should mention duplicate lot")
+    
+    @requires_absent_basic_cmpd_reg_load
+    def test_018_create_update_delete_salt(self):
+        """Test creating, updating, and deleting a salt"""
+        # Create a salt
+        salt = self._get_or_create_salt()
+        salt_id = salt['id']
+        # Delete it
+        self.client.delete_salt(salt_id)
+        # Create salt again
+        salt = self._get_or_create_salt()
+        self.assertNotEqual(salt['id'], salt_id, "After deleting and recreating a salt, the new salt should have a different id")
+        # Load data referencing the salt
+        mappings = [
+            {
+                "dbProperty": "Lot Salt Abbrev",
+                "defaultVal": salt.get('abbrev'),
+                "required": False,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Salt Equivalents",
+                "defaultVal": 1,
+                "required": False,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": GLOBAL_PROJECT_CODE,
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": STEREO_CATEGORY,
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+        file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        # Get the registered lot corp name from the response
+        registered = read_registered_csv(response)
+        lot_corp_names = [entry['Corp Name in DB'] for entry in registered]
+        # Delete the salt again and confirm it fails because of the reference from the data
+        with self.assertRaises(requests.HTTPError) as context:
+            self.client.delete_salt(salt['id'])
+        exception = context.exception
+        self.assertEqual(exception.response.status_code, 409,
+                        f"Should get 409 Conflict when trying to delete salt with existing references, got {exception.response.status_code}")
+        self.assertIn('This salt is referenced by', exception.response.text,
+                     "Error message should mention cannot delete salt due to existing references")
+        # Update (dryrun) and confirm the dependency is mentioned
+        # Changing abbreviation will impact lot corp names
+        salt['abbrev'] = "HBr"
+        salt['name'] = "HBr"
+        # Changing the mol will affect molecular weight
+        salt['molStructure'] = salt['molStructure'].replace("Cl", "Br")
+        dry_run_response = self.client.update_salt(salt)
+        # Confirm the dry run response has no errors, only warnings
+        errors = [message['message'] for message in dry_run_response if message['level'] == 'error']
+        self.assertEqual(len(errors), 0, f"Expected no errors in dry run response when updating salt, got errors: {errors}")
+        # Changes should flag many warnings
+        expected_warnings = [
+            "The abbreviation of this salt will be changed.",
+            "The name of this salt will be changed.",
+            "The weight of this salt will be changed.",
+            "This salt is referenced by 2 lots.",
+            f"2 Associated Batch Code(s): [{', '.join(lot_corp_names)}]",
+        ]
+        expected_messages = [{"level": "warning", "message": expected_warning} for expected_warning in expected_warnings]
+        self.check_expected_messages(expected_messages, dry_run_response, error_level_key='level')
+        # In default configuration, salt abbrev is not appended to lot corp name, so we should not see a warning
+        self.assertNotIn("Lot corp names references salt abbreviations. Any associated lot corp names will be updated.", [message['message'] for message in dry_run_response if message['level'] == 'warning'], "In default configuration, changing salt abbrev should not trigger warning about lot corp name change")
+        # Update (non-dryrun) and check it propagates the change to the lot
+        lot_corp_name = lot_corp_names[0]
+        original_meta_lot = self.client.get_meta_lot(lot_corp_name)
+        self.client.update_salt(salt, dry_run=False)
+        updated_meta_lot = self.client.get_meta_lot(lot_corp_name)
+        # Confirm the lotMolWeight has changed
+        self.assertNotEqual(original_meta_lot['lot']['lotMolWeight'], updated_meta_lot['lot']['lotMolWeight'], "Updating the salt should change the lot molecular weight")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""
@@ -4692,22 +4831,6 @@ class TestExperimentLoader(BaseAcasClientTest):
             if(message['message'].endswith('EOF within quoted string')):
                 hasEOFError = True
         self.assertTrue(hasEOFError)
-
-    # Test to check if expected messages are in messages from experiment loader
-    def check_expected_messages(self, expected_messages, messages):
-        for expected_message in expected_messages:
-            # This matches the response error message and level to the expected message and level
-            expected_result = [m for m in messages if m['errorLevel'] == expected_message['errorLevel'] and m['message'] == expected_message['message']]
-            if 'count' in expected_message:
-                if expected_message['count'] > -1:
-                    # If count is present and not -1, then we expect the number of results to be equal to the count
-                    self.assertEqual(len(expected_result), expected_message['count'])
-                else:
-                    # If count is -1, then we don't care about the number of results, just as long as it has the message
-                    self.assertGreaterThan(len(expected_result), 0)
-            else:
-                # Should return 1 and only 1 match
-                self.assertEqual(len(expected_result), 1)
 
     @requires_basic_cmpd_reg_load
     def test_001_basic_xlsx(self):

@@ -17,11 +17,33 @@ Two-part solution:
 1. **Pytest markers** to declare config requirements on tests
 2. **CI matrix** to run parallel jobs with different config profiles
 
+## Migration Strategy
+
+**From unittest to pytest:**
+- Add pytest as a dependency (pytest can run existing unittest-style tests unchanged)
+- Create `conftest.py` with pytest-native config checking
+- No backward compatibility needed - this is the first config-sensitive test
+- Existing decorators (`@requires_basic_cmpd_reg_load`, etc.) continue to work under pytest
+- CI switches from `python -m unittest discover` to `pytest`
+
+**Reuse from existing code:**
+- `get_nested_value()` utility from `config_checker.py` can be reused
+- Error handling patterns (graceful fallback when server unreachable) should be preserved
+
 ## Design Details
 
 ### Config Fetching
 
-Fetch client config from existing endpoint at `/conf/conf.js`:
+Fetch client config from existing endpoint at `/conf/conf.js` (port 3000).
+
+**Why this endpoint:**
+- Already exists and serves client configuration to the browser
+- No new acas code required
+- Client configs are already public (served to browsers), so no security concern
+
+**Note:** A dedicated `/api/systemTest/config` endpoint was considered but doesn't exist in the acas repo. Using the existing JS endpoint avoids requiring acas changes.
+
+**Implementation:**
 
 ```python
 def fetch_client_config(base_url="http://localhost:3000"):
@@ -32,7 +54,31 @@ def fetch_client_config(base_url="http://localhost:3000"):
     return json.loads(json_str)
 ```
 
-Config is cached at pytest session start via a session-scoped fixture.
+**Session-scoped caching:**
+
+```python
+_cached_config = None
+
+def get_client_config(base_url="http://localhost:3000"):
+    global _cached_config
+    if _cached_config is None:
+        try:
+            response = requests.get(f"{base_url}/conf/conf.js", timeout=5)
+            response.raise_for_status()
+            js_content = response.text
+            json_str = js_content.replace("window.conf=", "", 1).rstrip(";")
+            _cached_config = json.loads(json_str)
+        except Exception as e:
+            print(f"Warning: Could not fetch ACAS config: {e}")
+            print("Tests requiring specific config will be skipped.")
+            _cached_config = {}
+    return _cached_config
+```
+
+**Error handling:**
+- If ACAS is unreachable, returns empty dict and tests with config requirements skip
+- If config response is malformed, same behavior
+- If a config path doesn't exist, `get_nested_value()` returns `None`, causing skip
 
 **Scope limitation:** Only client configs are exposed. Server configs (which may contain secrets) are not accessible. This is intentional for security.
 
@@ -80,13 +126,26 @@ jobs:
   acas:
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        config-profile:
-          - name: default
-            compose-files: docker-compose.yml
-          - name: unique-notebook
-            compose-files: docker-compose.yml -f docker-compose.test-unique-notebook.yml
       fail-fast: false
+      matrix:
+        include:
+          - config-profile: default
+            compose-files: docker-compose.yml
+          - config-profile: unique-notebook
+            compose-files: docker-compose.yml -f docker-compose.test-unique-notebook.yml
+
+    steps:
+      # ... existing checkout, python setup, install steps ...
+
+      - name: Run docker compose up (${{ matrix.config-profile }})
+        working-directory: acas
+        run: |
+          docker compose -f ${{ matrix.compose-files }} up -d
+
+      # ... existing bob setup steps ...
+
+      - name: Run tests (${{ matrix.config-profile }})
+        run: pytest ./acasclient -v
 ```
 
 Each job:
@@ -111,8 +170,9 @@ Each job:
 
 ### Deleted Files
 
-- `acasclient/tests/config_checker.py` - replaced by conftest.py
-- `acasclient/tests/test_duplicate_notebook.py` - consolidated into main test file
+- `acasclient/tests/config_checker.py` - logic moved to conftest.py (reuse `get_nested_value()`)
+- `acasclient/tests/test_duplicate_notebook.py` - separate test file no longer needed; `test_019_duplicate_notebook_page` in main test file covers this
+- `acasclient/tests/TESTING_WITH_CONFIG.md` - replaced by updated documentation
 
 ## Testing Strategy
 

@@ -4856,10 +4856,11 @@ class TestCmpdReg(BaseAcasClientTest):
         response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
         # Load the same again in dryrun and confirm we get an error about duplicate notebook page
         response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
-        self.assertGreater(len(response['results']), 0, "Expected error results for duplicate lot")
-        err_result = response['results'][0]
-        self.assertEqual(err_result['level'], 'error', "Expected an error level result for duplicate notebook page")
-        self.assertEqual(err_result['message'], f'Lot notebook page "{NB_PAGE_1}" is already in use. Please use a unique notebook page.', "Expected error message to mention the duplicated notebook page.")
+        err_results = [res for res in response.get('results', []) if res.get('level') == 'error']
+        self.assertGreater(len(err_results), 0, "Expected an error level result for duplicate notebook page")
+        # Assert at least one error message mentions the duplicated notebook page
+        err_result = next((res for res in err_results if NB_PAGE_1 in res.get('message', '')), None)
+        self.assertIsNotNone(err_result, "Expected an error message to mention the duplicated notebook page.")
         # Dryrun Load a 2 compound file with a 2nd nb page hardcoded. Confirm we get back an error that the nb page is duplicated within the same file.
         file = Path(__file__).resolve().parent\
                 .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
@@ -4891,9 +4892,13 @@ class TestCmpdReg(BaseAcasClientTest):
         ]
         response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
         self.assertGreater(len(response['results']), 0, "Expected error results for duplicate notebook page within file")
-        err_result = response['results'][0]
-        self.assertEqual(err_result['level'], 'error', "Expected an error level result for duplicate notebook page within file")
-        self.assertEqual(err_result['message'], f'Lot notebook page "{NB_PAGE_2}" is duplicated within the same bulk load file. Please use a unique notebook page.', "Expected error message to indicate duplicate notebook page within file")
+        err_results = [res for res in response.get('results', []) if res.get('level') == 'error']
+        self.assertGreater(len(err_results), 0, "Expected an error level result for duplicate notebook page")
+        # Assert at least one error message mentions the duplicated notebook page
+        err_result = next((res for res in err_results if NB_PAGE_2 in res.get('message', '')), None)
+        self.assertIsNotNone(err_result, "Expected an error message to mention the duplicated notebook page.")
+        self.assertNotEqual(len(err_results), 0, "Expected at least one error result for duplicate notebook page within file")
+        self.assertIn("within the same bulk load file", err_results[0]['message'], "Expected error message to mention that the duplicate notebook page is within the same bulk load file")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

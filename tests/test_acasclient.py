@@ -4818,6 +4818,82 @@ class TestCmpdReg(BaseAcasClientTest):
         updated_meta_lot = self.client.get_meta_lot(lot_corp_name)
         # Confirm the lotMolWeight has changed
         self.assertNotEqual(original_meta_lot['lot']['lotMolWeight'], updated_meta_lot['lot']['lotMolWeight'], "Updating the salt should change the lot molecular weight")
+    
+    @unittest.skip("ACAS-956: Skip this test for now because uniqueNotebook is false by default")
+    @requires_absent_basic_cmpd_reg_load
+    def test_019_duplicate_notebook_page(self):
+        NB_PAGE_1 = "NB-1234"
+        NB_PAGE_2 = "NB-5678"
+        # Load a 1 compound test file with notebook page hardcoded (success)
+        file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_simple_mol.sdf')
+        mappings = [
+            {
+                "dbProperty": "Lot Notebook Page",
+                "defaultVal": NB_PAGE_1,
+                "required": False,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": GLOBAL_PROJECT_CODE,
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": STEREO_CATEGORY,
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=False)
+        # Load the same again in dryrun and confirm we get an error about duplicate notebook page
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
+        self.assertGreater(len(response['results']), 0, "Expected error results for duplicate lot")
+        err_result = response['results'][0]
+        self.assertEqual(err_result['level'], 'error', "Expected an error level result for duplicate notebook page")
+        self.assertEqual(err_result['message'], f'Lot notebook page "{NB_PAGE_1}" is already in use. Please use a unique notebook page.', "Expected error message to mention the duplicated notebook page.")
+        # Dryrun Load a 2 compound file with a 2nd nb page hardcoded. Confirm we get back an error that the nb page is duplicated within the same file.
+        file = Path(__file__).resolve().parent\
+                .joinpath('test_acasclient', 'test_012_register_sdf.sdf')
+        mappings = [
+            {
+                "dbProperty": "Lot Notebook Page",
+                "defaultVal": NB_PAGE_2,
+                "required": False,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Lot Chemist",
+                "defaultVal": "bob",
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Project",
+                "defaultVal": GLOBAL_PROJECT_CODE,
+                "required": True,
+                "sdfProperty": None
+            },
+            {
+                "dbProperty": "Parent Stereo Category",
+                "defaultVal": STEREO_CATEGORY,
+                "required": True,
+                "sdfProperty": None
+            },
+        ]
+        response = self.client.register_sdf(file, "bob", mappings, dry_run=True)
+        self.assertGreater(len(response['results']), 0, "Expected error results for duplicate notebook page within file")
+        err_result = response['results'][0]
+        self.assertEqual(err_result['level'], 'error', "Expected an error level result for duplicate notebook page within file")
+        self.assertEqual(err_result['message'], f'Lot notebook page "{NB_PAGE_2}" is duplicated within the same bulk load file. Please use a unique notebook page.', "Expected error message to indicate duplicate notebook page within file")
 
 class TestExperimentLoader(BaseAcasClientTest):
     """Tests for `Experiment Loading`."""

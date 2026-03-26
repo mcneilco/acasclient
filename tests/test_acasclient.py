@@ -3014,13 +3014,16 @@ class TestAcasclient(BaseAcasClientTest):
         file_to_upload = get_basic_experiment_load_file(self.tempdir, protocol_name=protocol_name, experiment_name=experiment_name)
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
+        expt_code = response['results']['experimentCode']
+        protocol_code = self.client.get_experiment_by_code(expt_code)['protocol']['codeName']
         # Search for the protocol by name
         res = self.client.protocol_search(protocol_name)
         self.assertEqual(len(res), 1)
         # Search for the protocol by substring
         for char in protocol_name:
             res = self.client.protocol_search(char)
-            self.assertEqual(len(res), 1, f"Expected to find protocol when searching with any substring, but failed with {char}")
+            match = [x for x in res if x['codeName'] == protocol_code]
+            self.assertEqual(len(match), 1, f"Expected to find protocol when searching with any substring, but failed with {char}")
         # Get the protocol by name
         res = self.client.get_protocols_by_label(protocol_name)
         self.assertEqual(len(res), 1)
@@ -3033,7 +3036,8 @@ class TestAcasclient(BaseAcasClientTest):
         for char in experiment_name:
             res = self.client.experiment_search(char)
             res = [x for x in res if x['ignored'] is False]
-            self.assertEqual(len(res), 1, f"Expected to find experiment when searching with any substring, but failed with {char}")
+            match = [x for x in res if x['codeName'] == expt_code]
+            self.assertEqual(len(match), 1, f"Expected to find experiment when searching with any substring, but failed with {char}")
         # Get the experiment by name
         expt = self.client.get_experiment_by_name(experiment_name)
         res = [x for x in res if x['ignored'] is False]

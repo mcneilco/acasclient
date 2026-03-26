@@ -15,8 +15,18 @@ import base64
 import hashlib
 from io import StringIO, IOBase
 from typing import Dict, List, Tuple
-from urllib.parse import quote
+from urllib.parse import quote as _stdlib_quote
 from contextlib import contextmanager
+
+
+def quote_path_segment(s):
+    """Percent-encode a string for use in a URL path segment.
+
+    Like urllib.parse.quote(s, safe=''), but also encodes '.' which quote()
+    considers unreserved. A bare '.' or '..' in a path segment is treated as
+    a relative-path reference and gets normalized away by HTTP stacks.
+    """
+    return _stdlib_quote(s, safe='').replace('.', '%2E')
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -994,7 +1004,7 @@ class client():
         Returns: Returns an array of protocols
         """
         resp = self.session.get("{}/api/protocols/genericSearch/{}"
-                                .format(self.url, quote(search_term, safe='')))
+                                .format(self.url, quote_path_segment(search_term)))
         resp.raise_for_status()
         return resp.json()
 
@@ -1009,7 +1019,7 @@ class client():
         Returns: Returns an array of experiments
         """
         resp = self.session.get("{}/api/getProtocolByLabel/{}"
-                                .format(self.url, quote(label, safe='')))
+                                .format(self.url, quote_path_segment(label)))
         resp.raise_for_status()
         return resp.json()
     
@@ -1135,7 +1145,7 @@ class client():
         """
 
         resp = self.session.get("{}/api/experiments/experimentName/{}".
-                                format(self.url, quote(experiment_name, safe='')))
+                                format(self.url, quote_path_segment(experiment_name)))
         if resp.status_code == 500:
             return None
         resp.raise_for_status()
@@ -1436,7 +1446,7 @@ en array of protocols
             params['projectCodes'] = ','.join(project_codes)
 
         resp = self.session.get("{}/api/experiments/genericSearch/{}/"
-                                .format(self.url, quote(query, safe='')),
+                                .format(self.url, quote_path_segment(query)),
                                 params=params)
 
         resp.raise_for_status()

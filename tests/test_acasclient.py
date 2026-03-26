@@ -3018,8 +3018,9 @@ class TestAcasclient(BaseAcasClientTest):
         res = self.client.protocol_search(protocol_name)
         self.assertEqual(len(res), 1)
         # Search for the protocol by substring
-        res = self.client.protocol_search("[")
-        self.assertEqual(len(res), 1, "Expected to find protocol when searching with partial special characters")
+        for char in protocol_name:
+            res = self.client.protocol_search(char)
+            self.assertEqual(len(res), 1, f"Expected to find protocol when searching with any substring, but failed with {char}")
         # Get the protocol by name
         res = self.client.get_protocols_by_label(protocol_name)
         self.assertEqual(len(res), 1)
@@ -3028,10 +3029,11 @@ class TestAcasclient(BaseAcasClientTest):
         # Filter out the ignored = True experiments
         res = [x for x in res if x['ignored'] is False]
         self.assertEqual(len(res), 1)
-         # Search for the protocol by substring
-        res = self.client.experiment_search("[")
-        res = [x for x in res if x['ignored'] is False]
-        self.assertEqual(len(res), 1, "Expected to find experiment when searching with partial special characters")
+        # Search for the experiment by substring
+        for char in experiment_name:
+            res = self.client.experiment_search(char)
+            res = [x for x in res if x['ignored'] is False]
+            self.assertEqual(len(res), 1, f"Expected to find experiment when searching with any substring, but failed with {char}")
         # Get the experiment by name
         expt = self.client.get_experiment_by_name(experiment_name)
         res = [x for x in res if x['ignored'] is False]

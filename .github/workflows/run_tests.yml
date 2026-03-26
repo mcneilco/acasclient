@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout acasclient
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: acasclient
       - name: Set Up Python 3.8
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: 3.8
       - name: Display Python version
@@ -38,7 +38,7 @@ jobs:
         run: |
           echo "ACAS_TAG=$(echo ${{ env.ACAS_REF }} | sed 's/\//-/g')" >> $GITHUB_ENV
       - name: Checkout ACAS
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: mcneilco/acas
           path: acas

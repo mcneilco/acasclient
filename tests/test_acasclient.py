@@ -4,6 +4,7 @@
 
 from functools import wraps
 import unittest
+import pytest
 from acasclient import acasclient
 from pathlib import Path
 import tempfile
@@ -4819,7 +4820,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Confirm the lotMolWeight has changed
         self.assertNotEqual(original_meta_lot['lot']['lotMolWeight'], updated_meta_lot['lot']['lotMolWeight'], "Updating the salt should change the lot molecular weight")
     
-    @unittest.skip("ACAS-956: Skip this test for now because uniqueNotebook is false by default")
+    @pytest.mark.requires_config(**{'cmpdreg.serverSettings.uniqueNotebook': True})
     @requires_absent_basic_cmpd_reg_load
     def test_019_duplicate_notebook_page(self):
         NB_PAGE_1 = "NB-1234"

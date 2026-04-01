@@ -3009,8 +3009,10 @@ class TestAcasclient(BaseAcasClientTest):
     @requires_basic_cmpd_reg_load
     def test_057_get_protocol_expt_special_characters_in_names(self):
         """Test getting protocols and experiments with special characters in their names."""
-        protocol_name = "test/protocol.name !@#[%]$%^&*(special/chars)"
-        experiment_name = "test/experiment.name !@#[%]$%^&*(special/chars)"
+        # Define special characters to test - each character unique to avoid redundant searches
+        special_chars = "/. !@#[]%$^&*()"
+        protocol_name = f"test_protocol{special_chars}name"
+        experiment_name = f"test_experiment{special_chars}name"
         file_to_upload = get_basic_experiment_load_file(self.tempdir, protocol_name=protocol_name, experiment_name=experiment_name)
         response = self.client.\
             experiment_loader(file_to_upload, "bob", False)
@@ -3019,11 +3021,11 @@ class TestAcasclient(BaseAcasClientTest):
         # Search for the protocol by name
         res = self.client.protocol_search(protocol_name)
         self.assertEqual(len(res), 1)
-        # Search for the protocol by substring
-        for char in protocol_name:
+        # Search for the protocol by each special character
+        for char in special_chars:
             res = self.client.protocol_search(char)
             match = [x for x in res if x['codeName'] == protocol_code]
-            self.assertEqual(len(match), 1, f"Expected to find protocol when searching with any substring, but failed with {char}")
+            self.assertEqual(len(match), 1, f"Expected to find protocol when searching with special char, but failed with '{char}'")
         # Get the protocol by name
         res = self.client.get_protocols_by_label(protocol_name)
         self.assertEqual(len(res), 1)
@@ -3032,12 +3034,12 @@ class TestAcasclient(BaseAcasClientTest):
         # Filter out the ignored = True experiments
         res = [x for x in res if x['ignored'] is False]
         self.assertEqual(len(res), 1)
-        # Search for the experiment by substring
-        for char in experiment_name:
+        # Search for the experiment by each special character
+        for char in special_chars:
             res = self.client.experiment_search(char)
             res = [x for x in res if x['ignored'] is False]
             match = [x for x in res if x['codeName'] == expt_code]
-            self.assertEqual(len(match), 1, f"Expected to find experiment when searching with any substring, but failed with {char}")
+            self.assertEqual(len(match), 1, f"Expected to find experiment when searching with special char, but failed with '{char}'")
         # Get the experiment by name
         expt = self.client.get_experiment_by_name(experiment_name)
         res = [x for x in res if x['ignored'] is False]

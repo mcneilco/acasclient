@@ -26,12 +26,14 @@ ACAS API Client
 Releases
 --------
 To publish a new release of acasclient, run:
-```
-        export NEW_VERSION=X.Y.Z
-        bump2version part --new-version $NEW_VERSION
-        git tag $NEW_VERSION
-        git push origin tag $NEW_VERSION
-```
+
+.. code-block:: bash
+
+   export NEW_VERSION=X.Y.Z
+   bump2version part --new-version $NEW_VERSION
+   git tag $NEW_VERSION
+   git push origin tag $NEW_VERSION
+
 This will trigger a CI build that will publish the new version to PyPI if all tests pass.
 
 Features

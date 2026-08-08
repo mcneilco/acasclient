@@ -14,7 +14,7 @@ requirements = ['requests', 'pandas', 'six', 'decorator', 'openpyxl', 'xlrd'],
 
 setup_requirements = [ ]
 
-test_requirements = [ ]
+test_requirements = ['pytest']
 
 setup(
     author="Brian Bolt",

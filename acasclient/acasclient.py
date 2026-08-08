@@ -1127,10 +1127,7 @@ class client():
         """
         resp = self.session.get("{}/api/experiments/protocolCodename/{}".
                                 format(self.url, protocol_code))
-        if resp.status_code == 500:
-            return None
-        else:
-            resp.raise_for_status()
+        resp.raise_for_status()
         return resp.json()
 
     def get_experiment_by_name(self, experiment_name):

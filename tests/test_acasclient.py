@@ -1505,9 +1505,9 @@ class TestAcasclient(BaseAcasClientTest):
 
         self.assertEqual(experiments[0]["lsLabels"][0]["labelText"],
                          experiment["lsLabels"][0]["labelText"])
-        experiments = self.client.\
-            get_experiments_by_protocol_code("FAKECODE")
-        self.assertIsNone(experiments)
+        with self.assertRaises(requests.HTTPError) as context:
+            self.client.get_experiments_by_protocol_code("FAKECODE")
+        self.assertIn('404 Client Error: Not Found', str(context.exception))
 
         # Verify project restrictions work
         # Create a restricted project 

@@ -1420,7 +1420,7 @@ class TestAcasclient(BaseAcasClientTest):
             export_cmpd_search_results(search_results)
         self.assertIn('reportFilePath', search_results_export)
         self.assertIn('summary', search_results_export)
-        self.assertEquals(search_results_export['summary'], "Successfully exported 1 lots.")
+        self.assertEqual(search_results_export['summary'], "Successfully exported 1 lots.")
         search_results_export = self.client.\
             get_file(search_results_export['reportFilePath'])
 
@@ -1686,7 +1686,7 @@ class TestAcasclient(BaseAcasClientTest):
         bulk_load_files = self.client.get_cmpdreg_bulk_load_files()
         this_blf = [blf for blf in bulk_load_files if blf["id"] == registration_result["id"]][0]
         self.assertIn('originalFileName', this_blf)
-        self.assertEquals(this_blf['originalFileName'], sd_filename)
+        self.assertEqual(this_blf['originalFileName'], sd_filename)
 
         # purge the bulk load file
         results = self.client.\
@@ -1696,7 +1696,7 @@ class TestAcasclient(BaseAcasClientTest):
         self.assertIn('success', results)
         self.assertTrue(results['success'])
         self.assertIn('originalFileName', results)
-        self.assertEquals(results['originalFileName'], sd_filename)
+        self.assertEqual(results['originalFileName'], sd_filename)
 
     @requires_basic_experiment_load
     def test_025_delete_experiment(self, experiment):
@@ -1995,7 +1995,7 @@ class TestAcasclient(BaseAcasClientTest):
         # Should return more than 0 lots
         all_lots_for_project = self.client.get_all_lots([all_lots[0]['project']])
         self.assertGreater(len(all_lots_for_project), 0)
-        self.assertEquals(all_lots_for_project[0]['project'], all_lots[0]['project'])
+        self.assertEqual(all_lots_for_project[0]['project'], all_lots[0]['project'])
 
         # Should return 0 lots
         all_lots_for_project = self.client.get_all_lots(['FAKEPROJECT'])
@@ -3958,7 +3958,7 @@ class TestCmpdReg(BaseAcasClientTest):
         # Get aliases
         aliases = self.client.get_parent_aliases(corp_name)
         self.assertEqual(len(aliases), 1)
-        self.assertEquals(aliases[0], alias_1)
+        self.assertEqual(aliases[0], alias_1)
 
         # Get parent alias kinds
         alias_type, alias_kind = self.get_first_parent_alias_type_kind()
@@ -3982,7 +3982,7 @@ class TestCmpdReg(BaseAcasClientTest):
         self.client.set_parent_aliases(corp_name, [test_alias])
         aliases = self.client.get_parent_aliases(corp_name)
         self.assertEqual(len(aliases), 1)
-        self.assertEquals(aliases[0], test_alias)
+        self.assertEqual(aliases[0], test_alias)
     
     @requires_absent_basic_cmpd_reg_load
     def test_008_register_second_lots(self):
@@ -4082,22 +4082,22 @@ class TestCmpdReg(BaseAcasClientTest):
             validation_status, validation_resp = self.client.edit_parent(parent, dry_run=True)
             # Confirm validation response mentions the lot
             self.assertTrue(validation_status)
-            self.assertEquals(len(validation_resp), 1)
-            self.assertEquals(validation_resp[0]['code'], 'CMPD-0000001-001')
-            self.assertEquals(validation_resp[0]['name'], 'CMPD-0000001-001')
+            self.assertEqual(len(validation_resp), 1)
+            self.assertEqual(validation_resp[0]['code'], 'CMPD-0000001-001')
+            self.assertEqual(validation_resp[0]['name'], 'CMPD-0000001-001')
             # TODO Get this working reliably and uncomment it
             # Commit the edit
             edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
             # Confirm edit response mentions the lot
             self.assertTrue(edit_status)
-            self.assertEquals(len(edit_resp), 1)
-            self.assertEquals(edit_resp[0]['code'], 'CMPD-0000001-001')
-            self.assertEquals(edit_resp[0]['name'], 'CMPD-0000001-001')
+            self.assertEqual(len(edit_resp), 1)
+            self.assertEqual(edit_resp[0]['code'], 'CMPD-0000001-001')
+            self.assertEqual(edit_resp[0]['name'], 'CMPD-0000001-001')
             # Get the parent again and check out changes were made
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
-            self.assertEquals(parent['stereoComment'], TEST_STEREO_COMMENT)
-            self.assertEquals(parent['stereoCategory']['code'], TEST_STEREO_CAT_CODE)
+            self.assertEqual(parent['stereoComment'], TEST_STEREO_COMMENT)
+            self.assertEqual(parent['stereoCategory']['code'], TEST_STEREO_CAT_CODE)
             # Confirm a non-admin cannot attempt a dry run edit
             # with self.assertRaises(requests.HTTPError) as context:
             #     cmpdreg_user.edit_parent(parent, dry_run=True)
@@ -4116,8 +4116,8 @@ class TestCmpdReg(BaseAcasClientTest):
             # Confirm attributes are back to as they were before
             meta_lot = self.client.get_meta_lot('CMPD-0000001-001')
             parent = meta_lot['lot']['parent']
-            self.assertEquals(parent['stereoComment'], ORIG_STEREO_COMMENT)
-            self.assertEquals(parent['stereoCategory']['code'], ORIG_STEREO_CAT_CODE)
+            self.assertEqual(parent['stereoComment'], ORIG_STEREO_COMMENT)
+            self.assertEqual(parent['stereoCategory']['code'], ORIG_STEREO_CAT_CODE)
             # Edit structure to match parent 2
             # This should result in a duplicate, and thus be blocked
             parent['molStructure'] = CMPD_2_STRUCTURE
@@ -4125,15 +4125,15 @@ class TestCmpdReg(BaseAcasClientTest):
             validation_status, validation_resp = self.client.edit_parent(parent, dry_run=True)
             self.assertFalse(validation_status)
             self.assertFalse(validation_resp['parentUnique'])
-            self.assertEquals(len(validation_resp['dupeParents']), 1)
-            self.assertEquals(validation_resp['dupeParents'][0]['corpName'], 'CMPD-0000002')
+            self.assertEqual(len(validation_resp['dupeParents']), 1)
+            self.assertEqual(validation_resp['dupeParents'][0]['corpName'], 'CMPD-0000002')
             # Attempt non-dryrun (should fail)
             edit_status, edit_resp = self.client.edit_parent(parent, dry_run=False)
             self.assertFalse(edit_status)
             self.assertFalse(edit_status)
             self.assertFalse(edit_resp['parentUnique'])
-            self.assertEquals(len(edit_resp['dupeParents']), 1)
-            self.assertEquals(edit_resp['dupeParents'][0]['corpName'], 'CMPD-0000002')
+            self.assertEqual(len(edit_resp['dupeParents']), 1)
+            self.assertEqual(edit_resp['dupeParents'][0]['corpName'], 'CMPD-0000002')
         finally:
             # Prevent interaction with other tests.
             self.delete_all_cmpd_reg_bulk_load_files()
@@ -4194,14 +4194,14 @@ class TestCmpdReg(BaseAcasClientTest):
         # CMPD-0000010 should have one alias
         meta_lot = self.client.get_meta_lot('CMPD-0000010-001')
         parent = meta_lot["lot"]["saltForm"]["parent"]
-        self.assertEquals(1, len(parent['parentAliases']))
+        self.assertEqual(1, len(parent['parentAliases']))
         # CMPD-0000011 and CMPD-0000012 should have zero aliases
         meta_lot = self.client.get_meta_lot('CMPD-0000011-001')
         parent = meta_lot["lot"]["saltForm"]["parent"]
-        self.assertEquals(0, len(parent['parentAliases']))
+        self.assertEqual(0, len(parent['parentAliases']))
         meta_lot = self.client.get_meta_lot('CMPD-0000012-001')
         parent = meta_lot["lot"]["saltForm"]["parent"]
-        self.assertEquals(0, len(parent['parentAliases']))
+        self.assertEqual(0, len(parent['parentAliases']))
     
     @requires_absent_basic_cmpd_reg_load
     def test_011_max_auto_lot_number(self):
